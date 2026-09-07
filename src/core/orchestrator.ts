@@ -10,8 +10,22 @@ import type {
   GrillingAnswer,
   GrillingQuestion,
 } from './grilling.ts';
-import type { Finding, Implementation, PipelineResult, Plan } from './types.ts';
+import type {
+  Finding,
+  FindingSource,
+  Implementation,
+  PipelineResult,
+  Plan,
+  SourcedFinding,
+} from './types.ts';
 import { hasBlockingFindings } from './types.ts';
+
+const SEVERITY_ORDER = {
+  Low: 0,
+  Medium: 1,
+  High: 2,
+  Critical: 3,
+} as const;
 
 /** A role transition emitted by the in-memory pipeline to its host UI. */
 export interface PipelineStageEvent {
@@ -23,7 +37,12 @@ export interface PipelineStageEvent {
     | 'verifier'
     | 'fixer'
     | 'pipeline';
-  readonly status: 'started' | 'awaiting-input' | 'completed' | 'failed';
+  readonly status:
+    | 'started'
+    | 'awaiting-input'
+    | 'completed'
+    | 'failed'
+    | 'cancelled';
   readonly taskId?: string;
   readonly round?: number;
 }
@@ -45,7 +64,6 @@ export interface OrchestratorOptions {
   readonly griller?: GrillingAgent;
   readonly onStage?: PipelineObserver;
   readonly maxFixPasses?: number;
-  readonly maxGrillingRounds?: number;
 }
 
 /** Caller-owned interaction for one batch of product or scope decisions. */
@@ -57,7 +75,6 @@ export type GrillingAnswerer = (
 export class SideroomOrchestrator {
   private readonly options: OrchestratorOptions & {
     readonly maxFixPasses: number;
-    readonly maxGrillingRounds: number;
   };
 
   constructor(options: OrchestratorOptions) {
@@ -65,11 +82,7 @@ export class SideroomOrchestrator {
     if (!Number.isInteger(maxFixPasses) || maxFixPasses < 1) {
       throw new Error('maxFixPasses must be an integer of at least 1');
     }
-    const maxGrillingRounds = options.maxGrillingRounds ?? 8;
-    if (!Number.isInteger(maxGrillingRounds) || maxGrillingRounds < 1) {
-      throw new Error('maxGrillingRounds must be an integer of at least 1');
-    }
-    this.options = { ...options, maxFixPasses, maxGrillingRounds };
+    this.options = { ...options, maxFixPasses };
   }
 
   /** Plan, implement, review, verify, and repair in the caller's project directory. */
@@ -79,7 +92,7 @@ export class SideroomOrchestrator {
   ): Promise<PipelineResult> {
     let implementations: readonly Implementation[] = [];
     let plan: Plan | undefined;
-    let findings: readonly Finding[] = [];
+    let findings: readonly SourcedFinding[] = [];
     try {
       const settledRequest = await this.settleRequest(request, answerQuestions);
       this.report({ phase: 'planner', status: 'started' });
@@ -113,12 +126,9 @@ export class SideroomOrchestrator {
         ]);
         this.report({ phase: 'reviewer', status: 'completed' });
         this.report({ phase: 'verifier', status: 'completed' });
-        findings = validateFindings(
-          mergeFindings(
-            validateFindings(review, 'reviewer stage'),
-            validateFindings(verification, 'verifier stage'),
-          ),
-          'quality gate',
+        findings = mergeFindings(
+          validateFindings(review, 'reviewer stage'),
+          validateFindings(verification, 'verifier stage'),
         );
         if (!hasBlockingFindings(findings)) {
           return {
@@ -129,11 +139,13 @@ export class SideroomOrchestrator {
             summary: 'Completed with no blocking findings.',
           };
         }
-        if (pass === this.options.maxFixPasses) break;
+        if (pass === this.options.maxFixPasses) {
+          break;
+        }
         this.report({ phase: 'fixer', status: 'started' });
         await this.options.fixer.run({
           implementation: combined,
-          findings: validateFindings(findings, 'fixer input'),
+          findings,
         });
         this.report({ phase: 'fixer', status: 'completed' });
       }
@@ -145,13 +157,21 @@ export class SideroomOrchestrator {
         summary: 'Blocking findings remain after the configured fixer passes.',
       };
     } catch (error) {
-      this.report({ phase: 'pipeline', status: 'failed' });
+      const cancelled = error instanceof Error && error.name === 'AbortError';
+      this.report({
+        phase: 'pipeline',
+        status: cancelled ? 'cancelled' : 'failed',
+      });
       return {
-        status: 'failed',
+        status: cancelled ? 'cancelled' : 'failed',
         ...(plan === undefined ? {} : { plan }),
         implementations,
         findings,
-        summary: error instanceof Error ? error.message : String(error),
+        summary: cancelled
+          ? 'Sideroom run cancelled.'
+          : error instanceof Error
+            ? error.message
+            : String(error),
       };
     }
   }
@@ -162,11 +182,13 @@ export class SideroomOrchestrator {
     answerQuestions: GrillingAnswerer | undefined,
   ): Promise<string> {
     const griller = this.options.griller;
-    if (griller === undefined) return request;
+    if (griller === undefined) {
+      return request;
+    }
 
     let answers: readonly GrillingAnswer[] = [];
-    for (let round = 0; round < this.options.maxGrillingRounds; round += 1) {
-      const roundNumber = round + 1;
+    let roundNumber = 1;
+    for (;;) {
       this.report({
         phase: 'grilling',
         status: 'started',
@@ -186,23 +208,34 @@ export class SideroomOrchestrator {
         status: 'awaiting-input',
         round: roundNumber,
       });
-      if (answerQuestions === undefined) {
-        throw new Error(
-          'Grilling needs user decisions; run sideroom in an interactive terminal.',
-        );
-      }
-      const roundAnswers = await answerQuestions(result.questions);
-      if (roundAnswers === undefined) {
-        throw new Error(
-          'Grilling was cancelled before the design was settled.',
-        );
-      }
+      const roundAnswers = await this.answersForRound(
+        result.questions,
+        answerQuestions,
+      );
       assertAnswersCoverQuestions(result.questions, roundAnswers);
       answers = [...answers, ...roundAnswers];
+      roundNumber += 1;
     }
-    throw new Error(
-      'Grilling exceeded the configured maximum number of rounds.',
-    );
+  }
+
+  private async answersForRound(
+    questions: readonly GrillingQuestion[],
+    answerQuestions: GrillingAnswerer | undefined,
+  ): Promise<readonly GrillingAnswer[]> {
+    if (answerQuestions === undefined) {
+      return questions.map((question) => ({
+        id: question.id,
+        answer: question.recommendation,
+      }));
+    }
+    const provided = await answerQuestions(questions);
+    if (provided === undefined) {
+      return questions.map((question) => ({
+        id: question.id,
+        answer: question.recommendation,
+      }));
+    }
+    return provided;
   }
 
   private report(event: PipelineStageEvent): void {
@@ -246,16 +279,41 @@ function combineImplementation(
 function mergeFindings(
   review: readonly Finding[],
   verification: readonly Finding[],
-): readonly Finding[] {
-  const unique = new Map<string, Finding>();
-  for (const finding of [...review, ...verification]) {
-    unique.set(
-      `${finding.fileLine}|${finding.rule}|${finding.description}`,
-      finding,
-    );
-  }
+): readonly SourcedFinding[] {
+  const unique = new Map<string, SourcedFinding>();
+  addFindings(unique, review, 'reviewer');
+  addFindings(unique, verification, 'verifier');
   return [...unique.values()].map((finding, index) => ({
     ...finding,
     number: index + 1,
   }));
+}
+
+function addFindings(
+  unique: Map<string, SourcedFinding>,
+  findings: readonly Finding[],
+  source: FindingSource,
+): void {
+  for (const finding of findings) {
+    const key = `${finding.fileLine}|${finding.rule}|${finding.description}`;
+    const existing = unique.get(key);
+    if (existing === undefined) {
+      unique.set(key, { ...finding, sources: [source] });
+      continue;
+    }
+    unique.set(key, {
+      ...existing,
+      severity: higherSeverity(existing.severity, finding.severity),
+      sources: existing.sources.includes(source)
+        ? existing.sources
+        : [...existing.sources, source],
+    });
+  }
+}
+
+function higherSeverity(
+  left: Finding['severity'],
+  right: Finding['severity'],
+): Finding['severity'] {
+  return SEVERITY_ORDER[left] >= SEVERITY_ORDER[right] ? left : right;
 }

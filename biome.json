@@ -1,7 +1,12 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.11/schema.json",
   "files": {
-    "includes": ["src/**/*.ts", "package.json", "biome.json"],
+    "includes": [
+      "src/**/*.ts",
+      "scripts/**/*.mjs",
+      "package.json",
+      "biome.json"
+    ],
     "ignoreUnknown": true
   },
   "formatter": {
@@ -12,7 +17,10 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "preset": "recommended"
+      "preset": "recommended",
+      "style": {
+        "useBlockStatements": "error"
+      }
     }
   },
   "javascript": {

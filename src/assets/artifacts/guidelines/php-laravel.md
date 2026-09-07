@@ -8,6 +8,7 @@ and Laravel's testing conventions. The shared baseline remains mandatory.
 
 | Do | Don't |
 | --- | --- |
+| Use braces around every `if` body | Write an unbraced conditional body |
 | Guard invalid input early | Nest the happy path in `if/else` pyramids |
 | Throw precise exceptions | Fall back to a default that hides bad state |
 | Keep controller, use case, and infrastructure separate | Validate, persist, and notify in one method |
@@ -26,12 +27,23 @@ The discount example stays flat.
 ```php
 function getDiscount(?User $user): float
 {
-    if ($user === null) return 0.0;
-    if (! $user->isActive()) return 0.0;
-    if (! $user->hasSubscription()) return 0.0;
+    if ($user === null) {
+        return 0.0;
+    }
+    if (! $user->isActive()) {
+        return 0.0;
+    }
+    if (! $user->hasSubscription()) {
+        return 0.0;
+    }
     return 0.2;
 }
 ```
+
+### Braced conditionals
+
+Wrap every `if` and `else` body in braces, even for a one-line guard clause.
+Keep the body and closing brace on their own lines.
 
 ### Fail fast
 
@@ -41,7 +53,9 @@ Do not silently choose a default shipping zone.
 function shippingCost(string $zoneId, ZoneRepository $zones): int
 {
     $zone = $zones->find($zoneId);
-    if ($zone === null) throw new DomainException("Unknown zoneId: {$zoneId}");
+    if ($zone === null) {
+        throw new DomainException("Unknown zoneId: {$zoneId}");
+    }
     return $zone->baseCost();
 }
 ```
@@ -185,7 +199,9 @@ Use a backed enum for the order state scenario.
 
 ```php
 enum OrderStatus: string { case PendingPayment = 'pending_payment'; case Paid = 'paid'; }
-if ($order->status === OrderStatus::PendingPayment) { $payments->request($order); }
+if ($order->status === OrderStatus::PendingPayment) {
+    $payments->request($order);
+}
 ```
 
 ### SOLID

@@ -16,8 +16,8 @@ import {
   getPackagedSkill,
   getPackageRoot,
 } from '../core/catalog.ts';
+import type { FilePolicy } from '../core/language-policy.ts';
 import type { ModelProvider, ModelRequest } from '../core/model.ts';
-import type { Language } from '../core/types.ts';
 
 /** Minimal Pi session shape; keeping this seam avoids live model calls in tests. */
 export interface PiSession {
@@ -43,10 +43,11 @@ export type PiSessionFactory = (
 /** Pi runtime configuration. This is the only executable harness today. */
 export interface PiRuntimeOptions {
   readonly dir: string;
-  readonly language: Language;
+  readonly policies: readonly FilePolicy[];
   readonly model?: string;
   readonly timeoutMs?: number;
   readonly allowWrite?: boolean;
+  readonly signal?: AbortSignal;
   readonly modelRuntime?: ModelRuntime;
   readonly createSession?: PiSessionFactory;
 }
@@ -60,7 +61,9 @@ export function piToolsFor(
   allowWrite: boolean,
   platform = process.platform,
 ): readonly string[] {
-  if (role.readonly || !allowWrite) return READONLY_TOOLS;
+  if (role.readonly || !allowWrite) {
+    return READONLY_TOOLS;
+  }
   return [
     'read',
     platform === 'win32' ? 'powershell' : 'bash',
@@ -79,9 +82,10 @@ export function createPiModelProvider(
   assertTargetDirectory(options.dir);
   let runtimePromise: Promise<ModelRuntime> | undefined;
   const runtime = (): Promise<ModelRuntime> => {
-    if (options.modelRuntime !== undefined)
+    if (options.modelRuntime !== undefined) {
       return Promise.resolve(options.modelRuntime);
-    runtimePromise ??= ModelRuntime.create();
+    }
+    runtimePromise ??= ModelRuntime.create({ signal: options.signal });
     return runtimePromise;
   };
   const createSession =
@@ -99,20 +103,34 @@ export function createPiModelProvider(
         systemPrompt: systemPromptFor(
           request.agent,
           role,
-          options.language,
+          options.policies,
           options.allowWrite !== false,
           options.dir,
           request.skill,
         ),
       });
-      const timeout = setTimeout(() => {
-        void session.abort().catch(reportAbortFailure);
-      }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+      const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      const deadline = new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => {
+          void session.abort().catch(reportAbortFailure);
+          reject(new Error(`Pi session timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      });
       try {
-        await session.prompt(buildTaskPrompt(request));
-        return parseJsonResponse(finalPiText(session.messages)) as T;
+        await Promise.race([
+          promptWithCancellation(
+            session,
+            buildTaskPrompt(request),
+            options.signal,
+          ),
+          deadline,
+        ]);
+        return parseJsonResponse<T>(finalPiText(session.messages));
       } finally {
-        clearTimeout(timeout);
+        if (timeout !== undefined) {
+          clearTimeout(timeout);
+        }
         session.dispose();
       }
     },
@@ -139,12 +157,12 @@ function assertTargetDirectory(directory: string): void {
 function systemPromptFor(
   agent: ModelRequest['agent'],
   role: { readonly readonly: boolean },
-  language: Language,
+  policies: readonly FilePolicy[],
   allowWrite: boolean,
   directory: string,
   skill: ModelRequest['skill'],
 ): string {
-  const sections = [buildSystemPrompt(agent, language)];
+  const sections = [buildSystemPrompt(agent, policies)];
   if (skill !== undefined) {
     sections.push(`## Packaged skill: ${skill}`, getPackagedSkill(skill));
   }
@@ -235,36 +253,39 @@ function createIsolatedSettings(directory: string): SettingsManager {
 }
 
 function resolveModel(model: string | undefined, runtime: ModelRuntime) {
-  if (model === undefined)
+  if (model === undefined) {
     return { model: undefined, thinkingLevel: undefined };
+  }
   const resolved = resolveCliModel({ cliModel: model, modelRuntime: runtime });
-  if (resolved.error !== undefined)
+  if (resolved.error !== undefined) {
     throw new Error(`Pi model ${model}: ${resolved.error}`);
+  }
   return resolved;
 }
 
 /** Extract text from Pi's final assistant message. */
 export function finalPiText(messages: readonly unknown[]): string {
-  let lastError: string | undefined;
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index];
-    if (
-      !isRecord(message) ||
-      message.role !== 'assistant' ||
-      !Array.isArray(message.content)
-    )
+    if (!isRecord(message) || message.role !== 'assistant') {
       continue;
-    if (typeof message.errorMessage === 'string')
-      lastError = message.errorMessage;
+    }
+    if (typeof message.errorMessage === 'string') {
+      throw new Error(`Pi assistant failed: ${message.errorMessage}`);
+    }
+    if (!Array.isArray(message.content)) {
+      throw new Error('Pi returned no final assistant text');
+    }
     const text = message.content.flatMap((part) =>
       isRecord(part) && part.type === 'text' && typeof part.text === 'string'
         ? [part.text]
         : [],
     );
-    if (text.length > 0) return text.join('');
+    if (text.length > 0) {
+      return text.join('');
+    }
+    throw new Error('Pi returned no final assistant text');
   }
-  if (lastError !== undefined)
-    throw new Error(`Pi assistant failed: ${lastError}`);
   throw new Error('Pi returned no final assistant text');
 }
 
@@ -293,9 +314,13 @@ function loadTargetProjectInstructions(directory: string): string {
 function findProjectRoot(directory: string): string {
   let current = path.resolve(directory);
   while (true) {
-    if (existsSync(path.join(current, '.git'))) return current;
+    if (existsSync(path.join(current, '.git'))) {
+      return current;
+    }
     const parent = path.dirname(current);
-    if (parent === current) return path.resolve(directory);
+    if (parent === current) {
+      return path.resolve(directory);
+    }
     current = parent;
   }
 }
@@ -305,9 +330,13 @@ function directoriesFrom(root: string, directory: string): readonly string[] {
   let current = directory;
   while (true) {
     result.unshift(current);
-    if (current === root) return result;
+    if (current === root) {
+      return result;
+    }
     const parent = path.dirname(current);
-    if (parent === current) return [directory];
+    if (parent === current) {
+      return [directory];
+    }
     current = parent;
   }
 }
@@ -323,9 +352,13 @@ function readInstructionFile(
     'CLAUDE.MD',
   ]) {
     const file = path.join(directory, name);
-    if (!existsSync(file)) continue;
+    if (!existsSync(file)) {
+      continue;
+    }
     try {
-      if (!statSync(file).isFile()) continue;
+      if (!statSync(file).isFile()) {
+        continue;
+      }
       return [{ file, content: readFileSync(file, 'utf8') }];
     } catch {
       return [];
@@ -334,10 +367,10 @@ function readInstructionFile(
   return [];
 }
 
-function parseJsonResponse(text: string): unknown {
+function parseJsonResponse<T>(text: string): T {
   const trimmed = text.trim();
   try {
-    return JSON.parse(trimmed) as unknown;
+    return JSON.parse(trimmed) as T;
   } catch (initialError) {
     const fenced = /```(?:json)?\s*([\s\S]*?)```/g;
     let match = fenced.exec(trimmed);
@@ -348,7 +381,7 @@ function parseJsonResponse(text: string): unknown {
     }
     if (candidate !== undefined) {
       try {
-        return JSON.parse(candidate) as unknown;
+        return JSON.parse(candidate) as T;
       } catch (fencedError) {
         throw new Error('Pi response was not valid JSON', {
           cause: fencedError,
@@ -357,6 +390,48 @@ function parseJsonResponse(text: string): unknown {
     }
     throw new Error('Pi response was not valid JSON', { cause: initialError });
   }
+}
+
+async function promptWithCancellation(
+  session: PiSession,
+  prompt: string,
+  signal: AbortSignal | undefined,
+): Promise<void> {
+  if (signal === undefined) {
+    await session.prompt(prompt);
+    return;
+  }
+  if (signal.aborted) {
+    await session.abort().catch(reportAbortFailure);
+    throw abortError(signal);
+  }
+  await new Promise<void>((resolve, reject) => {
+    const abort = (): void => {
+      void session.abort().catch(reportAbortFailure);
+      reject(abortError(signal));
+    };
+    signal.addEventListener('abort', abort, { once: true });
+    void session.prompt(prompt).then(
+      () => {
+        signal.removeEventListener('abort', abort);
+        resolve();
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', abort);
+        reject(error);
+      },
+    );
+  });
+}
+
+function abortError(signal: AbortSignal): Error {
+  const error = new Error(
+    typeof signal.reason === 'string'
+      ? signal.reason
+      : 'Sideroom run cancelled.',
+  );
+  error.name = 'AbortError';
+  return error;
 }
 
 function reportAbortFailure(error: unknown): void {

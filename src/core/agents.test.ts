@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createVerifier } from './agents.ts';
+import { createReviewer, createVerifier } from './agents.ts';
 import type { ModelRequest } from './model.ts';
 
 const QUALITY_INPUT = {
@@ -13,7 +13,11 @@ const QUALITY_INPUT = {
   plan: 'Implement the order flow.',
 };
 
-test('verifier validates its serialized findings contract', async () => {
+test('reviewer and verifier emit ordinary unsourced candidate findings', async () => {
+  const reviewer = createReviewer({
+    generate: async <T>(_request: ModelRequest) =>
+      'FINDING 1 | High | src/orders.ts:12 | Fail fast | Reject invalid order identifiers.' as T,
+  });
   const verifier = createVerifier({
     generate: async <T>(_request: ModelRequest) =>
       ({
@@ -23,10 +27,22 @@ test('verifier validates its serialized findings contract', async () => {
       }) as T,
   });
 
-  const findings = await verifier.run(QUALITY_INPUT);
+  const [reviewFindings, verificationFindings] = await Promise.all([
+    reviewer.run(QUALITY_INPUT),
+    verifier.run(QUALITY_INPUT),
+  ]);
+  const expected = [
+    {
+      number: 1,
+      severity: 'High',
+      fileLine: 'src/orders.ts:12',
+      rule: 'Fail fast',
+      description: 'Reject invalid order identifiers.',
+    },
+  ];
 
-  assert.equal(findings.length, 1);
-  assert.equal(findings[0]?.severity, 'High');
+  assert.deepEqual(reviewFindings, expected);
+  assert.deepEqual(verificationFindings, expected);
 });
 
 test('verifier rejects a non-string findings field at its output boundary', async () => {

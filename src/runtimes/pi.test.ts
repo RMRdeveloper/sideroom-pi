@@ -10,14 +10,17 @@ import {
   piToolsFor,
 } from './pi.ts';
 
-test('uses an isolated Pi session with the selected language policy', async () => {
+test('uses an isolated Pi session with the confirmed file-policy map', async () => {
   const calls: Array<{
     readonly systemPrompt: string;
     readonly tools: readonly string[];
   }> = [];
   const provider = createPiModelProvider({
     dir: process.cwd(),
-    language: 'java',
+    policies: [
+      { file: 'README.md', policy: 'shared' },
+      { file: 'src/App.java', policy: 'java' },
+    ],
     createSession: async (options) => {
       calls.push(options);
       return {
@@ -47,6 +50,8 @@ test('uses an isolated Pi session with the selected language policy', async () =
 
   assert.equal(result.summary, 'done');
   assert.match(calls[0]?.systemPrompt ?? '', /Java Coding Guidelines/);
+  assert.match(calls[0]?.systemPrompt ?? '', /Shared-only entries: README\.md/);
+  assert.match(calls[0]?.systemPrompt ?? '', /src\/App\.java/);
   assert.match(
     calls[0]?.systemPrompt ?? '',
     /Mandatory write-gate enforcement/,
@@ -83,7 +88,7 @@ test('loads only the skills packaged by Sideroom', async () => {
       .skills.map((skill) => skill.name)
       .sort(),
     [
-      'sideroom-critic',
+      'sideroom-domain-modeling',
       'sideroom-grilling',
       'sideroom-spec',
       'sideroom-transcribe-audio',
@@ -104,16 +109,51 @@ test('rejects an unavailable target directory before creating a session', () => 
     () =>
       createPiModelProvider({
         dir: `${process.cwd()}/missing-sideroom`,
-        language: 'typescript',
+        policies: [{ file: 'src/app.ts', policy: 'typescript' }],
       }),
     /Pi target directory is unavailable/,
   );
 });
 
-test('preserves an assistant error when Pi returns no text', () => {
+test('rejects a timed-out prompt and disposes its session', async () => {
+  let aborts = 0;
+  let disposals = 0;
+  const provider = createPiModelProvider({
+    dir: process.cwd(),
+    policies: [{ file: 'src/app.ts', policy: 'typescript' }],
+    timeoutMs: 20,
+    createSession: async () => ({
+      messages: [],
+      prompt: async () => new Promise<void>(() => undefined),
+      abort: async () => {
+        aborts += 1;
+      },
+      dispose: () => {
+        disposals += 1;
+      },
+    }),
+  });
+
+  await assert.rejects(
+    provider.generate({
+      agent: 'sideroom-planner',
+      input: { request: 'Update src/app.ts.' },
+      schema: '{ summary: string }',
+    }),
+    /Pi session timed out after 20ms/,
+  );
+  assert.equal(aborts, 1);
+  assert.equal(disposals, 1);
+});
+
+test('rejects a final assistant error instead of returning earlier text', () => {
   assert.throws(
     () =>
       finalPiText([
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: '{"summary":"stale"}' }],
+        },
         {
           role: 'assistant',
           content: [],

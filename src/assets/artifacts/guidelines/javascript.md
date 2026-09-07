@@ -9,6 +9,7 @@ code-writing operation.
 
 | Do | Don't |
 | --- | --- |
+| Use braces around every `if` body | Write an unbraced conditional body |
 | Exit invalid paths early | Bury the happy path in nested `if/else` blocks |
 | Throw on broken invariants | Substitute defaults that hide corrupted state |
 | Separate validation, transformation, persistence, and notification | Put unrelated responsibilities in one function |
@@ -27,7 +28,9 @@ code-writing operation.
 function getDiscount(user) {
   if (user) {
     if (user.isActive) {
-      if (user.hasSubscription) return 0.2;
+      if (user.hasSubscription) {
+        return 0.2;
+      }
     }
   }
   return 0;
@@ -35,12 +38,23 @@ function getDiscount(user) {
 
 // Good — flat and explicit
 function getDiscount(user) {
-  if (!user) return 0;
-  if (!user.isActive) return 0;
-  if (!user.hasSubscription) return 0;
+  if (!user) {
+    return 0;
+  }
+  if (!user.isActive) {
+    return 0;
+  }
+  if (!user.hasSubscription) {
+    return 0;
+  }
   return 0.2;
 }
 ```
+
+### Braced conditionals
+
+Wrap every `if` and `else` body in braces, even when it contains one guard
+clause. Biome enforces this with `style/useBlockStatements`.
 
 ### Fail fast
 
@@ -53,7 +67,9 @@ function getShippingCost(order) {
 // Good — preserve the violated invariant
 function getShippingCost(order) {
   const zone = ZONES[order.zoneId];
-  if (!zone) throw new Error(`Unknown zoneId: ${order.zoneId}`);
+  if (!zone) {
+    throw new Error(`Unknown zoneId: ${order.zoneId}`);
+  }
   return zone.baseCost;
 }
 ```
@@ -66,7 +82,9 @@ their responsibilities.
 
 ```js
 function validateUser(data) {
-  if (!data.email) throw new Error('email required');
+  if (!data.email) {
+    throw new Error('email required');
+  }
 }
 function normalizeUser(data) {
   return { ...data, email: data.email.trim().toLowerCase() };
@@ -87,7 +105,9 @@ not because two unrelated strings happen to be trimmed the same way.
 ```js
 const TICKET_STATUS = Object.freeze({ OPEN: 'open', CLOSED: 'closed' });
 function normalizeTicketStatus(value) {
-  if (Object.values(TICKET_STATUS).includes(value)) return value;
+  if (Object.values(TICKET_STATUS).includes(value)) {
+    return value;
+  }
   throw new Error(`Unknown ticket status: ${value}`);
 }
 ```

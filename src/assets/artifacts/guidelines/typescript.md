@@ -8,6 +8,7 @@ TypeScript. The shared baseline remains mandatory.
 
 | Do | Don't |
 | --- | --- |
+| Use braces around every `if` body | Write an unbraced conditional body |
 | Early return on bad input | Pyramid `if/else` nesting |
 | Explicit error, fail now | Fallbacks that hide a broken invariant |
 | One responsibility per unit | Validate, transform, persist, and notify together |
@@ -26,18 +27,35 @@ Keep the same discount scenario flat and typed.
 ```ts
 // Bad
 function getDiscount(user?: { active: boolean; subscriber: boolean }): number {
-  if (user) { if (user.active) { if (user.subscriber) return 0.2; } }
+  if (user) {
+    if (user.active) {
+      if (user.subscriber) {
+        return 0.2;
+      }
+    }
+  }
   return 0;
 }
 
 // Good
 function getDiscount(user?: { active: boolean; subscriber: boolean }): number {
-  if (!user) return 0;
-  if (!user.active) return 0;
-  if (!user.subscriber) return 0;
+  if (!user) {
+    return 0;
+  }
+  if (!user.active) {
+    return 0;
+  }
+  if (!user.subscriber) {
+    return 0;
+  }
   return 0.2;
 }
 ```
+
+### Braced conditionals
+
+Use braces for every `if` and `else` body, including one-line guard clauses.
+Biome enforces this with `style/useBlockStatements`.
 
 ### Fail fast
 
@@ -47,7 +65,9 @@ Never substitute a default zone for an impossible domain key.
 const zones: Record<string, { baseCost: number }> = { local: { baseCost: 5 } };
 function shippingCost(zoneId: string): number {
   const zone = zones[zoneId];
-  if (zone === undefined) throw new Error(`Unknown zoneId: ${zoneId}`);
+  if (zone === undefined) {
+    throw new Error(`Unknown zoneId: ${zoneId}`);
+  }
   return zone.baseCost;
 }
 ```
@@ -59,7 +79,9 @@ Split validation, normalization, persistence, and notification.
 ```ts
 function normalizeEmail(email: string): string { return email.trim().toLowerCase(); }
 async function createUser(email: string, users: UserRepository, mailer: Mailer): Promise<void> {
-  if (email.length === 0) throw new Error('email required');
+  if (email.length === 0) {
+    throw new Error('email required');
+  }
   const user = await users.insert({ email: normalizeEmail(email) });
   await mailer.send(user.email, 'welcome');
 }
@@ -73,7 +95,9 @@ abstraction; three identical ticket-status normalizations are.
 ```ts
 type TicketStatus = 'open' | 'closed';
 function normalizeTicketStatus(value: string): TicketStatus {
-  if (value === 'open' || value === 'closed') return value;
+  if (value === 'open' || value === 'closed') {
+    return value;
+  }
   throw new Error(`Unknown ticket status: ${value}`);
 }
 ```
@@ -199,7 +223,9 @@ Name order states once and reuse their contract.
 
 ```ts
 const ORDER_STATUS = { pendingPayment: 'pending_payment', paid: 'paid' } as const;
-if (order.status === ORDER_STATUS.pendingPayment) await requestPayment(order);
+if (order.status === ORDER_STATUS.pendingPayment) {
+  await requestPayment(order);
+}
 ```
 
 ### SOLID

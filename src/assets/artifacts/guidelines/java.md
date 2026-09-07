@@ -8,6 +8,7 @@ and layered application boundaries. The shared baseline remains mandatory.
 
 | Do | Don't |
 | --- | --- |
+| Use braces around every `if` body | Write an unbraced conditional body |
 | Guard invalid input early | Bury happy paths in nested `if/else` branches |
 | Throw a precise exception now | Substitute a default and hide invalid state |
 | Give a class one responsibility | Validate, transform, persist, and notify together |
@@ -25,12 +26,23 @@ The discount example keeps the happy path shallow.
 
 ```java
 double getDiscount(User user) {
-    if (user == null) return 0.0;
-    if (!user.active()) return 0.0;
-    if (!user.hasSubscription()) return 0.0;
+    if (user == null) {
+        return 0.0;
+    }
+    if (!user.active()) {
+        return 0.0;
+    }
+    if (!user.hasSubscription()) {
+        return 0.0;
+    }
     return 0.2;
 }
 ```
+
+### Braced conditionals
+
+Use braces for every `if` and `else` body, including a one-line guard clause.
+Place the body and closing brace on their own lines.
 
 ### Fail fast
 
@@ -39,7 +51,9 @@ An unknown shipping zone is invalid state, not a reason to use a default.
 ```java
 int shippingCost(String zoneId, Map<String, Zone> zones) {
     var zone = zones.get(zoneId);
-    if (zone == null) throw new IllegalArgumentException("Unknown zoneId: " + zoneId);
+    if (zone == null) {
+        throw new IllegalArgumentException("Unknown zoneId: " + zoneId);
+    }
     return zone.baseCost();
 }
 ```
@@ -53,7 +67,9 @@ final class CreateUser {
     private final UserRepository users;
     private final Mailer mailer;
     User create(String email) {
-        if (email.isBlank()) throw new IllegalArgumentException("email required");
+        if (email.isBlank()) {
+            throw new IllegalArgumentException("email required");
+        }
         var user = users.save(new User(normalizeEmail(email)));
         mailer.send(user.email(), "welcome");
         return user;
@@ -185,7 +201,9 @@ Model order states as an enum.
 
 ```java
 enum OrderStatus { PENDING_PAYMENT, PAID }
-if (order.status() == OrderStatus.PENDING_PAYMENT) payments.request(order);
+if (order.status() == OrderStatus.PENDING_PAYMENT) {
+    payments.request(order);
+}
 ```
 
 ### SOLID

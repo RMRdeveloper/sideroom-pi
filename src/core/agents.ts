@@ -77,8 +77,9 @@ export function createImplementer(
       ) {
         throw new Error('implementer returned malformed filesChanged');
       }
-      if (!isText(record.summary))
+      if (!isText(record.summary)) {
         throw new Error('implementer returned no summary');
+      }
       return {
         taskId: input.task.id,
         filesChanged: record.filesChanged,
@@ -101,8 +102,9 @@ export function createReviewer(
         schema:
           'a JSON string containing FINDING lines, or the JSON string "No findings"',
       });
-      if (!isText(value))
+      if (!isText(value)) {
         throw new Error('reviewer returned a non-string response');
+      }
       return parseFindings(value, 'reviewer');
     },
   };
@@ -138,15 +140,18 @@ export function createFixer(
   return {
     id: 'sideroom-fixer',
     async run(input) {
-      if (!hasBlockingFindings(input.findings))
+      if (!hasBlockingFindings(input.findings)) {
         return 'No blocking findings to fix.';
+      }
       const value = await model.generate<unknown>({
         agent: 'sideroom-fixer',
         input,
         schema: '{ summary: string }',
       });
       const record = recordOf(value, 'fixer returned a non-object response');
-      if (!isText(record.summary)) throw new Error('fixer returned no summary');
+      if (!isText(record.summary)) {
+        throw new Error('fixer returned no summary');
+      }
       return record.summary;
     },
   };
@@ -159,7 +164,9 @@ export function roleInstructions(id: AgentId): string {
 
 function parsePlan(value: unknown): Plan {
   const record = recordOf(value, 'planner returned a non-object response');
-  if (!isText(record.summary)) throw new Error('planner returned no summary');
+  if (!isText(record.summary)) {
+    throw new Error('planner returned no summary');
+  }
   if (!Array.isArray(record.tasks) || !record.tasks.every(isPlanTask)) {
     throw new Error('planner returned malformed tasks');
   }
@@ -169,7 +176,9 @@ function parsePlan(value: unknown): Plan {
   ) {
     throw new Error('planner returned malformed verification commands');
   }
-  if (record.tasks.length === 0) throw new Error('planner returned no tasks');
+  if (record.tasks.length === 0) {
+    throw new Error('planner returned no tasks');
+  }
   return {
     summary: record.summary,
     tasks: record.tasks,
@@ -178,7 +187,9 @@ function parsePlan(value: unknown): Plan {
 }
 
 function isPlanTask(value: unknown): value is PlanTask {
-  if (typeof value !== 'object' || value === null) return false;
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
   const record = value as Record<string, unknown>;
   return (
     isText(record.id) &&
@@ -192,7 +203,9 @@ function isPlanTask(value: unknown): value is PlanTask {
 }
 
 function recordOf(value: unknown, message: string): Record<string, unknown> {
-  if (typeof value !== 'object' || value === null) throw new Error(message);
+  if (typeof value !== 'object' || value === null) {
+    throw new Error(message);
+  }
   return value as Record<string, unknown>;
 }
 
@@ -201,7 +214,9 @@ function isText(value: unknown): value is string {
 }
 
 function requireText(value: unknown, message: string): void {
-  if (!isText(value)) throw new Error(message);
+  if (!isText(value)) {
+    throw new Error(message);
+  }
 }
 
 function findingReport(value: unknown, stage: string): readonly Finding[] {

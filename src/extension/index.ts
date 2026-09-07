@@ -1,10 +1,12 @@
+export { default } from './command.ts';
 export {
   answerQuestions,
-  default,
   formatQuestionDetail,
   formatQuestionPrompt,
   type GrillingOverlayResult,
+} from './grilling.ts';
+export {
   type LanguagePolicyPreflight,
-  PipelineProgress,
   preflightLanguagePolicies,
-} from './extension/index.ts';
+} from './preflight.ts';
+export { PipelineProgress } from './progress.ts';

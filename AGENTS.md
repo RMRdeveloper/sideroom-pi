@@ -15,9 +15,10 @@ manifest and the SDK. OpenCode is a future runtime and belongs behind
 - `src/assets/agents/*.md` contains the five role prompts.
 - `src/assets/artifacts/GUIDELINES_TEMPLATE.md` is the mandatory shared baseline.
 - `src/assets/artifacts/guidelines/*.md` adds language-specific policy for
-  TypeScript, JavaScript, PHP Laravel, Python, and Java.
+  TypeScript, JavaScript, PHP Laravel, Python, Java, Go, and Rust.
 - `skills/*/SKILL.md` contains reusable Pi skills, including the pipeline's
-  design-tree grilling gate and local audio transcription.
+  design-tree grilling gate, standalone domain-modeling guidance, and local audio
+  transcription.
 - `src/core/` owns routing and structured role contracts.
 - `src/pi-extension.ts` is the Pi command boundary; it must dispatch directly
   to the in-memory pipeline, never by prompting Pi's parent agent.
@@ -37,13 +38,17 @@ npm run build
 npm run changeset
 npm run changeset:status
 npm run version-packages
-npm run release
 ```
 
 Use Biome for formatting and linting; do not add ESLint, Prettier, or their
 plugins. Commit messages follow Conventional Commits and are checked by the
 `commit-msg` hook. The package requires Node 22.19 or later because Pi
-requires it.
+requires it. Release only from the protected `main` branch: create an
+annotated `v<SemVer>` tag after versioning, then manually dispatch the `Publish
+npm package` workflow with that exact tag. Never publish locally.
+
+Biome enforces braces around every TypeScript `if` body, including one-line
+guard clauses. Do not disable or work around `style/useBlockStatements`.
 
 ## Design rules
 

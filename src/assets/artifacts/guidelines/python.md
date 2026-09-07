@@ -8,6 +8,7 @@ Python testing conventions. The shared baseline remains mandatory.
 
 | Do | Don't |
 | --- | --- |
+| Use an indented body for every `if` | Write a one-line conditional body |
 | Return early for invalid state | Hide the happy path inside nested branches |
 | Raise precise errors immediately | Use a default to hide a broken invariant |
 | Give each function one reason to change | Validate, transform, save, and notify together |
@@ -33,6 +34,12 @@ def get_discount(user: User | None) -> float:
         return 0.0
     return 0.2
 ```
+
+### Conditional bodies
+
+Python has no braces. Its equivalent rule is that every `if` and `else` must
+have a complete, consistently indented body on following lines; never write a
+one-line conditional body.
 
 ### Fail fast
 

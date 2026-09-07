@@ -13,6 +13,8 @@ export const LANGUAGES = [
   'php-laravel',
   'python',
   'java',
+  'go',
+  'rust',
 ] as const;
 export type Language = (typeof LANGUAGES)[number];
 
@@ -39,7 +41,7 @@ export interface Implementation {
   readonly summary: string;
 }
 
-/** A deterministic finding understood by reviewer, verifier, and fixer. */
+/** A deterministic finding returned by an individual quality role. */
 export interface Finding {
   readonly number: number;
   readonly severity: 'Critical' | 'High' | 'Medium' | 'Low';
@@ -48,12 +50,20 @@ export interface Finding {
   readonly description: string;
 }
 
+/** A quality role that reported a finding. */
+export type FindingSource = 'reviewer' | 'verifier';
+
+/** A quality finding merged for fixer handoff and pipeline reporting. */
+export interface SourcedFinding extends Finding {
+  readonly sources: readonly FindingSource[];
+}
+
 /** A completed or failed in-memory pipeline run. */
 export interface PipelineResult {
-  readonly status: 'completed' | 'failed';
+  readonly status: 'completed' | 'failed' | 'cancelled';
   readonly plan?: Plan;
   readonly implementations: readonly Implementation[];
-  readonly findings: readonly Finding[];
+  readonly findings: readonly SourcedFinding[];
   readonly summary: string;
 }
 

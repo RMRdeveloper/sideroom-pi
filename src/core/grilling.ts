@@ -6,6 +6,13 @@ export interface GrillingQuestion {
   readonly title: string;
   readonly question: string;
   readonly recommendation: string;
+  /**
+   * Two or three mutually exclusive alternatives. A legacy response with only
+   * `recommendation` expands to a single option so older models keep working.
+   */
+  readonly options: readonly string[];
+  /** Index into `options` pointing at `recommendation`. */
+  readonly recommendationIndex: number;
 }
 
 /** An answer collected by the caller without persisting project-local state. */
@@ -40,7 +47,7 @@ export function createGriller(model: ModelProvider): GrillingAgent {
         skill: 'sideroom-grilling',
         input,
         schema:
-          '{ status: "questions", questions: [{ id: string, title: string, question: string, recommendation: string }] } | { status: "settled", summary: string }',
+          '{ status: "questions", questions: [{ id: string, title: string, question: string, recommendation: string, options: [string, string] | [string, string, string], recommendationIndex: number }] } | { status: "settled", summary: string }',
       });
       return parseGrillingResult(value);
     },
@@ -50,8 +57,9 @@ export function createGriller(model: ModelProvider): GrillingAgent {
 function parseGrillingResult(value: unknown): GrillingResult {
   const record = recordOf(value);
   if (record.status === 'settled') {
-    if (!isText(record.summary))
+    if (!isText(record.summary)) {
       throw new Error('grilling returned no settled summary');
+    }
     return { status: 'settled', summary: record.summary };
   }
   if (record.status !== 'questions' || !Array.isArray(record.questions)) {
@@ -79,11 +87,50 @@ function parseQuestion(value: unknown): GrillingQuestion {
   ) {
     throw new Error('grilling returned a malformed question');
   }
+  if (record.options === undefined) {
+    return {
+      id: record.id,
+      title: record.title,
+      question: record.question,
+      recommendation: record.recommendation,
+      options: [record.recommendation],
+      recommendationIndex: 0,
+    };
+  }
+  if (
+    !Array.isArray(record.options) ||
+    record.options.length < 2 ||
+    record.options.length > 3
+  ) {
+    throw new Error('grilling must provide two or three options');
+  }
+  const options: string[] = [];
+  for (const option of record.options) {
+    if (!isText(option)) {
+      throw new Error('grilling must provide two or three non-empty options');
+    }
+    options.push(option);
+  }
+  if (
+    typeof record.recommendationIndex !== 'number' ||
+    !Number.isInteger(record.recommendationIndex) ||
+    record.recommendationIndex < 0 ||
+    record.recommendationIndex >= options.length
+  ) {
+    throw new Error('grilling returned an invalid recommendationIndex');
+  }
+  if (options[record.recommendationIndex] !== record.recommendation) {
+    throw new Error(
+      'grilling recommendation must match options[recommendationIndex]',
+    );
+  }
   return {
     id: record.id,
     title: record.title,
     question: record.question,
     recommendation: record.recommendation,
+    options,
+    recommendationIndex: record.recommendationIndex,
   };
 }
 

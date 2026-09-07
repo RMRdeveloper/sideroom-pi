@@ -8,6 +8,7 @@ Each row is expanded, with examples, in the matching section below.
 
 | Do                                                 | Don't                                                                                       |
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Use braces around every `if` body                  | Write an unbraced, single-statement conditional body                                       |
 | Early return on bad input                          | Pyramid `if/else` nesting                                                                   |
 | Explicit error, fail now                           | Multiple fallbacks that hide the real failure                                               |
 | One responsibility per unit                        | Validate + transform + persist + notify in one place                                        |
@@ -55,12 +56,25 @@ function getDiscount(user) {
 
 // Good — guard clauses, happy path at the end, shallow indent
 function getDiscount(user) {
-  if (!user) return 0;
-  if (!user.isActive) return 0;
-  if (!user.hasSubscription) return 0;
+  if (!user) {
+    return 0;
+  }
+  if (!user.isActive) {
+    return 0;
+  }
+  if (!user.hasSubscription) {
+    return 0;
+  }
   return 0.2;
 }
 ```
+
+### Braced conditionals
+
+Every `if` and `else` body must use braces in languages that support them,
+including a one-line guard clause. Never rely on indentation alone to bind a
+statement to a conditional. In Python, which has no braces, use a complete
+indented suite and never a one-line conditional body.
 
 ### Fail fast
 
@@ -78,7 +92,9 @@ function getShippingCost(order) {
 // Good — fails immediately with a clear error
 function getShippingCost(order) {
   const zone = ZONES[order.zoneId];
-  if (!zone) throw new Error(`Unknown zoneId: ${order.zoneId}`);
+  if (!zone) {
+    throw new Error(`Unknown zoneId: ${order.zoneId}`);
+  }
   return zone.baseCost;
 }
 ```
@@ -90,7 +106,9 @@ A function, class, or module has one reason to change. If it does two jobs, spli
 ```js
 // Bad — validates, transforms, persists, and notifies all in one place
 async function saveUser(data) {
-  if (!data.email) throw new Error('email required');
+  if (!data.email) {
+    throw new Error('email required');
+  }
   const normalized = { ...data, email: data.email.trim().toLowerCase() };
   await db.users.insert(normalized);
   await mailer.send(normalized.email, 'welcome');
@@ -98,7 +116,9 @@ async function saveUser(data) {
 
 // Good — each unit has a single reason to change
 function validateUser(data) {
-  if (!data.email) throw new Error('email required');
+  if (!data.email) {
+    throw new Error('email required');
+  }
 }
 function normalizeUser(data) {
   return { ...data, email: data.email.trim().toLowerCase() };
@@ -284,14 +304,22 @@ Pick one convention and apply it consistently: e.g. `undefined` for "not yet set
 ```js
 // Bad — null is overloaded to mean three different things
 function getDiscount(user) {
-  if (!user) return null; // no user
-  if (!user.plan) return null; // no plan
-  if (user.plan.discount === 0) return null; // legitimately zero discount
+  if (!user) {
+    return null; // no user
+  }
+  if (!user.plan) {
+    return null; // no plan
+  }
+  if (user.plan.discount === 0) {
+    return null; // legitimately zero discount
+  }
 }
 
 // Good — each case is explicit, zero is a real value
 function getDiscount(user) {
-  if (!user || !user.plan) return 0;
+  if (!user || !user.plan) {
+    return 0;
+  }
   return user.plan.discount;
 }
 ```
@@ -439,7 +467,8 @@ class UpdateProfileRequest extends FormRequest {
 }
 class ProfileService {
     public function update(array $data) {
-        if (empty($data['email'])) { // redundant re-validation
+        // Redundant re-validation.
+        if (empty($data['email'])) {
             throw new \InvalidArgumentException('email required');
         }
         $this->user->update($data);

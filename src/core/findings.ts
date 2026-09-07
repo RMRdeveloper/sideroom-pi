@@ -10,7 +10,9 @@ export function parseFindings(
   stage = 'finding report',
 ): readonly Finding[] {
   const trimmed = source.trim();
-  if (trimmed.length === 0 || trimmed === 'No findings') return [];
+  if (trimmed.length === 0 || trimmed === 'No findings') {
+    return [];
+  }
 
   const parsed = trimmed.split('\n').map((line, index) => {
     const match = FINDING.exec(line.trim());

@@ -3,79 +3,79 @@ name: sideroom-grilling
 description: Clarify a non-trivial feature, plan, or decision through dependency-aware question rounds before implementation.
 license: MIT
 ---
-
 # Grilling
 
-Reach a shared understanding before a non-trivial change is planned or built.
+Reach shared understanding before planning or building a non-trivial change.
 Model the work as a **design tree**: each decision can unlock further decisions.
-Do not silently choose a product, scope, or trade-off decision for the user.
+Never silently decide scope, product behavior, or trade-offs for the user —
+those are theirs: desired outcome, scope, compatibility, user-visible
+behavior, priorities, accepted trade-offs.
 
 ## Read facts; ask for decisions
 
-Read existing repository instructions, source, tests, package scripts, and any
-`CONTEXT.md` or `CONTEXT-MAP.md` before the first round. Facts such as current
-behavior, available commands, and domain vocabulary are yours to verify. Never
-ask the user for a fact you can inspect.
+Before the first round, read repo instructions, source, tests, package
+scripts, and any `CONTEXT.md`/`CONTEXT-MAP.md`. Never ask the user for a fact
+you can inspect yourself.
 
-When a context file exists, use its vocabulary exactly. A context term is a
-domain concept, not a generic technical word. Prefer one canonical term; use
-`Avoid:` terms to prevent synonyms from blurring a decision. If the repository
-has multiple contexts, use its map to identify the relevant one and ask only
-when the relationship remains unclear. Do not create context files or any
-project-local Sideroom state.
-
-The user owns decisions: desired outcome, scope, compatibility, user-visible
-behavior, priorities, and accepted trade-offs.
+If a context file exists, use its vocabulary exactly — one canonical term per
+concept, with `Avoid:` terms preventing synonym drift. With multiple contexts,
+use the map to find the relevant one and ask only if the relationship is
+unclear. Don't create context files or other project-local Sideroom state.
 
 ## Rounds and frontier
 
-The **frontier** contains decisions whose prerequisites are already settled.
-Ask no more than three independent frontier questions in one round. A question
-that depends on another unanswered question belongs to a later round.
+The **frontier** is the set of decisions whose prerequisites are already
+settled. Ask up to three independent frontier questions per round; a question
+depending on an unanswered one waits for a later round. Number questions
+continuously across rounds.
 
-For every question:
+For each question, all five parts are required — never ask a question missing one:
 
-- Explain the concrete decision and its observable consequence.
-- Offer a recommended answer and why it best fits the known facts.
-- Keep alternatives mutually exclusive and avoid asking a disguised fact lookup.
-- Number questions continuously across rounds.
+- `title`: the concrete decision to make.
+- `question`: its observable consequence, with mutually exclusive alternatives and relevant facts.
+- `recommendation`: one recommended answer justified from known facts, with its trade-off.
+- `options`: two or three mutually exclusive alternatives as short strings, one of them the recommendation.
+- `recommendationIndex`: the index into `options` pointing at the recommendation.
+Never disguise a fact lookup as a question.
 
 After each answer, update the design tree, record the decision, and recompute
-the frontier. If the user accepts a recommendation, record the recommendation
-as the decision. If a fact lookup is still pending, ask every independent
-question that does not depend on it; do not block the entire round.
+the frontier — if the user accepts a recommendation, record that as the
+decision. If a fact lookup is still pending, ask every question that doesn't
+depend on it rather than blocking the round. Keep going until the frontier is
+empty; there's no round limit.
 
-In a conversational interface, format a fallback round as:
+In a conversational interface without a native question UI, use this fallback
+and wait for the answer — never proceed on silence:
 
 ```md
 **Q1 — <short decision title>**
+
 <question, alternatives, and relevant facts>
 
 Recommended: <one answer and its trade-off>
 ```
 
-Use a native question UI when the host provides one. Otherwise use the fallback
-format and wait for the user's answer; never proceed because silence is
-convenient.
-
 ## Completion and handoff
 
-The grilling phase is complete only when the frontier is empty: each branch is
-settled or explicitly out of scope. Then produce a compact **Settled
-understanding** containing decisions, non-goals, repository constraints, and
-risks the user accepted. Do not implement or plan until this is confirmed.
-
-Hand the confirmed understanding to the planner. It constrains the plan; it is
-not an implementation task.
+Grilling ends only when every branch is settled or explicitly out of scope.
+Produce a compact **Settled understanding**: decisions, non-goals, repo
+constraints, accepted risks. Hand it to the planner as a constraint, not an
+implementation task — don't implement or plan before it's confirmed.
 
 ## Sideroom pipeline mode
 
-When invoked by Sideroom with a requested JSON schema, perform exactly one
-round. Return only the requested JSON value:
+When Sideroom invokes with a requested JSON schema, run exactly one round and
+return only the requested JSON:
 
-- `status: "questions"` with one to three frontier questions, each with `id`,
-  `title`, `question`, and `recommendation`; or
-- `status: "settled"` with a concise `summary` suitable for the planner.
+- `status: "questions"` — one to three frontier questions, each with `id`,
+  `title` (concrete decision), `question` (observable consequence with
+  alternatives and facts), `recommendation` (justified answer with trade-off),
+  `options` (two or three short mutually exclusive alternatives), and
+  `recommendationIndex` (index into `options`).
+  `options[recommendationIndex]` must equal `recommendation` verbatim.
+- `status: "settled"` — a concise `summary` for the planner.
 
-The caller supplies prior answers in the task context. Do not repeat settled
-questions or make changes to the working tree.
+The caller supplies prior answers in the task context. Don't repeat settled
+questions or touch the working tree. An answer of exactly `Out of scope`
+means the user explicitly excluded that question: record it as a non-goal,
+never as a decision.

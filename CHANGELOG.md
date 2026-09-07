@@ -1,5 +1,18 @@
 # Changelog
 
+## 6.0.0
+
+### Major Changes
+
+- Add Go and Rust coding guidelines with per-file language-policy routing.
+- Infer the file-policy map from repository evidence when the request declares no
+  paths and continue without confirmation.
+- Answer each grilling round in a single overlay batch with a multiline editor
+  for custom answers; cancelled overlays fall back to sequential selects and
+  non-TUI sessions keep auto-accepting recommendations.
+- Remove manual clarification inputs and auto-settle cancelled grilling with
+  recommendations.
+
 ## 5.0.1
 
 ### Patch Changes

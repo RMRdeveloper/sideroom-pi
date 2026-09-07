@@ -7,6 +7,7 @@ import {
   getLanguageGuidelines,
   getSharedGuidelines,
 } from './catalog.ts';
+import { INFERRED_SCOPE } from './language-policy.ts';
 import { LANGUAGES } from './types.ts';
 
 test('loads each shipped language guideline', () => {
@@ -20,14 +21,43 @@ test('loads each shipped language guideline', () => {
   }
 });
 
-test('combines the complete role prompt with its language policy', () => {
+test('groups confirmed file policies in the complete role prompt', () => {
   const role = getAgentDefinition('sideroom-implementer');
+  const prompt = buildSystemPrompt('sideroom-implementer', [
+    { file: 'README.md', policy: 'shared' },
+    { file: 'src/api.ts', policy: 'typescript' },
+    { file: 'worker.py', policy: 'python' },
+    { file: 'cmd/server.go', policy: 'go' },
+    { file: 'src/lib.rs', policy: 'rust' },
+  ]);
+
   assert.equal(role.readonly, false);
   assert.match(role.instructions, /Read-first/);
+  assert.match(prompt, /TypeScript Coding Guidelines/);
+  assert.match(prompt, /Python Coding Guidelines/);
+  assert.match(prompt, /Go Coding Guidelines/);
+  assert.match(prompt, /Rust Coding Guidelines/);
+  assert.match(prompt, /Shared-only entries: README\.md/);
+  assert.match(prompt, /src\/api\.ts/);
+  assert.match(prompt, /worker\.py/);
+  assert.match(prompt, /cmd\/server\.go/);
+  assert.match(prompt, /src\/lib\.rs/);
   assert.match(
-    buildSystemPrompt('sideroom-implementer', 'php-laravel'),
-    /PHP Laravel Coding Guidelines/,
+    prompt,
+    /Do not write plan-discovered files absent from this confirmed map/,
   );
-  assert.match(buildSystemPrompt('sideroom-implementer', 'php-laravel'), /SRP/);
   assert.match(getSharedGuidelines(), /# Guidelines Template/);
+});
+
+test('uses the inferred instruction for repository-evidence scopes', () => {
+  const prompt = buildSystemPrompt('sideroom-implementer', [
+    { file: INFERRED_SCOPE, policy: 'typescript' },
+  ]);
+
+  assert.match(prompt, /Targets were inferred from repository evidence/);
+  assert.match(prompt, /do not write outside the current project/i);
+  assert.doesNotMatch(
+    prompt,
+    /Do not write plan-discovered files absent from this confirmed map/,
+  );
 });

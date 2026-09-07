@@ -24,7 +24,7 @@ For a reproducible environment, install a specific release instead. A pinned
 version does not move when you run Pi's package update command.
 
 ```bash
-pi install npm:@rmrdeveloper/sideroom-pi@5.0.0
+pi install npm:@rmrdeveloper/sideroom-pi@6.0.0
 ```
 
 To update an unpinned installation:
@@ -37,7 +37,6 @@ Start Pi from the repository you want to work in, then invoke the extension:
 
 ```text
 /sideroom "Add a health endpoint"
-/sideroom --language php-laravel "Add invoice export"
 /sideroom --read-only "Review the retry behavior"
 ```
 
@@ -46,9 +45,14 @@ single command; there is no subcommand or separate binary to run. When the
 request is omitted, Pi asks for it using its own UI.
 
 Supported guideline variants are `typescript` (default), `javascript`,
-`php-laravel`, `python`, and `java`. `--read-only` removes write-capable tools
-from every role. `--max-fix-passes <number>` changes the default limit of two
-repair passes.
+`php-laravel`, `python`, `java`, `go`, and `rust`. `--read-only` removes
+write-capable tools from every role. `--max-fix-passes <number>` changes the
+default limit of two repair passes.
+
+When the request declares no file paths, Sideroom infers the file-policy map
+from repository evidence (`composer.json`, `go.mod`, `Cargo.toml`,
+`package.json` with or without `tsconfig.json`, Python markers, and Java
+markers) and continues without confirmation.
 
 ## Provenance and isolation
 
@@ -69,7 +73,8 @@ shows the active phase, the waiting-for-answer state, and the direct-SDK
 provenance. Selecting a recommendation accepts it; selecting the alternate
 option opens a custom-answer field. The widget is removed automatically when a
 run completes or fails; the final Pi session message remains as the durable
-record. It is not a request to any global skill with the same name.
+record. Grilling continues until every design decision is settled; it has no
+fixed round limit. It is not a request to any global skill with the same name.
 
 ## Content and guidelines
 
@@ -79,9 +84,9 @@ The five role prompts are in `src/assets/agents/`. The shared policy is
 policies before their write gate and must read them before every code-writing
 tool call.
 
-Reusable Pi skills ship in `skills/`: `sideroom-grilling`, `sideroom-critic`,
-`sideroom-spec`, and `sideroom-transcribe-audio`. Pi loads them directly through
-the package manifest.
+Reusable Pi skills ship in `skills/`: `sideroom-grilling`,
+`sideroom-domain-modeling`, `sideroom-spec`, and `sideroom-transcribe-audio`.
+Pi loads them directly through the package manifest.
 The transcription skill needs `uv`, Python, and `ffmpeg` only when explicitly
 used.
 
@@ -108,17 +113,25 @@ Every user-visible package change needs a Changeset. Create one with:
 npm run changeset
 ```
 
-Review pending release work with `npm run changeset:status`. On the release
-branch, run `npm run version-packages`, review and commit the updated
-`package.json`, `package-lock.json`, and `CHANGELOG.md`, then publish
-deliberately with `npm run release`. The repository does not publish
-automatically from CI.
+Review pending release work with `npm run changeset:status`. On the protected
+`main` branch, run `npm run version-packages`, review and commit the updated
+`package.json`, `package-lock.json`, and `CHANGELOG.md`, then create and push an
+annotated `v<SemVer>` tag at that commit. Publish only by manually dispatching
+the `Publish npm package` workflow from `main` with that exact tag. The workflow
+fails unless the tag is annotated, resolves to `main`, and matches the package
+version; it publishes with npm OIDC provenance. Never publish locally.
 
 ## Layout
 
 ```text
 src/
-  pi-extension.ts        Pi extension entry point for /sideroom
+  pi-extension.ts        Pi extension entry point for /sideroom (thin barrel)
+  extension/             /sideroom command modules mounted by index.ts
+    command.ts           command registration, request intake, pipeline assembly
+    preflight.ts         language-policy preflight and map confirmation
+    grilling.ts          grilling overlay, sequential fallback, prompt detail
+    progress.ts          pipeline progress widget, status, and stage observer
+    report.ts            run record, session message, and model reference
   pi-command.ts          slash-command parsing
   app.ts                 Pi pipeline assembly
   core/                  orchestration, roles, contracts, and content catalog
