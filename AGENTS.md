@@ -2,28 +2,22 @@
 
 ## Scope
 
-Sideroom is a global Pi package with one active coding-agent runtime: Pi via
-`@earendil-works/pi-coding-agent`. Its entry point is the `/sideroom` Pi
-extension command. Do not add a standalone CLI, editor installers,
-project-local harness files, task persistence, or a subprocess wrapper around
-Pi. Preserve the packaged Pi skills; they are loaded through the Pi package
-manifest and the SDK. OpenCode is a future runtime and belongs behind
-`src/core/model.ts` only when it has a real implementation.
+Sideroom is a global Pi package. Each tool lives in `extensions/<name>/` with
+`index.ts` as the Pi entry (`export default`). Do not add a slash command, a
+standalone CLI, project-local harness files, or a subprocess wrapper around Pi.
+
+`assets/artifacts/GUIDELINES_TEMPLATE.md` is an unwired seed for later product
+work. Do not load it into a tool.
 
 ## Source of truth
 
-- `src/assets/agents/*.md` contains the five role prompts.
-- `src/assets/artifacts/GUIDELINES_TEMPLATE.md` is the mandatory shared baseline.
-- `src/assets/artifacts/guidelines/*.md` adds language-specific policy for
-  TypeScript, JavaScript, PHP Laravel, Python, Java, Go, and Rust.
-- `skills/*/SKILL.md` contains reusable Pi skills, including the pipeline's
-  design-tree grilling gate, standalone domain-modeling guidance, and local audio
-  transcription.
-- `src/core/` owns routing and structured role contracts.
-- `src/pi-extension.ts` is the Pi command boundary; it must dispatch directly
-  to the in-memory pipeline, never by prompting Pi's parent agent.
-- `src/runtimes/pi.ts` is the direct Pi SDK boundary. Keep its tool allowlist
-  explicit and exclude global Pi resources from role sessions.
+- `extensions/ask/index.ts` registers `sideroom_ask`.
+- `extensions/ask/model.ts` owns the schema and answer contract.
+- `extensions/ask/ui.ts` owns the TUI: questionnaire tabs, required
+  recommendation, always-on Out of scope, and a custom answer.
+
+Add a tool by creating `extensions/<name>/index.ts`. Pi discovers
+`extensions/*/index.ts`; helper files in that folder are not extensions.
 
 ## Commands
 
@@ -34,32 +28,22 @@ npm run lint
 npm run format:check
 npm test
 npm run check
-npm run build
 npm run changeset
 npm run changeset:status
 npm run version-packages
 ```
 
-Use Biome for formatting and linting; do not add ESLint, Prettier, or their
-plugins. Commit messages follow Conventional Commits and are checked by the
-`commit-msg` hook. The package requires Node 22.19 or later because Pi
-requires it. Release only from the protected `main` branch: create an
-annotated `v<SemVer>` tag after versioning, then manually dispatch the `Publish
-npm package` workflow with that exact tag. Never publish locally.
+Use Biome; do not add ESLint or Prettier. Conventional Commits. Node 22.19 or
+later. Release only through Changesets on protected `main`. Never publish
+locally.
 
-Biome enforces braces around every TypeScript `if` body, including one-line
-guard clauses. Do not disable or work around `style/useBlockStatements`.
+Biome requires braces around every `if` body. Do not disable
+`style/useBlockStatements`. Follow `assets/artifacts/GUIDELINES_TEMPLATE.md`.
 
 ## Design rules
 
-- Keep the pipeline in memory. It must not initialize or write Sideroom
-  configuration into the target repository.
-- Keep packaged skills global to the install. A skill may write only when the
-  user explicitly asks for an output path; it must never create project-local
-  Sideroom state.
-- Keep role routing in TypeScript; Markdown contributes instructions only.
-- Only implementer and fixer may receive write-capable Pi tools.
-- Before every write-capable tool call, the Pi runtime must place the shared
-  template and selected language policy before its explicit write gate.
-- Make every language guide an equivalent, language-idiomatic rendition of the
-  shared examples, not an independent conflicting rulebook.
+- `sideroom_ask` is a normal parent-agent tool. One call is one 1–N batch.
+- Each question requires `recommendationIndex`. The UI always adds Out of scope
+  and a custom answer; callers must not send those rows.
+- Non-TUI calls fail with an explicit UI-not-available error.
+- The tool must not write Sideroom state into the target repository.

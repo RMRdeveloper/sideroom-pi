@@ -75,7 +75,6 @@ jobs:
           npm --version
       - run: npm ci
       - run: npm run check
-      - run: npm run build
       - id: pack
         name: Pack release artifacts
         uses: changesets/action/pack@22ccf9aa43179fe9e27dc62e575971d28cce197c # v2.0.0

@@ -5,26 +5,29 @@
 [![npm license](https://img.shields.io/npm/l/@rmrdeveloper/sideroom-pi?label=license)](https://www.npmjs.com/package/@rmrdeveloper/sideroom-pi)
 
 Sideroom Pi is a global [Pi package](https://pi.dev/docs/latest/packages). It
-registers the `/sideroom` command inside Pi and runs planner, implementer,
-reviewer, verifier, and fixer as isolated Pi SDK sessions.
+registers `sideroom_ask`, a TUI questionnaire the parent agent can call to
+clarify requirements, preferences, or decisions. It writes no `.pi`
+configuration, task graph, or other Sideroom files into the repository you
+are working in.
 
-It creates no `.pi` configuration, task graph, harness state, or other files
-in the repository being changed.
+## Quick path
 
-## Install
+1. Install globally from npm. Pi writes this installation to your user
+   settings, so do not use `-l`.
 
-Install Sideroom globally from npm. Pi writes this installation to your user
-settings, so do not use `-l`.
+   ```bash
+   pi install npm:@rmrdeveloper/sideroom-pi
+   ```
+
+2. Start Pi in the repository you want to work in.
+3. Ask the parent agent a question that needs a decision. It can call
+   `sideroom_ask` in the TUI.
+
+For a reproducible environment, pin a release. A pinned version does not move
+when you run Pi's package update command.
 
 ```bash
-pi install npm:@rmrdeveloper/sideroom-pi
-```
-
-For a reproducible environment, install a specific release instead. A pinned
-version does not move when you run Pi's package update command.
-
-```bash
-pi install npm:@rmrdeveloper/sideroom-pi@6.0.1
+pi install npm:@rmrdeveloper/sideroom-pi@7.0.0
 ```
 
 To update an unpinned installation:
@@ -33,79 +36,46 @@ To update an unpinned installation:
 pi update --extension npm:@rmrdeveloper/sideroom-pi
 ```
 
-Start Pi from the repository you want to work in, then invoke the extension:
+## Details
 
-```text
-/sideroom "Add a health endpoint"
-/sideroom --read-only "Review the retry behavior"
-```
+| Topic | Decision |
+| --- | --- |
+| Surface | One LLM-callable tool, `sideroom_ask`. No `/sideroom` command. |
+| Batch | One tool call is one 1–N question batch. Call again for another round. |
+| Recommendation | Every question must send `recommendationIndex`. |
+| Always-on rows | The UI adds Out of scope and a custom answer. Do not send those options. |
+| Headless | Print, JSON, and RPC return `Error: UI not available`. |
+| Seed artifact | `assets/artifacts/GUIDELINES_TEMPLATE.md` ships unwired. |
 
-Pi extension commands are necessarily slash commands, so `/sideroom` is the
-single command; there is no subcommand or separate binary to run. When the
-request is omitted, Pi asks for it using its own UI.
+## Tool
 
-Supported guideline variants are `typescript` (default), `javascript`,
-`php-laravel`, `python`, `java`, `go`, and `rust`. `--read-only` removes
-write-capable tools from every role. `--max-fix-passes <number>` changes the
-default limit of two repair passes.
+`sideroom_ask` follows Pi's questionnaire UI: a simple list for one question,
+tabs plus Submit for several. English copy. Each question needs:
 
-When the request declares no file paths, Sideroom infers the file-policy map
-from repository evidence (`composer.json`, `go.mod`, `Cargo.toml`,
-`package.json` with or without `tsconfig.json`, Python markers, and Java
-markers) and continues without confirmation.
+- `id`
+- `prompt`
+- at least two `{ value, label, description? }` options
+- `recommendationIndex` pointing at the recommended option
+- optional `label` for the tab bar (defaults to `Q1`, `Q2`, …)
 
-## Provenance and isolation
-
-`/sideroom` is dispatched to the extension before Pi expands skills or sends
-the command to the interactive agent. The extension then creates direct,
-in-memory SDK sessions for the five Sideroom roles. Those child sessions load
-only this package's skills and explicit policy; global Pi skills, extensions,
-prompt templates, and global context files are excluded.
-
-At the end of every run, Pi displays a `Sideroom completed` or `Sideroom
-failed` message with its provenance and the completed roles. It also records
-the same trace in Pi's session history as `sideroom:run`; this is Pi session
-metadata, never a file in the target repository.
-
-The packaged `sideroom-grilling` skill runs as the design-decision gate. Its
-questions use Pi's native decision UI. During a run, a persistent Pi widget
-shows the active phase, the waiting-for-answer state, and the direct-SDK
-provenance. Selecting a recommendation accepts it; selecting the alternate
-option opens a custom-answer field. The widget is removed automatically when a
-run completes or fails; the final Pi session message remains as the durable
-record. Grilling continues until every design decision is settled; it has no
-fixed round limit. It is not a request to any global skill with the same name.
-
-## Content and guidelines
-
-The five role prompts are in `src/assets/agents/`. The shared policy is
-`src/assets/artifacts/GUIDELINES_TEMPLATE.md`; the language layers live in
-`src/assets/artifacts/guidelines/`. Implementer and fixer receive those
-policies before their write gate and must read them before every code-writing
-tool call.
-
-Reusable Pi skills ship in `skills/`: `sideroom-grilling`,
-`sideroom-domain-modeling`, `sideroom-spec`, and `sideroom-transcribe-audio`.
-Pi loads them directly through the package manifest.
-The transcription skill needs `uv`, Python, and `ffmpeg` only when explicitly
-used.
+The recommended option is marked in the list. Escape cancels the batch.
 
 ## Development
 
 ```bash
 npm install
 npm run check
-npm run build
 ```
 
-Biome is the sole formatter and linter. Runtime code uses Pi's SDK only; Pi
-provides `@earendil-works/pi-coding-agent` as a peer dependency.
+Biome is the sole formatter and linter. Pi loads TypeScript from `extensions/`
+directly; do not bundle. Pi provides `@earendil-works/pi-coding-agent`,
+`@earendil-works/pi-tui`, and `typebox` as peer dependencies.
 
 ## Releases and commits
 
 Commit messages must follow the Conventional Commits format. The existing
 Husky `commit-msg` hook validates each local commit with Commitlint, for
-example `feat: add a pipeline summary` or `fix: validate malformed findings`.
+example `feat: mark the recommended sideroom_ask option`.
 
 Every user-visible package change needs a Changeset. Create one with:
 
@@ -117,32 +87,24 @@ Review pending release work with `npm run changeset:status`. When Changesets
 are merged to `main`, the `Release` workflow creates or updates a reviewable
 Changesets version PR. That PR contains the generated `package.json`,
 `package-lock.json`, and `CHANGELOG.md` updates. Merge the version PR only after
-review; its merge runs `npm ci`, `npm run check`, and `npm run build`, then uses
+review; its merge runs `npm ci` and `npm run check`, then uses
 npm 11.5.1 and npm Trusted Publishing (GitHub OIDC) to publish. Changesets then
 pushes the release Git tag and creates the GitHub Release automatically.
 
 Never run `npm publish`, create release tags, or create GitHub Releases locally.
 Publishing is allowed only through the merged Changesets version PR and the
 `Release` workflow. The npm package's Trusted Publisher must be configured for
-this GitHub repository, `.github/workflows/release.yml`, and the `npm`
-environment; configure the matching GitHub `npm` environment before the first
-release.
+this GitHub repository, the workflow filename `release.yml` (not its path),
+and the `npm` environment; configure the matching GitHub `npm` environment
+before the first release.
 
 ## Layout
 
 ```text
-src/
-  pi-extension.ts        Pi extension entry point for /sideroom (thin barrel)
-  extension/             /sideroom command modules mounted by index.ts
-    command.ts           command registration, request intake, pipeline assembly
-    preflight.ts         language-policy preflight and map confirmation
-    grilling.ts          grilling overlay, sequential fallback, prompt detail
-    progress.ts          pipeline progress widget, status, and stage observer
-    report.ts            run record, session message, and model reference
-  pi-command.ts          slash-command parsing
-  app.ts                 Pi pipeline assembly
-  core/                  orchestration, roles, contracts, and content catalog
-  runtimes/pi.ts         direct Pi SDK adapter for isolated child sessions
-  assets/                role prompts and coding guidelines
-skills/                  package-provided Pi skills
+extensions/
+  ask/                   sideroom_ask (index.ts, model.ts, ui.ts)
+assets/artifacts/        unwired GUIDELINES_TEMPLATE.md seed
 ```
+
+Add another tool as `extensions/<name>/index.ts`. Pi discovers
+`extensions/*/index.ts`; helpers in that folder are not loaded as extensions.

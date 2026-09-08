@@ -1,0 +1,196 @@
+import { type Static, Type } from 'typebox';
+import { Check, Errors } from 'typebox/value';
+
+export const TOOL_NAME = 'sideroom_ask';
+export const OUT_OF_SCOPE_VALUE = 'Out of scope';
+export const OUT_OF_SCOPE_LABEL = 'Out of scope';
+export const CUSTOM_VALUE = '__other__';
+export const CUSTOM_LABEL = 'Write a custom answer';
+export const UI_UNAVAILABLE =
+  'Error: UI not available (running in non-interactive mode)';
+
+const QuestionOptionSchema = Type.Object({
+  value: Type.String({ description: 'The value returned when selected' }),
+  label: Type.String({ description: 'Display label for the option' }),
+  description: Type.Optional(
+    Type.String({ description: 'Optional description shown below the label' }),
+  ),
+});
+
+const QuestionSchema = Type.Object({
+  id: Type.String({ description: 'Unique identifier for this question' }),
+  label: Type.Optional(
+    Type.String({
+      description:
+        "Short contextual label for the tab bar, e.g. 'Scope' (defaults to Q1, Q2)",
+    }),
+  ),
+  prompt: Type.String({ description: 'The full question text to display' }),
+  options: Type.Array(QuestionOptionSchema, {
+    minItems: 2,
+    description: 'At least two mutually exclusive options',
+  }),
+  recommendationIndex: Type.Integer({
+    minimum: 0,
+    description: 'Index into options pointing at the recommended option',
+  }),
+});
+
+export const AskParamsSchema = Type.Object({
+  questions: Type.Array(QuestionSchema, {
+    minItems: 1,
+    description: 'Questions to ask the user in this batch',
+  }),
+});
+
+export type AskParams = Static<typeof AskParamsSchema>;
+export type QuestionOption = AskParams['questions'][number]['options'][number];
+
+export interface AskQuestion {
+  readonly id: string;
+  readonly label: string;
+  readonly prompt: string;
+  readonly options: readonly QuestionOption[];
+  readonly recommendationIndex: number;
+}
+
+export interface AskAnswer {
+  readonly id: string;
+  readonly value: string;
+  readonly label: string;
+  readonly wasCustom: boolean;
+  readonly outOfScope: boolean;
+  readonly index?: number;
+}
+
+export interface AskResult {
+  readonly questions: readonly AskQuestion[];
+  readonly answers: readonly AskAnswer[];
+  readonly cancelled: boolean;
+}
+
+export type RenderOption = QuestionOption & {
+  readonly isOther?: boolean;
+  readonly isOutOfScope?: boolean;
+  readonly isRecommended?: boolean;
+};
+
+export type ParseAskResult =
+  | { readonly ok: true; readonly questions: readonly AskQuestion[] }
+  | { readonly ok: false; readonly message: string };
+
+export function parseAskParams(value: unknown): ParseAskResult {
+  if (!Check(AskParamsSchema, value)) {
+    return { ok: false, message: schemaErrorMessage(value) };
+  }
+
+  const seen = new Set<string>();
+  for (const question of value.questions) {
+    if (seen.has(question.id)) {
+      return {
+        ok: false,
+        message: `Error: Duplicate question id: ${question.id}`,
+      };
+    }
+    seen.add(question.id);
+    if (question.recommendationIndex >= question.options.length) {
+      return {
+        ok: false,
+        message: `Error: recommendationIndex ${String(question.recommendationIndex)} is out of range for question '${question.id}'`,
+      };
+    }
+  }
+
+  return { ok: true, questions: normalizeQuestions(value.questions) };
+}
+
+export function normalizeQuestions(
+  questions: AskParams['questions'],
+): AskQuestion[] {
+  return questions.map((question, index) => {
+    const label = question.label;
+    return {
+      id: question.id,
+      label:
+        label !== undefined && label.trim().length > 0
+          ? label
+          : `Q${String(index + 1)}`,
+      prompt: question.prompt,
+      options: question.options,
+      recommendationIndex: question.recommendationIndex,
+    };
+  });
+}
+
+export function renderOptions(question: AskQuestion): RenderOption[] {
+  const options: RenderOption[] = question.options.map((option, index) => ({
+    ...option,
+    isRecommended: index === question.recommendationIndex,
+  }));
+  options.push({
+    value: OUT_OF_SCOPE_VALUE,
+    label: OUT_OF_SCOPE_LABEL,
+    isOutOfScope: true,
+  });
+  options.push({
+    value: CUSTOM_VALUE,
+    label: CUSTOM_LABEL,
+    isOther: true,
+  });
+  return options;
+}
+
+export function formatAnswerLines(
+  questions: readonly AskQuestion[],
+  answers: readonly AskAnswer[],
+): string[] {
+  return answers.map((answer) => {
+    const question = questions.find((entry) => entry.id === answer.id);
+    const questionLabel = question?.label ?? answer.id;
+    if (answer.outOfScope) {
+      return `${questionLabel}: Out of scope`;
+    }
+    if (answer.wasCustom) {
+      return `${questionLabel}: user wrote: ${answer.label}`;
+    }
+    if (answer.index !== undefined) {
+      return `${questionLabel}: user selected: ${String(answer.index)}. ${answer.label}`;
+    }
+    return `${questionLabel}: user selected: ${answer.label}`;
+  });
+}
+
+function schemaErrorMessage(value: unknown): string {
+  const [error] = Errors(AskParamsSchema, value);
+  if (error === undefined) {
+    return 'Error: Invalid sideroom_ask parameters';
+  }
+  if (error.keyword === 'minItems' && error.instancePath === '/questions') {
+    return 'Error: No questions provided';
+  }
+  const optionsMatch = /\/questions\/(\d+)\/options$/.exec(error.instancePath);
+  if (error.keyword === 'minItems' && optionsMatch !== null) {
+    const questionIndex = Number(optionsMatch[1]);
+    const questions = asQuestions(value);
+    const question = questions[questionIndex];
+    const id =
+      question !== undefined && typeof question.id === 'string'
+        ? question.id
+        : String(questionIndex);
+    return `Error: Question '${id}' must include at least two options`;
+  }
+  return `Error: Invalid sideroom_ask parameters`;
+}
+
+function asQuestions(value: unknown): readonly Record<string, unknown>[] {
+  if (typeof value !== 'object' || value === null) {
+    return [];
+  }
+  if (!('questions' in value) || !Array.isArray(value.questions)) {
+    return [];
+  }
+  return value.questions.filter(
+    (question): question is Record<string, unknown> =>
+      typeof question === 'object' && question !== null,
+  );
+}

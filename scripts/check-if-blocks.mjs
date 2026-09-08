@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 
-const sourceRoot = path.resolve('src');
+const sourceRoot = path.resolve('extensions');
 const issues = sourceFiles(sourceRoot).flatMap(checkSourceFile);
 
 if (issues.length > 0) {
