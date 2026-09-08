@@ -113,13 +113,20 @@ Every user-visible package change needs a Changeset. Create one with:
 npm run changeset
 ```
 
-Review pending release work with `npm run changeset:status`. On the protected
-`main` branch, run `npm run version-packages`, review and commit the updated
-`package.json`, `package-lock.json`, and `CHANGELOG.md`, then create and push an
-annotated `v<SemVer>` tag at that commit. Publish only by manually dispatching
-the `Publish npm package` workflow from `main` with that exact tag. The workflow
-fails unless the tag is annotated, resolves to `main`, and matches the package
-version; it publishes with npm OIDC provenance. Never publish locally.
+Review pending release work with `npm run changeset:status`. When Changesets
+are merged to `main`, the `Release` workflow creates or updates a reviewable
+Changesets version PR. That PR contains the generated `package.json`,
+`package-lock.json`, and `CHANGELOG.md` updates. Merge the version PR only after
+review; its merge runs `npm ci`, `npm run check`, and `npm run build`, then uses
+npm 11.5.1 and npm Trusted Publishing (GitHub OIDC) to publish. Changesets then
+pushes the release Git tag and creates the GitHub Release automatically.
+
+Never run `npm publish`, create release tags, or create GitHub Releases locally.
+Publishing is allowed only through the merged Changesets version PR and the
+`Release` workflow. The npm package's Trusted Publisher must be configured for
+this GitHub repository, `.github/workflows/release.yml`, and the `npm`
+environment; configure the matching GitHub `npm` environment before the first
+release.
 
 ## Layout
 
