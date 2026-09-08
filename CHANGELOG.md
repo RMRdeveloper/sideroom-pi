@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.0.1
+
+### Patch Changes
+
+- Retry publishing with npm trusted publishing on npm 11.5.1.
+
 ## 6.0.0
 
 ### Major Changes

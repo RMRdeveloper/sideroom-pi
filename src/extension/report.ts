@@ -7,7 +7,7 @@ import type { FilePolicy } from '../core/language-policy.ts';
 import type { PipelineStageEvent } from '../core/orchestrator.ts';
 import type { PipelineResult } from '../core/types.ts';
 
-const VERSION = '6.0.0';
+const VERSION = '6.0.1';
 export const TRACE_TYPE = 'sideroom:run';
 
 interface RunDetails {

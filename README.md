@@ -24,7 +24,7 @@ For a reproducible environment, install a specific release instead. A pinned
 version does not move when you run Pi's package update command.
 
 ```bash
-pi install npm:@rmrdeveloper/sideroom-pi@6.0.0
+pi install npm:@rmrdeveloper/sideroom-pi@6.0.1
 ```
 
 To update an unpinned installation:

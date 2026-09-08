@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Exact annotated vSemVer tag to publish (for example, v6.0.0)
+        description: Exact annotated vSemVer tag to publish (for example, v6.0.1)
         required: true
         type: string
 
@@ -53,7 +53,11 @@ jobs:
             echo "tag and package version do not match" >&2
             exit 1
           fi
+      - name: Use and report npm 11.5.1
+        run: |
+          npm install --global npm@11.5.1
+          npm --version
       - run: npm ci
       - run: npm run check
       - run: npm run build
-      - run: npm publish --provenance --access public
+      - run: npm publish --access public
