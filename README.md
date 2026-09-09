@@ -1,111 +1,159 @@
-# Sideroom Pi
+# Sideroom Pi — the side room your agent was missing
 
 [![npm version](https://img.shields.io/npm/v/@rmrdeveloper/sideroom-pi?label=npm&logo=npm)](https://www.npmjs.com/package/@rmrdeveloper/sideroom-pi)
 [![npm monthly downloads](https://img.shields.io/npm/dm/@rmrdeveloper/sideroom-pi?label=downloads&logo=npm)](https://www.npmjs.com/package/@rmrdeveloper/sideroom-pi)
 [![npm license](https://img.shields.io/npm/l/@rmrdeveloper/sideroom-pi?label=license)](https://www.npmjs.com/package/@rmrdeveloper/sideroom-pi)
 
-Sideroom Pi is a global [Pi package](https://pi.dev/docs/latest/packages). It
-registers two parent-agent tools: `sideroom_ask`, a TUI questionnaire for
-clarifying decisions, and `sideroom_todo`, a live work board shown above the
-editor. It also shows a session-scoped list of files successfully edited by Pi,
-and steers write/edit toward packaged coding guidelines. It writes no `.pi`
-configuration, task graph, or other Sideroom files into the repository you are
-working in.
+> Coding agents fail in predictable ways: they guess instead of asking, they
+> bury progress in chat scroll, they litter your repo with `TODO.md` files,
+> and every session writes code in a slightly different style.
+>
+> **Sideroom fixes all four — without touching your repository.**
+
+Sideroom Pi is a global [Pi package](https://pi.dev/docs/latest/packages)
+that gives the parent agent a *side room* next to your code: a place to ask
+sharp questions, show live progress, track what changed, and stay honest
+about code quality. The room lives in the Pi session, not in your repo. No
+`.pi` config, no task graph, no Sideroom files left behind.
+
+## Why Sideroom exists
+
+Every long agent session drifts toward the same failure modes:
+
+1. **Silent guessing.** The agent hits an ambiguous decision and picks
+   something instead of asking — because asking in plain chat is awkward
+   and easy to ignore.
+2. **Invisible work.** "What is it doing? Which step is it on? Did it skip
+   something?" Progress disappears into thousands of lines of transcript.
+3. **Repo pollution.** Workarounds appear as `todos.json`, scratch notes,
+   and half-abandoned plans committed next to real code.
+4. **Style drift.** Each session reinvents conventions: nesting depth, error
+   handling, naming, validation. Review becomes cleanup.
+
+Sideroom answers each one with a small, opinionated surface:
+
+| Failure | Sideroom answer |
+| --- | --- |
+| Silent guessing | `sideroom_ask` — questions with an opinion, one batch at a time |
+| Invisible work | `sideroom_todo` — a live board above the editor, always one step in focus |
+| Repo pollution | Session-branch state — the board and history die with the session, never with a commit |
+| Style drift | A one-line reminder + the on-demand `sideroom-guidelines` skill |
+
+## What it feels like
+
+You ask the agent for something non-trivial. Instead of vanishing into a
+wall of tool calls, it:
+
+- **Asks like a senior would.** A clean TUI questionnaire appears — tabs for
+  several questions, a simple list for one. Every question carries a
+  recommendation, you can always answer *Out of scope* or write your own,
+  and everything is written in your language. Escape cancels the whole
+  batch. No guessing, no twenty follow-up clarifications in chat.
+- **Works in the open.** A compact board sits above the editor:
+  `pending → in_progress → completed`. Exactly one step is active at a
+  time; the agent completes the current step and starts the next one in the
+  same move, so skipped steps become structurally hard. The board survives
+  reload, tree navigation, and compaction.
+- **Shows its traces.** Below the board, the last edited files appear as
+  clickable `file://` links. `F8` opens the full session history; `R` clears
+  it. Only successful Pi `write`/`edit` calls are tracked — no guesses from
+  shell output, Git, or subagents.
+- **Writes code that reads the same every time.** Before every edit, the
+  agent is nudged toward one shared checklist: guard clauses, braced
+  conditionals, fail fast, one responsibility per unit, no speculative
+  layers. Language-specific deltas for Java, PHP/Laravel, TypeScript,
+  Python, Go, and Rust load on demand — never dumped into the prompt.
+
+## What's inside
+
+### `sideroom_ask` — decisions, not interrogations
+
+One call is one 1–N question batch. Each question needs an `id`, a `prompt`,
+at least two `{ value, label }` options, and a `recommendationIndex` pointing
+at the recommended option. The UI adds the rest: the recommended mark, the
+always-on *Out of scope* row, and a custom answer.
+
+TUI-only by design. In print, JSON, or RPC modes it fails fast with
+`UI not available` instead of hanging.
+
+### `sideroom_todo` — a board, not a bureaucracy
+
+A display-only, ordered work board. The agent maintains it; you steer through
+chat. It never creates a repository task file or a `/todos` command.
+
+- `propose` replaces the full board (interactive TUI only).
+- `update` patches `{ id, status?, content? }` items and works everywhere,
+  including headless modes.
+- Invariant: while anything is pending, exactly one item is `in_progress`.
+
+### Edited files — proof, not promises
+
+Automatic tracking of successful `write` and `edit` results for the active
+session. The compact view shows at most five recent paths below an active
+board; the extended `F8` view scrolls through everything. Paths outside the
+project are labelled `external`. A new session starts clean.
+
+### Guidelines — a nudge, not a novel
+
+A short system-prompt reminder points at the packaged
+`sideroom-guidelines` skill. The skill body holds the shared Do/Don't table;
+one matching file under `skills/sideroom-guidelines/references/languages/`
+covers the language being edited. The canonical seed,
+`assets/artifacts/GUIDELINES_TEMPLATE.md`, is never pasted into the prompt.
 
 ## Quick path
 
-1. Install globally from npm. Pi writes this installation to your user
-   settings, so do not use `-l`.
+1. Install globally from npm. Pi records this in your user settings, so do
+   not use `-l`.
 
    ```bash
    pi install npm:@rmrdeveloper/sideroom-pi
    ```
 
 2. Start Pi in the repository you want to work in.
-3. Ask the parent agent a question that needs a decision or a visible work
-   board. It can call `sideroom_ask` or `sideroom_todo` in the TUI.
+3. Ask the parent agent something that needs a decision or a visible plan.
+   It calls `sideroom_ask` or `sideroom_todo` in the TUI.
 
-For a reproducible environment, pin a release. A pinned version does not move
-when you run Pi's package update command.
+Pin for reproducibility — a pinned version does not move on Pi's package
+update:
 
 ```bash
 pi install npm:@rmrdeveloper/sideroom-pi@7.0.0
 ```
 
-To update an unpinned installation:
+Update an unpinned installation with:
 
 ```bash
 pi update --extension npm:@rmrdeveloper/sideroom-pi
 ```
 
-## Details
+## Reference
 
-| Topic | Decision |
-| --- | --- |
-| Surface | Two LLM-callable tools: `sideroom_ask` and `sideroom_todo`. No `/sideroom` command. |
-| Questionnaire | One `sideroom_ask` call is one 1–N question batch; every question has `recommendationIndex`. |
-| Always-on rows | The questionnaire UI adds Out of scope and a custom answer. Do not send those options. |
-| Work board | `sideroom_todo propose` replaces a visible board; `update` patches items by id. |
-| Headless | `sideroom_todo update` works in print, JSON, and RPC. `propose` and `sideroom_ask` return `Error: UI not available` there. |
-| Edited files | Successful `write` and `edit` results appear below an active work board; `F8` opens the full list. |
-| Session state | The work board and edited-file history live in the Pi session branch, not in the target repository. |
-| Coding guidelines | A short system-prompt reminder points at the `sideroom-guidelines` skill. Language deltas load on demand. |
-| Seed artifact | `assets/artifacts/GUIDELINES_TEMPLATE.md` is the canonical seed; it is not dumped into the prompt. |
+### Questionnaire contract
 
-## Tool
+Write prompts, tab labels, and option copy in the language the user is
+speaking; keep ids, option values, and TUI chrome in English. Do not send
+*Out of scope* or custom-answer rows yourself — the UI always adds them.
 
-`sideroom_ask` follows Pi's questionnaire UI: a simple list for one question,
-tabs plus Submit for several. Write prompts, tab labels, and option copy in
-the language the user is speaking; ids, option values, and TUI chrome stay
-English. Each question needs:
+### Board contract
 
-- `id`
-- `prompt`
-- at least two `{ value, label, description? }` options
-- `recommendationIndex` pointing at the recommended option
-- optional `label` for the tab bar (defaults to `Q1`, `Q2`, …)
+Items have stable string ids, short content, and one of `pending`,
+`in_progress`, `completed`, or `cancelled`. Complete the current item and
+start the next one in the same `update` call. Snapshots live in the active
+session branch and are rebuilt after navigation and compaction.
 
-The recommended option is marked in the list. Escape cancels the batch.
+### Edited-files contract
 
-## Work board
+- Trigger: only successful Pi `write`/`edit` results.
+- Compact widget: max five paths, reapplied below the board.
+- Extended view: `F8` toggles, `R` clears session history.
+- Links: OSC 8 `file://` — click behavior depends on your terminal.
 
-`sideroom_todo` keeps an ordered, display-only board above the editor. The
-agent maintains it and the user steers through chat. It never creates a
-repository task file or a `/todos` command.
+### Guidelines contract
 
-- `propose` replaces the full board and is available only in the interactive
-  TUI.
-- `update` applies one or more `{ id, status?, content? }` patches and works in
-  every Pi mode.
-- Items have stable string ids, short content, and one of `pending`,
-  `in_progress`, `completed`, or `cancelled`.
-- While items are pending, exactly one item must be `in_progress`. Complete the
-  current item and start the next one in the same update.
-- Snapshots are stored in the active session branch. The board is rebuilt after
-  session navigation and compaction.
-
-## Edited files
-
-The package automatically records successful Pi `write` and `edit` calls for
-the active session. It does not infer filesystem changes from shell commands,
-Git, people, or subagents. The compact list is shown below the work board when
-one is active and contains at most five recent paths.
-
-- `F8` opens or closes the extended, scrollable list; press `R` there
-  to clear the current session's history.
-- Every path is an OSC 8 `file://` link. Your terminal determines whether that
-  is a click, Ctrl+click, or another modifier-assisted action.
-- Paths outside the active project are labelled `external`.
-- A new session starts with a new list; the current session's history survives
-  reload, tree navigation, and compaction.
-
-## Coding guidelines
-
-Before `write` or `edit`, the parent agent is reminded to read the packaged
-`sideroom-guidelines` skill. That skill holds the shared Do/Don't table. For
-`.java`, `.php`, `.ts`/`.tsx`, `.py`, `.go`, and `.rs`, the agent also reads one
-matching file under `skills/sideroom-guidelines/references/languages/`. Other
-languages follow the shared table only.
+Read the skill before `write`/`edit`. Read at most one language delta per
+change — the one matching the path. Other languages follow the shared table
+only.
 
 ## Development
 
@@ -114,36 +162,28 @@ npm install
 npm run check
 ```
 
-Biome is the sole formatter and linter. Pi loads TypeScript from `extensions/`
-directly; do not bundle. Pi provides `@earendil-works/pi-coding-agent`,
-`@earendil-works/pi-tui`, and `typebox` as peer dependencies.
+Biome is the sole formatter and linter. Pi loads TypeScript from
+`extensions/` directly; do not bundle. Pi provides
+`@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`, and `typebox` as
+peer dependencies.
 
 ## Releases and commits
 
-Commit messages must follow the Conventional Commits format. The existing
-Husky `commit-msg` hook validates each local commit with Commitlint, for
-example `feat: mark the recommended sideroom_ask option`.
+Commits follow Conventional Commits (enforced by the Husky `commit-msg` hook,
+e.g. `feat: mark the recommended sideroom_ask option`).
 
-Every user-visible package change needs a Changeset. Create one with:
+Every user-visible change needs a Changeset:
 
 ```bash
 npm run changeset
+npm run changeset:status
 ```
 
-Review pending release work with `npm run changeset:status`. When Changesets
-are merged to `main`, the `Release` workflow creates or updates a reviewable
-Changesets version PR. That PR contains the generated `package.json`,
-`package-lock.json`, and `CHANGELOG.md` updates. Merge the version PR only after
-review; its merge runs `npm ci` and `npm run check`, then uses
-npm 11.5.1 and npm Trusted Publishing (GitHub OIDC) to publish. Changesets then
-pushes the release Git tag and creates the GitHub Release automatically.
-
-Never run `npm publish`, create release tags, or create GitHub Releases locally.
-Publishing is allowed only through the merged Changesets version PR and the
-`Release` workflow. The npm package's Trusted Publisher must be configured for
-this GitHub repository, the workflow filename `release.yml` (not its path),
-and the `npm` environment; configure the matching GitHub `npm` environment
-before the first release.
+When Changesets merge to `main`, the `Release` workflow opens a reviewable
+version PR with the generated `package.json`, `package-lock.json`, and
+`CHANGELOG.md` updates. Merging it runs `npm ci` + `npm run check`, then
+publishes via npm Trusted Publishing (GitHub OIDC), tags, and releases.
+Never `npm publish`, tag, or release locally.
 
 ## Layout
 
