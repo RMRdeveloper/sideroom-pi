@@ -79,13 +79,118 @@ export type ParseAskResult =
   | { readonly ok: true; readonly questions: readonly AskQuestion[] }
   | { readonly ok: false; readonly message: string };
 
+interface JsonWireObject {
+  readonly [key: string]: JsonWireValue | undefined;
+}
+
+type JsonWireValue =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly JsonWireValue[]
+  | JsonWireObject;
+
+export function prepareAskArguments(args: unknown): AskParams {
+  return decodeAskWireArgs(args) as AskParams;
+}
+
+function decodeAskWireArgs(args: unknown): JsonWireValue {
+  if (!isJsonWireObject(args)) {
+    return toJsonWireValue(args);
+  }
+
+  const questions = decodeAskQuestions(args.questions);
+  if (questions === args.questions) {
+    return args;
+  }
+
+  return { ...args, questions };
+}
+
+function decodeAskQuestions(
+  value: JsonWireValue | undefined,
+): JsonWireValue | undefined {
+  if (value === undefined) {
+    return value;
+  }
+
+  const parsed = decodeJsonWireField(value);
+  if (!Array.isArray(parsed)) {
+    return parsed;
+  }
+
+  let changed = parsed !== value;
+  const questions = parsed.map((question) => {
+    const decoded = decodeAskQuestion(question);
+    if (decoded !== question) {
+      changed = true;
+    }
+    return decoded;
+  });
+  if (!changed) {
+    return value;
+  }
+  return questions;
+}
+
+function decodeAskQuestion(question: JsonWireValue): JsonWireValue {
+  if (!isJsonWireObject(question)) {
+    return question;
+  }
+
+  const options = decodeJsonWireField(question.options);
+  if (options === question.options) {
+    return question;
+  }
+
+  return { ...question, options };
+}
+
+function decodeJsonWireField(
+  value: JsonWireValue | undefined,
+): JsonWireValue | undefined {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value) as JsonWireValue;
+  } catch {
+    return value;
+  }
+}
+
+function isJsonWireObject(value: unknown): value is JsonWireObject {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function toJsonWireValue(value: unknown): JsonWireValue {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(toJsonWireValue);
+  }
+  if (isJsonWireObject(value)) {
+    return value;
+  }
+  return null;
+}
+
 export function parseAskParams(value: unknown): ParseAskResult {
-  if (!Check(AskParamsSchema, value)) {
-    return { ok: false, message: schemaErrorMessage(value) };
+  const decoded = decodeAskWireArgs(value);
+  if (!Check(AskParamsSchema, decoded)) {
+    return { ok: false, message: schemaErrorMessage(decoded) };
   }
 
   const seen = new Set<string>();
-  for (const question of value.questions) {
+  for (const question of decoded.questions) {
     if (seen.has(question.id)) {
       return {
         ok: false,
@@ -101,7 +206,7 @@ export function parseAskParams(value: unknown): ParseAskResult {
     }
   }
 
-  return { ok: true, questions: normalizeQuestions(value.questions) };
+  return { ok: true, questions: normalizeQuestions(decoded.questions) };
 }
 
 export function normalizeQuestions(

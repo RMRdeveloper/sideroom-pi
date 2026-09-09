@@ -8,6 +8,7 @@ import {
   normalizeQuestions,
   OUT_OF_SCOPE_LABEL,
   parseAskParams,
+  prepareAskArguments,
   renderOptions,
 } from './model.ts';
 
@@ -173,4 +174,60 @@ test('formats selected, recommended, custom, and out-of-scope answers for the mo
     ])[0],
     'Scope: Out of scope',
   );
+});
+
+test('decodes JSON-string questions and options then applies the strict schema', () => {
+  const native = sampleParams();
+  const fromQuestions = parseAskParams({
+    questions: JSON.stringify(native.questions),
+  });
+  assert.equal(fromQuestions.ok, true);
+  if (!fromQuestions.ok) {
+    return;
+  }
+  assert.deepEqual(
+    fromQuestions.questions,
+    normalizeQuestions(native.questions),
+  );
+
+  const [first] = native.questions;
+  assert.ok(first);
+  const fromOptions = parseAskParams({
+    questions: [{ ...first, options: JSON.stringify(first.options) }],
+  });
+  assert.equal(fromOptions.ok, true);
+  if (!fromOptions.ok) {
+    return;
+  }
+  assert.deepEqual(fromOptions.questions[0]?.options, first.options);
+
+  assert.equal(prepareAskArguments(native), native);
+  assert.deepEqual(
+    prepareAskArguments({ questions: JSON.stringify(native.questions) }),
+    native,
+  );
+});
+
+test('still rejects invalid JSON strings and decoded values that fail the schema', () => {
+  const [first] = sampleParams().questions;
+  assert.ok(first);
+  const cases: unknown[] = [
+    { questions: '[{' },
+    { questions: '{}' },
+    { questions: JSON.stringify([{ id: 'scope' }]) },
+    {
+      questions: [
+        {
+          ...first,
+          options: JSON.stringify([{ value: 'only', label: 'Only' }]),
+        },
+      ],
+    },
+    { questions: JSON.stringify([]) },
+  ];
+
+  for (const params of cases) {
+    const parsed = parseAskParams(params);
+    assert.equal(parsed.ok, false);
+  }
 });

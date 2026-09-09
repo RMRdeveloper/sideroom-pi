@@ -1,7 +1,12 @@
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { Text } from '@earendil-works/pi-tui';
 import { executeAsk } from './execute.ts';
-import { AskParamsSchema, type AskResult, TOOL_NAME } from './model.ts';
+import {
+  AskParamsSchema,
+  type AskResult,
+  prepareAskArguments,
+  TOOL_NAME,
+} from './model.ts';
 
 export const ASK_DESCRIPTION =
   'Ask the user one or more questions in the language they are speaking. Use for clarifying requirements, getting preferences, or confirming decisions. Each question must include a recommended option. For a single question, shows a simple option list. For multiple questions, shows a tab-based interface.';
@@ -27,6 +32,7 @@ export default function registerAsk(pi: ExtensionAPI): void {
     promptSnippet: ASK_PROMPT_SNIPPET,
     promptGuidelines: ASK_PROMPT_GUIDELINES,
     parameters: AskParamsSchema,
+    prepareArguments: prepareAskArguments,
     executionMode: 'sequential',
     execute: async (_toolCallId, params, _signal, _onUpdate, ctx) =>
       executeAsk(params, ctx),

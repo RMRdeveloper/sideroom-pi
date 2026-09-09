@@ -10,6 +10,7 @@ test('registers sideroom_ask as a sequential parent-agent tool', () => {
     readonly executionMode?: string;
     readonly promptSnippet?: string;
     readonly promptGuidelines?: readonly string[];
+    prepareArguments?: (args: unknown) => unknown;
   }> = [];
   registerAsk({
     registerTool: (tool) => {
@@ -31,5 +32,36 @@ test('registers sideroom_ask as a sequential parent-agent tool', () => {
   assert.match(
     ASK_PROMPT_GUIDELINES.join('\n'),
     /language the user is speaking/,
+  );
+});
+
+test('prepares stringified questions before execute sees native arrays', () => {
+  const tools: Array<{
+    prepareArguments?: (args: unknown) => unknown;
+  }> = [];
+  registerAsk({
+    registerTool: (tool) => {
+      tools.push(tool);
+    },
+  } as Pick<ExtensionAPI, 'registerTool'> as ExtensionAPI);
+
+  const questions = [
+    {
+      id: 'scope',
+      prompt: 'Who should receive the first rollout?',
+      options: [
+        { value: 'pilot', label: 'Pilot with one team' },
+        { value: 'all', label: 'Roll out to every team now' },
+      ],
+      recommendationIndex: 0,
+    },
+  ];
+  const tool = tools[0];
+  assert.ok(tool?.prepareArguments);
+  assert.deepEqual(
+    tool.prepareArguments({ questions: JSON.stringify(questions) }),
+    {
+      questions,
+    },
   );
 });
