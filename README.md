@@ -7,9 +7,10 @@
 Sideroom Pi is a global [Pi package](https://pi.dev/docs/latest/packages). It
 registers two parent-agent tools: `sideroom_ask`, a TUI questionnaire for
 clarifying decisions, and `sideroom_todo`, a live work board shown above the
-editor. It also shows a session-scoped list of files successfully edited by Pi.
-It writes no `.pi` configuration, task graph, or other Sideroom files into the
-repository you are working in.
+editor. It also shows a session-scoped list of files successfully edited by Pi,
+and steers write/edit toward packaged coding guidelines. It writes no `.pi`
+configuration, task graph, or other Sideroom files into the repository you are
+working in.
 
 ## Quick path
 
@@ -48,7 +49,8 @@ pi update --extension npm:@rmrdeveloper/sideroom-pi
 | Headless | `sideroom_todo update` works in print, JSON, and RPC. `propose` and `sideroom_ask` return `Error: UI not available` there. |
 | Edited files | Successful `write` and `edit` results appear below an active work board; `F8` opens the full list. |
 | Session state | The work board and edited-file history live in the Pi session branch, not in the target repository. |
-| Seed artifact | `assets/artifacts/GUIDELINES_TEMPLATE.md` ships unwired. |
+| Coding guidelines | A short system-prompt reminder points at the `sideroom-guidelines` skill. Language deltas load on demand. |
+| Seed artifact | `assets/artifacts/GUIDELINES_TEMPLATE.md` is the canonical seed; it is not dumped into the prompt. |
 
 ## Tool
 
@@ -97,6 +99,14 @@ one is active and contains at most five recent paths.
 - A new session starts with a new list; the current session's history survives
   reload, tree navigation, and compaction.
 
+## Coding guidelines
+
+Before `write` or `edit`, the parent agent is reminded to read the packaged
+`sideroom-guidelines` skill. That skill holds the shared Do/Don't table. For
+`.java`, `.php`, `.ts`/`.tsx`, `.py`, `.go`, and `.rs`, the agent also reads one
+matching file under `skills/sideroom-guidelines/references/languages/`. Other
+languages follow the shared table only.
+
 ## Development
 
 ```bash
@@ -143,7 +153,9 @@ extensions/
   todo/                  sideroom_todo (index.ts, execute.ts, session.ts,
                          guards.ts, model.ts, ui.ts)
   modified-files/        session-backed edited-file tracker and view
-assets/artifacts/        unwired GUIDELINES_TEMPLATE.md seed
+  guidelines/            short write/edit reminder
+skills/sideroom-guidelines/  on-demand checklist and language deltas
+assets/artifacts/        GUIDELINES_TEMPLATE.md seed
 ```
 
 Add another tool as `extensions/<name>/index.ts`. Pi discovers

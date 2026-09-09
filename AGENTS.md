@@ -6,8 +6,9 @@ Sideroom is a global Pi package. Each tool lives in `extensions/<name>/` with
 `index.ts` as the Pi entry (`export default`). Do not add a slash command, a
 standalone CLI, project-local harness files, or a subprocess wrapper around Pi.
 
-`assets/artifacts/GUIDELINES_TEMPLATE.md` is an unwired seed for later product
-work. Do not load it into a tool.
+`assets/artifacts/GUIDELINES_TEMPLATE.md` is the canonical seed. Do not dump
+it into the system prompt. `extensions/guidelines/` injects a short reminder;
+`skills/sideroom-guidelines/` is the on-demand checklist and language deltas.
 
 ## Source of truth
 
@@ -29,6 +30,10 @@ work. Do not load it into a tool.
   session restoration, and the `F8` view.
 - `extensions/modified-files/session.ts` owns snapshots and widget refreshes;
   `extensions/modified-files/ui.ts` owns the compact and extended displays.
+- `extensions/guidelines/index.ts` appends a short write/edit reminder.
+- `extensions/guidelines/prompt.ts` owns the reminder text and idempotent append.
+- `skills/sideroom-guidelines/SKILL.md` owns the Do/Don't table and language map;
+  `skills/sideroom-guidelines/references/languages/` owns per-language deltas.
 
 Add a tool by creating `extensions/<name>/index.ts`. Pi discovers
 `extensions/*/index.ts`; helper files in that folder are not extensions.
@@ -71,3 +76,5 @@ Biome requires braces around every `if` body. Do not disable
 - `modified-files` tracks only successful Pi `write` and `edit` results in the
   current session. Its compact widget shows at most five paths and must
   reapply after `sideroom:todo-widget-refreshed` so it remains below the board.
+- `guidelines` injects a short reminder only. The skill body and one language
+  delta load on demand. Do not add a slash command or a writer subagent.

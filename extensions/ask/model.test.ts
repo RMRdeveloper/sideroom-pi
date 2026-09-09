@@ -1,7 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 import {
   type AskParams,
   CUSTOM_LABEL,
@@ -43,15 +41,6 @@ function sampleParams(): AskParams {
     ],
   };
 }
-
-test('keeps the unwired guidelines template as a seed', () => {
-  const file = fileURLToPath(
-    new URL('../../assets/artifacts/GUIDELINES_TEMPLATE.md', import.meta.url),
-  );
-  const text = readFileSync(file, 'utf8');
-  assert.match(text, /# Guidelines Template/);
-  assert.match(text, /Use braces around every `if` body/);
-});
 
 test('rejects an empty batch, duplicate ids, short option lists, and a bad recommendationIndex', () => {
   const empty = parseAskParams({ questions: [] });
