@@ -5,10 +5,10 @@
 [![npm license](https://img.shields.io/npm/l/@rmrdeveloper/sideroom-pi?label=license)](https://www.npmjs.com/package/@rmrdeveloper/sideroom-pi)
 
 Sideroom Pi is a global [Pi package](https://pi.dev/docs/latest/packages). It
-registers `sideroom_ask`, a TUI questionnaire the parent agent can call to
-clarify requirements, preferences, or decisions. It writes no `.pi`
-configuration, task graph, or other Sideroom files into the repository you
-are working in.
+registers two parent-agent tools: `sideroom_ask`, a TUI questionnaire for
+clarifying decisions, and `sideroom_todo`, a live work board shown above the
+editor. It writes no `.pi` configuration, task graph, or other Sideroom files
+into the repository you are working in.
 
 ## Quick path
 
@@ -20,8 +20,8 @@ are working in.
    ```
 
 2. Start Pi in the repository you want to work in.
-3. Ask the parent agent a question that needs a decision. It can call
-   `sideroom_ask` in the TUI.
+3. Ask the parent agent a question that needs a decision or a visible work
+   board. It can call `sideroom_ask` or `sideroom_todo` in the TUI.
 
 For a reproducible environment, pin a release. A pinned version does not move
 when you run Pi's package update command.
@@ -40,11 +40,12 @@ pi update --extension npm:@rmrdeveloper/sideroom-pi
 
 | Topic | Decision |
 | --- | --- |
-| Surface | One LLM-callable tool, `sideroom_ask`. No `/sideroom` command. |
-| Batch | One tool call is one 1–N question batch. Call again for another round. |
-| Recommendation | Every question must send `recommendationIndex`. |
-| Always-on rows | The UI adds Out of scope and a custom answer. Do not send those options. |
-| Headless | Print, JSON, and RPC return `Error: UI not available`. |
+| Surface | Two LLM-callable tools: `sideroom_ask` and `sideroom_todo`. No `/sideroom` command. |
+| Questionnaire | One `sideroom_ask` call is one 1–N question batch; every question has `recommendationIndex`. |
+| Always-on rows | The questionnaire UI adds Out of scope and a custom answer. Do not send those options. |
+| Work board | `sideroom_todo propose` replaces a visible board; `update` patches items by id. |
+| Headless | `sideroom_todo update` works in print, JSON, and RPC. `propose` and `sideroom_ask` return `Error: UI not available` there. |
+| Session state | The work board lives in the Pi session branch, not in the target repository. |
 | Seed artifact | `assets/artifacts/GUIDELINES_TEMPLATE.md` ships unwired. |
 
 ## Tool
@@ -59,6 +60,23 @@ tabs plus Submit for several. English copy. Each question needs:
 - optional `label` for the tab bar (defaults to `Q1`, `Q2`, …)
 
 The recommended option is marked in the list. Escape cancels the batch.
+
+## Work board
+
+`sideroom_todo` keeps an ordered, display-only board above the editor. The
+agent maintains it and the user steers through chat. It never creates a
+repository task file or a `/todos` command.
+
+- `propose` replaces the full board and is available only in the interactive
+  TUI.
+- `update` applies one or more `{ id, status?, content? }` patches and works in
+  every Pi mode.
+- Items have stable string ids, short content, and one of `pending`,
+  `in_progress`, `completed`, or `cancelled`.
+- While items are pending, exactly one item must be `in_progress`. Complete the
+  current item and start the next one in the same update.
+- Snapshots are stored in the active session branch. The board is rebuilt after
+  session navigation and compaction.
 
 ## Development
 
@@ -102,7 +120,9 @@ before the first release.
 
 ```text
 extensions/
-  ask/                   sideroom_ask (index.ts, model.ts, ui.ts)
+  ask/                   sideroom_ask (index.ts, execute.ts, model.ts, ui.ts)
+  todo/                  sideroom_todo (index.ts, execute.ts, session.ts,
+                         guards.ts, model.ts, ui.ts)
 assets/artifacts/        unwired GUIDELINES_TEMPLATE.md seed
 ```
 

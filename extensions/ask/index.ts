@@ -1,19 +1,7 @@
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-} from '@earendil-works/pi-coding-agent';
+import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { Text } from '@earendil-works/pi-tui';
-import {
-  type AskParams,
-  AskParamsSchema,
-  type AskQuestion,
-  type AskResult,
-  formatAnswerLines,
-  parseAskParams,
-  TOOL_NAME,
-  UI_UNAVAILABLE,
-} from './model.ts';
-import { runAskUi } from './ui.ts';
+import { executeAsk } from './execute.ts';
+import { AskParamsSchema, type AskResult, TOOL_NAME } from './model.ts';
 
 export const ASK_DESCRIPTION =
   'Ask the user one or more questions. Use for clarifying requirements, getting preferences, or confirming decisions. Each question must include a recommended option. For a single question, shows a simple option list. For multiple questions, shows a tab-based interface.';
@@ -28,42 +16,6 @@ export const ASK_PROMPT_GUIDELINES = [
   'One sideroom_ask call is one batch; call it again if another round of questions is needed.',
   'sideroom_ask only works in the interactive TUI; it returns an error in print, JSON, or RPC modes.',
 ];
-
-interface AskToolResult {
-  readonly content: [{ readonly type: 'text'; readonly text: string }];
-  readonly details: AskResult;
-}
-
-export async function executeAsk(
-  params: AskParams,
-  ctx: Pick<ExtensionContext, 'mode' | 'ui'>,
-): Promise<AskToolResult> {
-  const parsed = parseAskParams(params);
-  if (!parsed.ok) {
-    return cancelledResult(parsed.message);
-  }
-  if (ctx.mode !== 'tui') {
-    return cancelledResult(UI_UNAVAILABLE, parsed.questions);
-  }
-
-  const result = await runAskUi(ctx.ui, parsed.questions);
-  if (result.cancelled) {
-    return {
-      content: [{ type: 'text', text: 'User cancelled the questionnaire' }],
-      details: result,
-    };
-  }
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: formatAnswerLines(parsed.questions, result.answers).join('\n'),
-      },
-    ],
-    details: result,
-  };
-}
 
 // Pi loads extensions/*/index.ts through export default.
 export default function registerAsk(pi: ExtensionAPI): void {
@@ -123,15 +75,3 @@ export default function registerAsk(pi: ExtensionAPI): void {
     },
   });
 }
-
-function cancelledResult(
-  message: string,
-  questions: readonly AskQuestion[] = [],
-): AskToolResult {
-  return {
-    content: [{ type: 'text', text: message }],
-    details: { questions, answers: [], cancelled: true },
-  };
-}
-
-export type { AskResult };
