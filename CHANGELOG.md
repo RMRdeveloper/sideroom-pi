@@ -1,5 +1,12 @@
 # Changelog
 
+## 7.0.1
+
+### Patch Changes
+
+- e80d9bd: Decode JSON-string `sideroom_ask` questions and nested options before the strict schema check so OpenCode-style tool calls still validate question structure.
+- 63f965a: Decode JSON-string `sideroom_todo` arrays before the strict schema check so OpenCode-style tool calls still validate item structure.
+
 ## 7.0.0
 
 ### Major Changes
