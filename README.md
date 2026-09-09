@@ -155,48 +155,6 @@ Read the skill before `write`/`edit`. Read at most one language delta per
 change — the one matching the path. Other languages follow the shared table
 only.
 
-## Development
+## License
 
-```bash
-npm install
-npm run check
-```
-
-Biome is the sole formatter and linter. Pi loads TypeScript from
-`extensions/` directly; do not bundle. Pi provides
-`@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`, and `typebox` as
-peer dependencies.
-
-## Releases and commits
-
-Commits follow Conventional Commits (enforced by the Husky `commit-msg` hook,
-e.g. `feat: mark the recommended sideroom_ask option`).
-
-Every user-visible change needs a Changeset:
-
-```bash
-npm run changeset
-npm run changeset:status
-```
-
-When Changesets merge to `main`, the `Release` workflow opens a reviewable
-version PR with the generated `package.json`, `package-lock.json`, and
-`CHANGELOG.md` updates. Merging it runs `npm ci` + `npm run check`, then
-publishes via npm Trusted Publishing (GitHub OIDC), tags, and releases.
-Never `npm publish`, tag, or release locally.
-
-## Layout
-
-```text
-extensions/
-  ask/                   sideroom_ask (index.ts, execute.ts, model.ts, ui.ts)
-  todo/                  sideroom_todo (index.ts, execute.ts, session.ts,
-                         guards.ts, model.ts, ui.ts)
-  modified-files/        session-backed edited-file tracker and view
-  guidelines/            short write/edit reminder
-skills/sideroom-guidelines/  on-demand checklist and language deltas
-assets/artifacts/        GUIDELINES_TEMPLATE.md seed
-```
-
-Add another tool as `extensions/<name>/index.ts`. Pi discovers
-`extensions/*/index.ts`; helpers in that folder are not loaded as extensions.
+MIT.
