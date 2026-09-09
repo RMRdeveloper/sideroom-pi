@@ -1,5 +1,13 @@
 # Changelog
 
+## 7.1.0
+
+### Minor Changes
+
+- cad60d5: Add `sideroom-domain-modeling` skill: sharpen the ubiquitous language while designing, write settled terms to `CONTEXT.md` with `_Avoid_` synonyms, and offer ADRs only when all three gates pass
+- cad60d5: Add `sideroom-domain-scaffold` skill: survey the central domain code as source of truth, build or complete `CONTEXT.md` without interviews, and grill unreconciled terms once at the end
+- cad60d5: Add `sideroom-grill` skill: interview fuzzy plans in `sideroom_ask` rounds and write the settled vocabulary to `CONTEXT.md` and hard decisions to `docs/adr/`
+
 ## 7.0.1
 
 ### Patch Changes
