@@ -38,6 +38,7 @@ Sideroom answers each one with a small, opinionated surface:
 | Invisible work | `sideroom_todo` — a live board above the editor, always one step in focus |
 | Repo pollution | Session-branch state — the board and history die with the session, never with a commit |
 | Style drift | A one-line reminder + the on-demand `sideroom-guidelines` skill |
+| Vague plans | `sideroom-grill` — an interview that settles the words before the work |
 
 ## What it feels like
 
@@ -92,6 +93,20 @@ Automatic tracking of successful `write` and `edit` results for the active
 session. The compact view shows at most five recent paths below an active
 board; the extended `F8` view scrolls through everything. Paths outside the
 project are labelled `external`. A new session starts clean.
+
+### Grill — settle the words first
+
+An on-demand skill for fuzzy plans. It interviews you in `sideroom_ask`
+rounds — reading the codebase first so it never asks what the code already
+says — until you share one understanding. Resolved terms land in
+`CONTEXT.md` the moment they resolve; hard decisions land as ADRs under
+`docs/adr/`. Everything else stays in the conversation, ready to become a
+spec or an implementation. Vocabulary sharpening during the rounds follows
+the companion `sideroom-domain-modeling` skill, which also runs on its own
+whenever the words — not the plan — are the problem. And when there is no
+one to interview at all, `sideroom-domain-scaffold` reads the central
+domain code as source of truth, builds or completes `CONTEXT.md` on its
+own, and grills the conflicting terms once, at the end.
 
 ### Guidelines — a nudge, not a novel
 
@@ -154,6 +169,13 @@ session branch and are rebuilt after navigation and compaction.
 Read the skill before `write`/`edit`. Read at most one language delta per
 change — the one matching the path. Other languages follow the shared table
 only.
+
+### Grill contract
+
+Load the skill at the start of a change with a fuzzy plan.
+Single-session scope only. Files are created lazily: nothing exists until
+the first term or decision crystallises. A session with a sharper glossary
+and zero ADRs is working as designed.
 
 ## License
 
