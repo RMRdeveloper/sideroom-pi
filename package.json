@@ -1,6 +1,6 @@
 {
   "name": "@rmrdeveloper/sideroom-pi",
-  "version": "7.0.0",
+  "version": "7.0.1",
   "description": "A global Pi package with a questionnaire, work board, edited-file view, and coding guidelines for parent agents.",
   "type": "module",
   "files": [
