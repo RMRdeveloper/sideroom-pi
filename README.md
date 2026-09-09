@@ -53,7 +53,9 @@ pi update --extension npm:@rmrdeveloper/sideroom-pi
 ## Tool
 
 `sideroom_ask` follows Pi's questionnaire UI: a simple list for one question,
-tabs plus Submit for several. English copy. Each question needs:
+tabs plus Submit for several. Write prompts, tab labels, and option copy in
+the language the user is speaking; ids, option values, and TUI chrome stay
+English. Each question needs:
 
 - `id`
 - `prompt`

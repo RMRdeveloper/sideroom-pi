@@ -59,6 +59,9 @@ Biome requires braces around every `if` body. Do not disable
 - `sideroom_ask` is a normal parent-agent tool. One call is one 1–N batch.
 - Each question requires `recommendationIndex`. The UI always adds Out of scope
   and a custom answer; callers must not send those rows.
+- Write `sideroom_ask` prompts, tab labels, and option labels or descriptions
+  in the language the user is speaking. Keep ids, option values, and source in
+  English. TUI chrome stays English.
 - Non-TUI calls fail with an explicit UI-not-available error.
 - The tool must not write Sideroom state into the target repository.
 - `sideroom_todo` is a display-only work board. `propose` replaces it and is

@@ -22,10 +22,14 @@ test('registers sideroom_ask as a sequential parent-agent tool', () => {
   assert.equal(tools[0]?.executionMode, 'sequential');
   assert.equal(
     tools[0]?.promptSnippet,
-    'Ask the user one or more questions with a recommended option.',
+    'Ask the user one or more questions with a recommended option, in their language.',
   );
   assert.deepEqual(tools[0]?.promptGuidelines, ASK_PROMPT_GUIDELINES);
   for (const guideline of ASK_PROMPT_GUIDELINES) {
     assert.match(guideline, /sideroom_ask/);
   }
+  assert.match(
+    ASK_PROMPT_GUIDELINES.join('\n'),
+    /language the user is speaking/,
+  );
 });

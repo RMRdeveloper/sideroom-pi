@@ -4,14 +4,15 @@ import { executeAsk } from './execute.ts';
 import { AskParamsSchema, type AskResult, TOOL_NAME } from './model.ts';
 
 export const ASK_DESCRIPTION =
-  'Ask the user one or more questions. Use for clarifying requirements, getting preferences, or confirming decisions. Each question must include a recommended option. For a single question, shows a simple option list. For multiple questions, shows a tab-based interface.';
+  'Ask the user one or more questions in the language they are speaking. Use for clarifying requirements, getting preferences, or confirming decisions. Each question must include a recommended option. For a single question, shows a simple option list. For multiple questions, shows a tab-based interface.';
 
 export const ASK_PROMPT_SNIPPET =
-  'Ask the user one or more questions with a recommended option.';
+  'Ask the user one or more questions with a recommended option, in their language.';
 
 export const ASK_PROMPT_GUIDELINES = [
   'Use sideroom_ask to clarify requirements, preferences, or decisions with the user.',
   'Each sideroom_ask question needs an id, a prompt, at least two options, and a recommendationIndex pointing at the recommended option.',
+  'Write every sideroom_ask prompt, tab label, and option label or description in the language the user is speaking. Keep ids, option values, and tool code in English.',
   'sideroom_ask always adds Out of scope and a custom answer; do not include those options yourself.',
   'One sideroom_ask call is one batch; call it again if another round of questions is needed.',
   'sideroom_ask only works in the interactive TUI; it returns an error in print, JSON, or RPC modes.',
