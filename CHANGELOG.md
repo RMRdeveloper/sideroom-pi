@@ -1,5 +1,27 @@
 # Changelog
 
+## 7.0.0
+
+### Major Changes
+
+- 9c5824a: Replace the `/sideroom` coding pipeline with the `sideroom_ask` question tool.
+  
+  This major release removes the isolated planner/implementer/reviewer/verifier/fixer
+  pipeline, the `/sideroom` command, packaged skills, and language guideline layers.
+  The package now registers one parent-agent TUI questionnaire from
+  `extensions/ask/`. Each question requires a recommendation; the UI always adds
+  Out of scope and a custom answer. Pi loads TypeScript extensions directly.
+
+### Minor Changes
+
+- 1f3ebee: Show session-scoped files successfully edited by Pi, with file links and an extended shortcut view.
+- edccb03: Steer write/edit toward packaged coding guidelines, with on-demand language deltas.
+- 2863bf3: Add `sideroom_todo`, a compact session-backed work board that the parent agent can propose and update while the user watches progress in the TUI.
+
+### Patch Changes
+
+- 9d5c22d: Instruct `sideroom_ask` callers to write prompts, tab labels, and option copy in the language the user is speaking.
+
 ## 6.0.1
 
 ### Patch Changes
