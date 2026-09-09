@@ -22,6 +22,7 @@ test('registers a sequential tool that snapshots and injects the live board', as
   const snapshots: unknown[] = [];
   const steers: Array<{ message: unknown; options: unknown }> = [];
   const widgets: Array<{ key: string; content: unknown }> = [];
+  const widgetRefreshes: unknown[] = [];
   const api = {
     registerTool(tool: RegisteredTool) {
       registered.tool = tool;
@@ -34,6 +35,11 @@ test('registers a sequential tool that snapshots and injects the live board', as
     },
     sendMessage(message: unknown, options: unknown) {
       steers.push({ message, options });
+    },
+    events: {
+      emit(_channel: string, value: unknown) {
+        widgetRefreshes.push(value);
+      },
     },
   } as unknown as ExtensionAPI;
   const ctx = {
@@ -68,6 +74,7 @@ test('registers a sequential tool that snapshots and injects the live board', as
   });
   assert.deepEqual(snapshots, [{ items: initialItems }]);
   assert.equal(widgets.at(-1)?.key, 'sideroom-todo');
+  assert.deepEqual(widgetRefreshes, [ctx]);
 
   const beforeAgentStart = handlers.get('before_agent_start');
   assert.ok(beforeAgentStart);
@@ -115,6 +122,7 @@ test('nudges only once when mutating an empty board', () => {
     sendMessage(message: unknown) {
       steers.push(message);
     },
+    events: { emit() {} },
   } as unknown as ExtensionAPI;
   const ctx = {
     sessionManager: { getBranch: () => [] },

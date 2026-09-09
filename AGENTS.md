@@ -25,6 +25,10 @@ work. Do not load it into a tool.
 - `extensions/todo/guards.ts` owns skip-prevention steers.
 - `extensions/todo/model.ts` owns the board schema, normalization, patches, and
   state invariants; `extensions/todo/ui.ts` owns its display-only widget.
+- `extensions/modified-files/index.ts` composes successful edit/write tracking,
+  session restoration, and the `F8` view.
+- `extensions/modified-files/session.ts` owns snapshots and widget refreshes;
+  `extensions/modified-files/ui.ts` owns the compact and extended displays.
 
 Add a tool by creating `extensions/<name>/index.ts`. Pi discovers
 `extensions/*/index.ts`; helper files in that folder are not extensions.
@@ -61,3 +65,6 @@ Biome requires braces around every `if` body. Do not disable
   TUI-only; `update` patches ids in every mode. Persist snapshots with
   `appendEntry`, reconstruct from `getBranch()`, and never take over
   `session_before_compact` or add `/todos`.
+- `modified-files` tracks only successful Pi `write` and `edit` results in the
+  current session. Its compact widget shows at most five paths and must
+  reapply after `sideroom:todo-widget-refreshed` so it remains below the board.

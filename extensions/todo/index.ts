@@ -11,6 +11,7 @@ import {
   registerSessionRefreshEvents,
   restoreAndRefreshBoard,
   restoreBoard,
+  TODO_WIDGET_REFRESH_EVENT,
   type TodoStore,
 } from './session.ts';
 
@@ -33,17 +34,25 @@ export default function registerTodo(pi: ExtensionAPI): void {
   const restore: BoardLifecycle = (ctx) => {
     restoreBoard(store, ctx);
   };
+  const notifyWidgetRefresh: BoardLifecycle = (ctx) => {
+    pi.events.emit(TODO_WIDGET_REFRESH_EVENT, ctx);
+  };
   const restoreAndRefresh: BoardLifecycle = (ctx) => {
     restoreAndRefreshBoard(store, ctx);
+    notifyWidgetRefresh(ctx);
   };
 
   registerSessionRefreshEvents(pi, restoreAndRefresh);
   registerGuardEvents(pi, store, restore);
   registerBoardContext(pi, store, restoreAndRefresh);
-  registerTodoTool(pi, store);
+  registerTodoTool(pi, store, notifyWidgetRefresh);
 }
 
-function registerTodoTool(pi: ExtensionAPI, store: TodoStore): void {
+function registerTodoTool(
+  pi: ExtensionAPI,
+  store: TodoStore,
+  notifyWidgetRefresh: BoardLifecycle,
+): void {
   pi.registerTool({
     name: TOOL_NAME,
     label: 'Sideroom Todo',
@@ -59,6 +68,7 @@ function registerTodoTool(pi: ExtensionAPI, store: TodoStore): void {
       }
 
       commitBoard(store, pi, ctx, result.details.items);
+      notifyWidgetRefresh(ctx);
       return result;
     },
     renderCall(args, theme) {

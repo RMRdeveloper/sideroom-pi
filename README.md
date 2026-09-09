@@ -7,8 +7,9 @@
 Sideroom Pi is a global [Pi package](https://pi.dev/docs/latest/packages). It
 registers two parent-agent tools: `sideroom_ask`, a TUI questionnaire for
 clarifying decisions, and `sideroom_todo`, a live work board shown above the
-editor. It writes no `.pi` configuration, task graph, or other Sideroom files
-into the repository you are working in.
+editor. It also shows a session-scoped list of files successfully edited by Pi.
+It writes no `.pi` configuration, task graph, or other Sideroom files into the
+repository you are working in.
 
 ## Quick path
 
@@ -45,7 +46,8 @@ pi update --extension npm:@rmrdeveloper/sideroom-pi
 | Always-on rows | The questionnaire UI adds Out of scope and a custom answer. Do not send those options. |
 | Work board | `sideroom_todo propose` replaces a visible board; `update` patches items by id. |
 | Headless | `sideroom_todo update` works in print, JSON, and RPC. `propose` and `sideroom_ask` return `Error: UI not available` there. |
-| Session state | The work board lives in the Pi session branch, not in the target repository. |
+| Edited files | Successful `write` and `edit` results appear below an active work board; `F8` opens the full list. |
+| Session state | The work board and edited-file history live in the Pi session branch, not in the target repository. |
 | Seed artifact | `assets/artifacts/GUIDELINES_TEMPLATE.md` ships unwired. |
 
 ## Tool
@@ -77,6 +79,21 @@ repository task file or a `/todos` command.
   current item and start the next one in the same update.
 - Snapshots are stored in the active session branch. The board is rebuilt after
   session navigation and compaction.
+
+## Edited files
+
+The package automatically records successful Pi `write` and `edit` calls for
+the active session. It does not infer filesystem changes from shell commands,
+Git, people, or subagents. The compact list is shown below the work board when
+one is active and contains at most five recent paths.
+
+- `F8` opens or closes the extended, scrollable list; press `R` there
+  to clear the current session's history.
+- Every path is an OSC 8 `file://` link. Your terminal determines whether that
+  is a click, Ctrl+click, or another modifier-assisted action.
+- Paths outside the active project are labelled `external`.
+- A new session starts with a new list; the current session's history survives
+  reload, tree navigation, and compaction.
 
 ## Development
 
@@ -123,6 +140,7 @@ extensions/
   ask/                   sideroom_ask (index.ts, execute.ts, model.ts, ui.ts)
   todo/                  sideroom_todo (index.ts, execute.ts, session.ts,
                          guards.ts, model.ts, ui.ts)
+  modified-files/        session-backed edited-file tracker and view
 assets/artifacts/        unwired GUIDELINES_TEMPLATE.md seed
 ```
 

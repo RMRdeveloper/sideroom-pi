@@ -14,6 +14,7 @@ import { renderTodoWidget } from './ui.ts';
 
 export const SNAPSHOT_TYPE = 'sideroom-todo';
 export const WIDGET_KEY = 'sideroom-todo';
+export const TODO_WIDGET_REFRESH_EVENT = 'sideroom:todo-widget-refreshed';
 
 export interface TodoStore {
   items: readonly TodoItem[];

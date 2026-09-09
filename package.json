@@ -1,7 +1,7 @@
 {
   "name": "@rmrdeveloper/sideroom-pi",
   "version": "6.0.1",
-  "description": "A global Pi package with a TUI questionnaire and live work board for parent agents.",
+  "description": "A global Pi package with a questionnaire, work board, and edited-file view for parent agents.",
   "type": "module",
   "files": [
     "extensions",
@@ -32,6 +32,7 @@
     "pi-extension",
     "questionnaire",
     "todo",
+    "edited-files",
     "sideroom_ask",
     "sideroom_todo",
     "typescript"
