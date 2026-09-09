@@ -4,6 +4,7 @@ import {
   applyTodoParams,
   formatBoardBlock,
   parseTodoParams,
+  prepareTodoArguments,
   shouldNudgePropose,
   shouldWatchdogUpdate,
   type TodoItem,
@@ -206,4 +207,76 @@ test('formats the compact board and only nudges the applicable skipped workflow'
     shouldNudgePropose({ ...base, items: [], steerFromUs: true }),
     false,
   );
+});
+
+test('decodes JSON-string items and patches then applies the strict schema', () => {
+  const items: TodoItem[] = [
+    { id: 'auth', content: 'Add login route', status: 'in_progress' },
+    { id: 'tests', content: 'Cover login', status: 'pending' },
+  ];
+  const parsed = parseTodoParams({
+    action: 'propose',
+    items: JSON.stringify(items),
+  });
+  assert.deepEqual(parsed, {
+    ok: true,
+    params: { action: 'propose', items },
+  });
+
+  const nativePropose = propose(items);
+  assert.equal(prepareTodoArguments(nativePropose), nativePropose);
+  assert.deepEqual(
+    prepareTodoArguments({
+      action: 'propose',
+      items: JSON.stringify(items),
+    }),
+    nativePropose,
+  );
+
+  const update = parseTodoParams({
+    action: 'update',
+    patches: JSON.stringify([
+      { id: 'auth', status: 'completed' },
+      { id: 'tests', status: 'in_progress' },
+    ]),
+  });
+  assert.equal(update.ok, true);
+  if (!update.ok) {
+    return;
+  }
+  assert.deepEqual(applyTodoParams(board, update.params), {
+    ok: true,
+    items: [
+      { id: 'auth', content: 'Add login route', status: 'completed' },
+      { id: 'tests', content: 'Cover login', status: 'in_progress' },
+      { id: 'schema', content: 'Item types', status: 'completed' },
+    ],
+  });
+});
+
+test('still rejects invalid JSON strings and decoded values that fail the schema', () => {
+  const cases: unknown[] = [
+    { action: 'propose', items: '[{' },
+    { action: 'propose', items: '{}' },
+    { action: 'propose', items: JSON.stringify([{ id: 'auth' }]) },
+    { action: 'update', patches: 'not-json' },
+    {
+      action: 'propose',
+      items: JSON.stringify([
+        { id: 'one', content: 'One', status: 'pending' },
+        { id: 'two', content: 'Two', status: 'pending' },
+      ]),
+    },
+  ];
+
+  for (const params of cases) {
+    const parsed = parseTodoParams(params);
+    assert.equal(parsed.ok, false);
+    if (!parsed.ok) {
+      assert.match(
+        parsed.message,
+        /Invalid sideroom_todo parameters|exactly one/,
+      );
+    }
+  }
 });

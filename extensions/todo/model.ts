@@ -115,13 +115,84 @@ const STATUS_MARKS: Readonly<Record<TodoStatus, string>> = {
 const BOARD_INSTRUCTIONS =
   'Call sideroom_todo update before the next item. While any item is pending, exactly one must be in_progress. Complete the current item and start the next in the same update. propose replaces the list; update patches by id.';
 
+interface JsonWireObject {
+  readonly [key: string]: JsonWireValue | undefined;
+}
+
+type JsonWireValue =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly JsonWireValue[]
+  | JsonWireObject;
+
+export function prepareTodoArguments(args: unknown): TodoParams {
+  return decodeTodoWireArgs(args) as TodoParams;
+}
+
+function decodeTodoWireArgs(args: unknown): JsonWireValue {
+  if (!isJsonWireObject(args)) {
+    return toJsonWireValue(args);
+  }
+
+  const items = decodeJsonWireField(args.items);
+  const patches = decodeJsonWireField(args.patches);
+  if (items === args.items && patches === args.patches) {
+    return args;
+  }
+
+  return {
+    ...args,
+    ...('items' in args ? { items } : {}),
+    ...('patches' in args ? { patches } : {}),
+  };
+}
+
+function decodeJsonWireField(
+  value: JsonWireValue | undefined,
+): JsonWireValue | undefined {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value) as JsonWireValue;
+  } catch {
+    return value;
+  }
+}
+
+function isJsonWireObject(value: unknown): value is JsonWireObject {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function toJsonWireValue(value: unknown): JsonWireValue {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(toJsonWireValue);
+  }
+  if (isJsonWireObject(value)) {
+    return value;
+  }
+  return null;
+}
+
 export function parseTodoParams(value: unknown): ParseTodoResult {
-  if (!Check(TodoParamsSchema, value)) {
+  const decoded = decodeTodoWireArgs(value);
+  if (!Check(TodoParamsSchema, decoded)) {
     return { ok: false, message: 'Error: Invalid sideroom_todo parameters' };
   }
 
-  if (value.action === TODO_ACTION.propose) {
-    const items = normalizeItems(value.items);
+  if (decoded.action === TODO_ACTION.propose) {
+    const items = normalizeItems(decoded.items);
     if (!items.ok) {
       return { ok: false, message: items.message };
     }
@@ -135,7 +206,7 @@ export function parseTodoParams(value: unknown): ParseTodoResult {
     };
   }
 
-  const patches = normalizePatches(value.patches);
+  const patches = normalizePatches(decoded.patches);
   if (!patches.ok) {
     return { ok: false, message: patches.message };
   }

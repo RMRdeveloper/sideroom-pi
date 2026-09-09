@@ -151,9 +151,34 @@ test('nudges only once when mutating an empty board', () => {
   ]);
 });
 
+test('prepares stringified items before execute sees native arrays', () => {
+  const registered: { tool?: RegisteredTool } = {};
+  const api = {
+    registerTool(tool: RegisteredTool) {
+      registered.tool = tool;
+    },
+    on() {},
+    appendEntry() {},
+    sendMessage() {},
+    events: { emit() {} },
+  } as unknown as ExtensionAPI;
+
+  registerTodo(api);
+  const tool = registered.tool;
+  assert.ok(tool?.prepareArguments);
+  assert.deepEqual(
+    tool.prepareArguments({
+      action: 'propose',
+      items: JSON.stringify(initialItems),
+    }),
+    propose(initialItems),
+  );
+});
+
 interface RegisteredTool {
   readonly name: string;
   readonly executionMode?: string;
+  prepareArguments?: (args: unknown) => TodoParams;
   execute(
     toolCallId: string,
     params: TodoParams,
