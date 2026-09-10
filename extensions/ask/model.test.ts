@@ -12,6 +12,11 @@ import {
   renderOptions,
 } from './model.ts';
 
+const MAX_QUESTIONS = 4;
+const MAX_OPTIONS = 4;
+const MAX_TAB_LABEL_LENGTH = 16;
+const MAX_OPTION_LABEL_LENGTH = 60;
+
 function sampleParams(): AskParams {
   return {
     questions: [
@@ -83,6 +88,100 @@ test('rejects an empty batch, duplicate ids, short option lists, and a bad recom
 
   const parsed = parseAskParams(sampleParams());
   assert.equal(parsed.ok, true);
+});
+
+test('accepts input at every questionnaire batch limit', () => {
+  const parsedBoundary = parseAskParams({
+    questions: Array.from({ length: MAX_QUESTIONS }, (_, questionIndex) => ({
+      id: `question-${String(questionIndex + 1)}`,
+      label: 'L'.repeat(MAX_TAB_LABEL_LENGTH),
+      prompt: 'Choose an option',
+      options: Array.from({ length: MAX_OPTIONS }, (_, optionIndex) => ({
+        value: `option-${String(optionIndex + 1)}`,
+        label: 'O'.repeat(MAX_OPTION_LABEL_LENGTH),
+      })),
+      recommendationIndex: MAX_OPTIONS - 1,
+    })),
+  });
+  assert.equal(parsedBoundary.ok, true);
+});
+
+test('rejects each exceeded questionnaire batch limit explicitly', () => {
+  const [sampleQuestion] = sampleParams().questions;
+  assert.ok(sampleQuestion);
+  const oversizedInputs: ReadonlyArray<{
+    readonly input: unknown;
+    readonly expectedMessage: string;
+  }> = [
+    {
+      input: {
+        questions: Array.from({ length: MAX_QUESTIONS + 1 }, (_, index) => ({
+          ...sampleQuestion,
+          id: `question-${String(index + 1)}`,
+        })),
+      },
+      expectedMessage:
+        'Error: A questionnaire batch may include at most 4 questions',
+    },
+    {
+      input: {
+        questions: [
+          {
+            ...sampleQuestion,
+            options: [
+              ...sampleQuestion.options,
+              ...Array.from(
+                { length: MAX_OPTIONS - sampleQuestion.options.length + 1 },
+                (_, index) => ({
+                  value: `extra-${String(index + 1)}`,
+                  label: `Extra ${String(index + 1)}`,
+                }),
+              ),
+            ],
+          },
+        ],
+      },
+      expectedMessage: "Error: Question 'scope' may include at most 4 options",
+    },
+    {
+      input: {
+        questions: [
+          {
+            ...sampleQuestion,
+            label: 'L'.repeat(MAX_TAB_LABEL_LENGTH + 1),
+          },
+        ],
+      },
+      expectedMessage:
+        "Error: Question 'scope' label may contain at most 16 characters",
+    },
+    {
+      input: {
+        questions: [
+          {
+            ...sampleQuestion,
+            options: [
+              {
+                ...sampleQuestion.options[0],
+                label: 'O'.repeat(MAX_OPTION_LABEL_LENGTH + 1),
+              },
+              sampleQuestion.options[1],
+            ],
+          },
+        ],
+      },
+      expectedMessage:
+        "Error: Option 1 for question 'scope' may contain at most 60 characters",
+    },
+  ];
+
+  for (const { input, expectedMessage } of oversizedInputs) {
+    const parsedInput = parseAskParams(input);
+    assert.equal(parsedInput.ok, false);
+    if (!parsedInput.ok) {
+      assert.equal(parsedInput.message, expectedMessage);
+    }
+  }
 });
 
 test('keeps the recommended option label intact and always appends Out of scope and a custom answer', () => {

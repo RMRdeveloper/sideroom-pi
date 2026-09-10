@@ -63,6 +63,26 @@ test('rejects a recommendationIndex past the option list before opening the UI',
   assert.match(result.content[0]?.text ?? '', /recommendationIndex 9/);
 });
 
+test('rejects an oversized batch before opening the UI', async () => {
+  const [question] = sampleParams.questions;
+  assert.ok(question);
+  const toolResult = await executeAsk(
+    {
+      questions: Array.from({ length: 5 }, (_, index) => ({
+        ...question,
+        id: `question-${String(index + 1)}`,
+      })),
+    },
+    context('tui'),
+  );
+
+  assert.equal(toolResult.details.cancelled, true);
+  assert.equal(
+    toolResult.content[0]?.text,
+    'Error: A questionnaire batch may include at most 4 questions',
+  );
+});
+
 test('returns cancelled details when the user dismisses the questionnaire', async () => {
   const result = await executeAsk(
     sampleParams,

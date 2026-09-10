@@ -24,6 +24,35 @@ test('reconstructs the latest custom snapshot, including an intentionally empty 
   );
 });
 
+test('forked session branches inherit the board and then reconstruct independently', () => {
+  const sharedBranch = [customEntry({ items: initialItems })];
+  const originalItems: readonly TodoItem[] = [
+    { id: 'auth', content: 'Add login route', status: 'completed' },
+    { id: 'tests', content: 'Cover login', status: 'in_progress' },
+  ];
+  const forkedItems: readonly TodoItem[] = [
+    { id: 'auth', content: 'Add login route', status: 'in_progress' },
+    { id: 'tests', content: 'Cover login', status: 'cancelled' },
+  ];
+
+  assert.deepEqual(reconstructTodoItems(sharedBranch as never), initialItems);
+  assert.deepEqual(
+    reconstructTodoItems([
+      ...sharedBranch,
+      customEntry({ items: originalItems }),
+    ] as never),
+    originalItems,
+  );
+  assert.deepEqual(
+    reconstructTodoItems([
+      ...sharedBranch,
+      customEntry({ items: forkedItems }),
+    ] as never),
+    forkedItems,
+  );
+  assert.deepEqual(reconstructTodoItems(sharedBranch as never), initialItems);
+});
+
 function customEntry(data: unknown): unknown {
   return { type: 'custom', customType: 'sideroom-todo', data };
 }

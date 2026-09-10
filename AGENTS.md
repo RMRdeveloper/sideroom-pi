@@ -8,7 +8,7 @@ standalone CLI, project-local harness files, or a subprocess wrapper around Pi.
 
 `assets/artifacts/GUIDELINES_TEMPLATE.md` is the canonical seed. Do not dump
 it into the system prompt. `extensions/guidelines/` injects a short reminder;
-`skills/sideroom-guidelines/` is the on-demand checklist and language deltas.
+`skills/sideroom-guidelines/` is the on-demand checklist and complete language guides.
 
 ## Source of truth
 
@@ -33,7 +33,7 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
 - `extensions/guidelines/index.ts` appends a short write/edit reminder.
 - `extensions/guidelines/prompt.ts` owns the reminder text and idempotent append.
 - `skills/sideroom-guidelines/SKILL.md` owns the Do/Don't table and language map;
-  `skills/sideroom-guidelines/references/languages/` owns per-language deltas.
+  `skills/sideroom-guidelines/references/languages/` owns complete per-language guides.
 
 Add a tool by creating `extensions/<name>/index.ts`. Pi discovers
 `extensions/*/index.ts`; helper files in that folder are not extensions.
@@ -76,5 +76,6 @@ Biome requires braces around every `if` body. Do not disable
 - `modified-files` tracks only successful Pi `write` and `edit` results in the
   current session. Its compact widget shows at most five paths and must
   reapply after `sideroom:todo-widget-refreshed` so it remains below the board.
-- `guidelines` injects a short reminder only. The skill body and one language
-  delta load on demand. Do not add a slash command or a writer subagent.
+- `guidelines` injects a short reminder and blocks `write`/`edit` until exact
+  full-file reads load the packaged skill body and one complete language guide. Do not add a slash
+  command or a writer subagent.

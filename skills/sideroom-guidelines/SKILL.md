@@ -11,18 +11,20 @@ metadata:
 
 ## Activation Contract
 
-Load this skill before `write` or `edit`. Load at most one file from `references/languages/` for the path being changed.
+Load this whole skill with `read`, without `offset` or `limit`, before the first `write` or `edit` in each agent run. Use the absolute skill path shown in Available Skills. For each supported target language, also fully load its exact guide from `references/languages/`.
 
 ## Hard Rules
 
-- Follow the Do/Don't table. Language files override syntax and framework idiom only.
-- Do not load language files you are not editing this turn.
+- Treat every rule in the loaded language guide as mandatory for changed code.
+- Do not write or edit until exact full-file reads of the required packaged paths succeed; partial reads and same-named files do not count.
+- Do not bypass the gate with Bash, a subprocess, or another mutation tool.
+- Do not load language guides unrelated to files being changed.
 - Fail fast, keep control flow flat, and validate once at the boundary.
 
 ## Decision Gates
 
 | Path | Read |
-|------|------|
+| ------ | ------ |
 | `.java` | `references/languages/java.md` |
 | `.php` | `references/languages/php-laravel.md` |
 | `.ts` `.tsx` | `references/languages/typescript.md` |
@@ -33,9 +35,11 @@ Load this skill before `write` or `edit`. Load at most one file from `references
 
 ## Execution Steps
 
-1. Apply the table to the change.
-2. Read the matching language file, if any.
-3. Ship the smallest change that satisfies the current requirement.
+1. Read this complete file from its packaged path before any mutation.
+2. Fully read the matching packaged language guide, if the target has a supported extension.
+3. Implement the smallest change that satisfies the current requirement.
+4. Review every changed unit against the loaded guide.
+5. Run the relevant formatter, linter, type checks, and tests before finishing.
 
 ## Do / Don't
 
@@ -65,7 +69,7 @@ Load this skill before `write` or `edit`. Load at most one file from `references
 
 ## Output Contract
 
-Changed code follows the table and the loaded language delta. No extra files, layers, or comments unless the change requires them.
+Changed code follows every applicable rule in the loaded complete guide. The final response names the validation run and any check that could not run. No extra files, layers, comments, or bypass mutations unless the requirement needs them.
 
 ## References
 

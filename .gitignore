@@ -35,6 +35,7 @@ Thumbs.db
 
 # Sideroom local state (never commit generated state per AGENTS.md)
 .sideroom/
+/RPIV_GAP_ANALYSIS.md
 
 # Local Pi / tool runtime state
 .atl/

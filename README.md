@@ -37,7 +37,7 @@ Sideroom answers each one with a small, opinionated surface:
 | Silent guessing | `sideroom_ask` — questions with an opinion, one batch at a time |
 | Invisible work | `sideroom_todo` — a live board above the editor, always one step in focus |
 | Repo pollution | Session-branch state — the board and history die with the session, never with a commit |
-| Style drift | A one-line reminder + the on-demand `sideroom-guidelines` skill |
+| Style drift | A pre-edit gate + the on-demand `sideroom-guidelines` skill |
 | Vague plans | `sideroom-grill` — an interview that settles the words before the work |
 
 ## What it feels like
@@ -59,11 +59,12 @@ wall of tool calls, it:
   clickable `file://` links. `F8` opens the full session history; `R` clears
   it. Only successful Pi `write`/`edit` calls are tracked — no guesses from
   shell output, Git, or subagents.
-- **Writes code that reads the same every time.** Before every edit, the
-  agent is nudged toward one shared checklist: guard clauses, braced
-  conditionals, fail fast, one responsibility per unit, no speculative
-  layers. Language-specific deltas for Java, PHP/Laravel, TypeScript,
-  Python, Go, and Rust load on demand — never dumped into the prompt.
+- **Writes code that reads the same every time.** Before the first edit in
+  each agent run, the agent must read the shared contract and the one complete
+  guide matching the target language. Premature `write`/`edit` calls are
+  blocked. The guides cover guard clauses, braced conditionals, fail-fast
+  errors, focused units, and all 19 canonical rules without dumping them into
+  the system prompt.
 
 ## What's inside
 
@@ -108,13 +109,15 @@ one to interview at all, `sideroom-domain-scaffold` reads the central
 domain code as source of truth, builds or completes `CONTEXT.md` on its
 own, and grills the conflicting terms once, at the end.
 
-### Guidelines — a nudge, not a novel
+### Guidelines — a gate, not a novel
 
-A short system-prompt reminder points at the packaged
-`sideroom-guidelines` skill. The skill body holds the shared Do/Don't table;
-one matching file under `skills/sideroom-guidelines/references/languages/`
-covers the language being edited. The canonical seed,
-`assets/artifacts/GUIDELINES_TEMPLATE.md`, is never pasted into the prompt.
+A short system-prompt contract points at the packaged
+`sideroom-guidelines` skill. Before `write` or `edit`, a guard requires a
+full read of the packaged skill and, for supported targets, the one complete
+language guide under `skills/sideroom-guidelines/references/languages/`.
+Each guide mirrors all 19 rules in the canonical seed with idiomatic examples.
+The seed, `assets/artifacts/GUIDELINES_TEMPLATE.md`, is never pasted into the
+system prompt.
 
 ## Quick path
 
@@ -146,6 +149,11 @@ pi update --extension npm:@rmrdeveloper/sideroom-pi
 
 ### Questionnaire contract
 
+Each batch accepts one to four questions, with two to four caller-provided
+options per question. Tab labels accept at most 16 characters and option
+labels at most 60. Inputs that exceed a limit are rejected rather than
+truncated.
+
 Write prompts, tab labels, and option copy in the language the user is
 speaking; keep ids, option values, and TUI chrome in English. Do not send
 *Out of scope* or custom-answer rows yourself — the UI always adds them.
@@ -157,6 +165,10 @@ Items have stable string ids, short content, and one of `pending`,
 start the next one in the same `update` call. Snapshots live in the active
 session branch and are rebuilt after navigation and compaction.
 
+A forked session inherits the board visible at its fork point. Later board
+updates are reconstructed from each session's active branch, so the fork and
+the original session evolve independently.
+
 ### Edited-files contract
 
 - Trigger: only successful Pi `write`/`edit` results.
@@ -166,9 +178,14 @@ session branch and are rebuilt after navigation and compaction.
 
 ### Guidelines contract
 
-Read the skill before `write`/`edit`. Read at most one language delta per
-change — the one matching the path. Other languages follow the shared table
-only.
+In each agent run, fully read the exact packaged skill path before the first
+`write`/`edit`. For Java, PHP/Laravel, TypeScript/TSX, Python, Go, or Rust,
+also fully read the packaged guide matching the target path. Reads with
+`offset` or `limit`, failed reads, and same-named files elsewhere do not count.
+The extension blocks the mutation until the required reads succeed; unsupported
+languages use the shared table. Do not route around
+the gate through Bash or another file-mutation path. Before finishing, review
+the diff against the loaded guide and run the relevant project checks.
 
 ### Grill contract
 

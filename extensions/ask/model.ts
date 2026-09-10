@@ -9,9 +9,17 @@ export const CUSTOM_LABEL = 'Write a custom answer';
 export const UI_UNAVAILABLE =
   'Error: UI not available (running in non-interactive mode)';
 
+const MAX_QUESTIONS = 4;
+const MAX_OPTIONS = 4;
+const MAX_TAB_LABEL_LENGTH = 16;
+const MAX_OPTION_LABEL_LENGTH = 60;
+
 const QuestionOptionSchema = Type.Object({
   value: Type.String({ description: 'The value returned when selected' }),
-  label: Type.String({ description: 'Display label for the option' }),
+  label: Type.String({
+    maxLength: MAX_OPTION_LABEL_LENGTH,
+    description: `Display label for the option, with at most ${String(MAX_OPTION_LABEL_LENGTH)} characters`,
+  }),
   description: Type.Optional(
     Type.String({ description: 'Optional description shown below the label' }),
   ),
@@ -21,14 +29,15 @@ const QuestionSchema = Type.Object({
   id: Type.String({ description: 'Unique identifier for this question' }),
   label: Type.Optional(
     Type.String({
-      description:
-        "Short contextual label for the tab bar, e.g. 'Scope' (defaults to Q1, Q2)",
+      maxLength: MAX_TAB_LABEL_LENGTH,
+      description: `Short contextual label of at most ${String(MAX_TAB_LABEL_LENGTH)} characters for the tab bar, e.g. 'Scope' (defaults to Q1, Q2)`,
     }),
   ),
   prompt: Type.String({ description: 'The full question text to display' }),
   options: Type.Array(QuestionOptionSchema, {
     minItems: 2,
-    description: 'At least two mutually exclusive options',
+    maxItems: MAX_OPTIONS,
+    description: `Two to ${String(MAX_OPTIONS)} mutually exclusive options`,
   }),
   recommendationIndex: Type.Integer({
     minimum: 0,
@@ -39,7 +48,8 @@ const QuestionSchema = Type.Object({
 export const AskParamsSchema = Type.Object({
   questions: Type.Array(QuestionSchema, {
     minItems: 1,
-    description: 'Questions to ask the user in this batch',
+    maxItems: MAX_QUESTIONS,
+    description: `One to ${String(MAX_QUESTIONS)} questions to ask the user in this batch`,
   }),
 });
 
@@ -270,21 +280,56 @@ function schemaErrorMessage(value: unknown): string {
   if (error === undefined) {
     return 'Error: Invalid sideroom_ask parameters';
   }
-  if (error.keyword === 'minItems' && error.instancePath === '/questions') {
-    return 'Error: No questions provided';
+  if (error.instancePath === '/questions') {
+    if (error.keyword === 'minItems') {
+      return 'Error: No questions provided';
+    }
+    if (error.keyword === 'maxItems') {
+      return `Error: A questionnaire batch may include at most ${String(MAX_QUESTIONS)} questions`;
+    }
   }
+
+  const questions = asQuestions(value);
   const optionsMatch = /\/questions\/(\d+)\/options$/.exec(error.instancePath);
-  if (error.keyword === 'minItems' && optionsMatch !== null) {
+  if (optionsMatch !== null) {
     const questionIndex = Number(optionsMatch[1]);
-    const questions = asQuestions(value);
-    const question = questions[questionIndex];
-    const id =
-      question !== undefined && typeof question.id === 'string'
-        ? question.id
-        : String(questionIndex);
-    return `Error: Question '${id}' must include at least two options`;
+    const id = questionId(questions, questionIndex);
+    if (error.keyword === 'minItems') {
+      return `Error: Question '${id}' must include at least two options`;
+    }
+    if (error.keyword === 'maxItems') {
+      return `Error: Question '${id}' may include at most ${String(MAX_OPTIONS)} options`;
+    }
   }
+
+  const tabLabelMatch = /\/questions\/(\d+)\/label$/.exec(error.instancePath);
+  if (error.keyword === 'maxLength' && tabLabelMatch !== null) {
+    const questionIndex = Number(tabLabelMatch[1]);
+    const id = questionId(questions, questionIndex);
+    return `Error: Question '${id}' label may contain at most ${String(MAX_TAB_LABEL_LENGTH)} characters`;
+  }
+
+  const optionLabelMatch = /\/questions\/(\d+)\/options\/(\d+)\/label$/.exec(
+    error.instancePath,
+  );
+  if (error.keyword === 'maxLength' && optionLabelMatch !== null) {
+    const questionIndex = Number(optionLabelMatch[1]);
+    const optionIndex = Number(optionLabelMatch[2]);
+    const id = questionId(questions, questionIndex);
+    return `Error: Option ${String(optionIndex + 1)} for question '${id}' may contain at most ${String(MAX_OPTION_LABEL_LENGTH)} characters`;
+  }
+
   return `Error: Invalid sideroom_ask parameters`;
+}
+
+function questionId(
+  questions: readonly Record<string, unknown>[],
+  index: number,
+): string {
+  const question = questions[index];
+  return question !== undefined && typeof question.id === 'string'
+    ? question.id
+    : String(index);
 }
 
 function asQuestions(value: unknown): readonly Record<string, unknown>[] {
