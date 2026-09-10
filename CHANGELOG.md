@@ -1,5 +1,15 @@
 # Changelog
 
+## 8.0.0
+
+### Major Changes
+
+- 693f936: Bound `sideroom_ask` batches to four questions and four options per question, limit tab and option labels, and reject oversized input with specific errors before opening the UI.
+
+### Minor Changes
+
+- 693f936: Block `write` and `edit` until agents fully read the packaged coding skill and matching language guide, and expand every supported guide to all 19 canonical rules.
+
 ## 7.1.0
 
 ### Minor Changes
