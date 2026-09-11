@@ -250,6 +250,12 @@ Single-session scope only. Files are created lazily: nothing exists until
 the first term or decision crystallises. A session with a sharper glossary
 and zero ADRs is working as designed.
 
+## Documentation
+
+Maintainer reference lives in [`docs/`](docs/README.md): the
+[architecture](docs/architecture.md) and one page per
+[extension](docs/extensions/ask.md).
+
 ## License
 
 MIT.
