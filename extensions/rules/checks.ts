@@ -5,12 +5,12 @@ import {
   type RuleId,
   supportsBracedConditionals,
 } from './catalog.ts';
+import { maskNonCode } from './lexer.ts';
 import type { AddedLine, RuleViolation } from './model.ts';
 
 const BANNED_ALTERNATION = 'data|info|temp|tmp|result|obj|val|x';
-
-const BRACED_IF = /\b(?:if|else\s+if|for|while)\s*\(.*\)\s*(?!\{)\S/;
-const BRACED_ELSE = /\belse\s+(?!if\b|\{)\S/;
+const CONTROL_HEADER = /\b(?:if|else\s+if|for|while)\s*\(/g;
+const ELSE_KEYWORD = /\belse\b/g;
 const PYTHON_INLINE_SUITE =
   /^\s*(?:if|elif|else|for|while|with|try|except|finally|def|class)\b.*:\s*(?:return|pass|raise|break|continue|yield|assert|del|import|from|global|nonlocal|print|await|lambda)\b/;
 
@@ -50,19 +50,33 @@ export function evaluateAddedLines(
   lines: readonly AddedLine[],
 ): RuleViolation[] {
   const violations: RuleViolation[] = [];
+  const joined = lines.map((added) => added.text).join('\n');
+  const code = maskNonCode(joined, language);
+  const codeLines = code.split('\n');
+  const usesBracedConditionals = supportsBracedConditionals(language);
 
-  for (const added of lines) {
-    if (supportsBracedConditionals(language)) {
-      collectBracedConditionals(added, violations);
-    } else if (language === LANGUAGE.python) {
-      collectPythonSuite(added, violations);
-    }
-    collectClearNames(added, violations);
-    collectComments(added, violations);
-    collectDebugArtifacts(added, violations);
+  if (usesBracedConditionals) {
+    collectBracedConditionals(code, lines, violations);
   }
 
-  collectErrorHandling(language, lines, violations);
+  for (let index = 0; index < lines.length; index += 1) {
+    const added = lines[index];
+    if (added === undefined) {
+      continue;
+    }
+    const codeLine: AddedLine = {
+      line: added.line,
+      text: codeLines[index] ?? '',
+    };
+    if (language === LANGUAGE.python) {
+      collectPythonSuite(codeLine, violations);
+    }
+    collectClearNames(codeLine, violations);
+    collectComments(added, violations);
+    collectDebugArtifacts(codeLine, violations);
+  }
+
+  collectErrorHandling(language, code, lines, violations);
   return dedupe(violations);
 }
 
@@ -75,15 +89,60 @@ function violation(
 }
 
 function collectBracedConditionals(
-  added: AddedLine,
+  code: string,
+  lines: readonly AddedLine[],
   violations: RuleViolation[],
 ): void {
-  if (BRACED_IF.test(added.text) || BRACED_ELSE.test(added.text)) {
+  const controlMatcher = new RegExp(
+    CONTROL_HEADER.source,
+    CONTROL_HEADER.flags,
+  );
+  const controlMatches = code.matchAll(controlMatcher);
+  for (const match of controlMatches) {
+    const matchOffset = match.index ?? 0;
+    const openingOffset = code.indexOf('(', matchOffset);
+    if (openingOffset < 0) {
+      continue;
+    }
+    const closingOffset = closingParenthesisOffset(code, openingOffset);
+    if (closingOffset === undefined) {
+      continue;
+    }
+    const bodyOffset = nextCodeOffset(code, closingOffset + 1);
+    if (bodyOffset === undefined) {
+      continue;
+    }
+    const hasBlockBody = code[bodyOffset] === '{';
+    if (hasBlockBody) {
+      continue;
+    }
     violations.push(
       violation(
         'braced-conditionals',
         '[braced-conditionals] Wrap the conditional body in braces.',
-        added.line,
+        lineForOffset(code, lines, matchOffset),
+      ),
+    );
+  }
+
+  const elseMatcher = new RegExp(ELSE_KEYWORD.source, ELSE_KEYWORD.flags);
+  const elseMatches = code.matchAll(elseMatcher);
+  for (const match of elseMatches) {
+    const matchOffset = match.index ?? 0;
+    const bodyOffset = nextCodeOffset(code, matchOffset + match[0].length);
+    if (bodyOffset === undefined) {
+      continue;
+    }
+    const hasBlockBody = code[bodyOffset] === '{';
+    const hasNestedIf = startsWithWord(code, bodyOffset, 'if');
+    if (hasBlockBody || hasNestedIf) {
+      continue;
+    }
+    violations.push(
+      violation(
+        'braced-conditionals',
+        '[braced-conditionals] Wrap the conditional body in braces.',
+        lineForOffset(code, lines, matchOffset),
       ),
     );
   }
@@ -106,20 +165,20 @@ function collectPythonSuite(
 
 function collectErrorHandling(
   language: LanguageId,
+  code: string,
   lines: readonly AddedLine[],
   violations: RuleViolation[],
 ): void {
-  const joined = lines.map((added) => added.text).join('\n');
   if (language === LANGUAGE.python) {
-    collectPattern(PYTHON_SWALLOW, joined, lines, violations);
-    collectPattern(PYTHON_SWALLOW_BLOCK, joined, lines, violations);
+    collectPattern(PYTHON_SWALLOW, code, lines, violations);
+    collectPattern(PYTHON_SWALLOW_BLOCK, code, lines, violations);
     return;
   }
   if (language === LANGUAGE.generic) {
     return;
   }
-  collectPattern(EMPTY_CATCH, joined, lines, violations);
-  collectPattern(SWALLOW_RETURN, joined, lines, violations);
+  collectPattern(EMPTY_CATCH, code, lines, violations);
+  collectPattern(SWALLOW_RETURN, code, lines, violations);
 }
 
 function collectPattern(
@@ -213,6 +272,49 @@ function collectDebugArtifacts(
       ),
     );
   }
+}
+
+function closingParenthesisOffset(
+  code: string,
+  openingOffset: number,
+): number | undefined {
+  let depth = 0;
+  for (let index = openingOffset; index < code.length; index += 1) {
+    const character = code[index];
+    if (character === '(') {
+      depth += 1;
+      continue;
+    }
+    if (character !== ')') {
+      continue;
+    }
+    depth -= 1;
+    if (depth === 0) {
+      return index;
+    }
+  }
+  return undefined;
+}
+
+function nextCodeOffset(code: string, offset: number): number | undefined {
+  for (let index = offset; index < code.length; index += 1) {
+    const character = code[index] ?? '';
+    const isWhitespace = /\s/.test(character);
+    if (!isWhitespace) {
+      return index;
+    }
+  }
+  return undefined;
+}
+
+function startsWithWord(code: string, offset: number, word: string): boolean {
+  const startsAtOffset = code.startsWith(word, offset);
+  if (!startsAtOffset) {
+    return false;
+  }
+  const following = code[offset + word.length] ?? '';
+  const isWordCharacter = /[A-Za-z0-9_$]/.test(following);
+  return following.length === 0 || !isWordCharacter;
 }
 
 function lineForOffset(

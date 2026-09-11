@@ -29,6 +29,19 @@ test('addedLines consumes duplicate previous lines once', () => {
   assert.deepEqual(lines, [{ line: 2, text: 'const a = 1;' }]);
 });
 
+test('addedLines ignores moved and reindented lines', () => {
+  const lines = addedLines('first();\nsecond();\n', '  second();\nfirst();\n');
+  assert.deepEqual(lines, []);
+});
+
+test('addedLines reports inserted lines at their new positions', () => {
+  const lines = addedLines(
+    'first();\nlast();\n',
+    'first();\ninserted();\nlast();\n',
+  );
+  assert.deepEqual(lines, [{ line: 2, text: 'inserted();' }]);
+});
+
 test('flags a braceless conditional as blocking', () => {
   const violations = evaluate(
     'src/user.ts',
@@ -44,6 +57,31 @@ test('accepts a braced conditional', () => {
     'src/user.ts',
     undefined,
     'if (!user) {\n  return 0;\n}\n',
+  );
+  assert.deepEqual(violations, []);
+});
+
+test('flags a braceless conditional whose body starts on the next line', () => {
+  const violations = evaluate(
+    'src/user.ts',
+    undefined,
+    'if' + ' (isReady(user))\n  return 0;\n',
+  );
+  assert.deepEqual(ruleIds(violations), ['braced-conditionals']);
+});
+
+test('ignores conditional-looking text inside strings and comments', () => {
+  const conditionalText = 'if' + ' (ready) return 0';
+  const catchText = 'cat' + 'ch (error) {}';
+  const commentText = `/* ${conditionalText} */`;
+  const violations = evaluate(
+    'src/user.ts',
+    undefined,
+    [
+      `const message = "${conditionalText}";`,
+      `const template = \`${catchText}\`;`,
+      commentText,
+    ].join('\n'),
   );
   assert.deepEqual(violations, []);
 });
