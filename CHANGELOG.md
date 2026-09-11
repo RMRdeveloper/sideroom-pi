@@ -1,5 +1,11 @@
 # Changelog
 
+## 8.0.1
+
+### Patch Changes
+
+- 3f5535f: Sharpen skill descriptions so Pi routes domain, scaffolding, grilling, and coding workflows more precisely.
+
 ## 8.0.0
 
 ### Major Changes
