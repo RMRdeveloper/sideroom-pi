@@ -19,4 +19,10 @@ export default function registerGuidelines(pi: ExtensionAPI): void {
     }
     return { systemPrompt };
   });
+
+  // Compaction may summarize the loaded guides out of context mid-run; force
+  // a fresh read instead of trusting a now-stale in-memory flag.
+  pi.on('session_compact', () => {
+    resetGuidelineReadState(readState);
+  });
 }

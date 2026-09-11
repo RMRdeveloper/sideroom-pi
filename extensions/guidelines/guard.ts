@@ -1,3 +1,6 @@
+import { realpathSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { isAbsolute, join, normalize, resolve } from 'node:path';
 import {
   type ExtensionAPI,
   isReadToolResult,
@@ -31,7 +34,7 @@ export function registerGuidelineGuard(
   pi: ExtensionAPI,
   state: GuidelineReadState,
 ): void {
-  pi.on('tool_result', (event) => {
+  pi.on('tool_result', (event, ctx) => {
     if (!isReadToolResult(event) || event.isError) {
       return;
     }
@@ -45,7 +48,7 @@ export function registerGuidelineGuard(
     ) {
       return;
     }
-    recordGuidelineRead(state, input.path);
+    recordGuidelineRead(state, input.path, ctx.cwd);
   });
 
   pi.on('tool_call', (event) => {
@@ -71,19 +74,20 @@ export function registerGuidelineGuard(
 export function recordGuidelineRead(
   state: GuidelineReadState,
   path: string | undefined,
+  cwd: string = process.cwd(),
 ): void {
   if (path === undefined) {
     return;
   }
 
-  const normalizedPath = normalizePath(path);
-  if (normalizedPath === normalizePath(GUIDELINE_SKILL_PATH)) {
+  const canonicalPath = canonicalizePath(path, cwd);
+  if (canonicalPath === canonicalCatalogPath(GUIDELINE_SKILL_PATH)) {
     state.skillRead = true;
     return;
   }
 
   for (const guide of LANGUAGE_GUIDES) {
-    if (normalizedPath === normalizePath(guide.path)) {
+    if (canonicalPath === canonicalCatalogPath(guide.path)) {
       state.languageGuidesRead.add(guide.path);
       return;
     }
@@ -116,12 +120,50 @@ export function mutationBlockReason(
 }
 
 function languageGuideFor(path: string): string | undefined {
-  const normalizedPath = normalizePath(path).toLowerCase();
+  const normalizedPath = stripLeadingAt(path)
+    .replaceAll('\\', '/')
+    .toLowerCase();
   return LANGUAGE_GUIDES.find(({ extensions }) =>
     extensions.some((extension) => normalizedPath.endsWith(extension)),
   )?.path;
 }
 
-function normalizePath(path: string): string {
-  return path.replace(/^@/, '').replaceAll('\\', '/');
+const canonicalCatalogPaths = new Map<string, string>();
+
+function canonicalCatalogPath(path: string): string {
+  const cached = canonicalCatalogPaths.get(path);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const canonical = realpathOr(path);
+  canonicalCatalogPaths.set(path, canonical);
+  return canonical;
+}
+
+function canonicalizePath(path: string, cwd: string): string {
+  const expanded = expandHome(stripLeadingAt(path));
+  const absolute = isAbsolute(expanded) ? expanded : resolve(cwd, expanded);
+  return realpathOr(normalize(absolute));
+}
+
+function realpathOr(path: string): string {
+  try {
+    return realpathSync.native(path);
+  } catch {
+    return path;
+  }
+}
+
+function expandHome(path: string): string {
+  if (path === '~') {
+    return homedir();
+  }
+  if (path.startsWith('~/') || path.startsWith('~\\')) {
+    return join(homedir(), path.slice(2));
+  }
+  return path;
+}
+
+function stripLeadingAt(path: string): string {
+  return path.startsWith('@') ? path.slice(1) : path;
 }
