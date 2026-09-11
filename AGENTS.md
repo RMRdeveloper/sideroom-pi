@@ -32,6 +32,15 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   `extensions/modified-files/ui.ts` owns the compact and extended displays.
 - `extensions/guidelines/index.ts` appends a short write/edit reminder.
 - `extensions/guidelines/prompt.ts` owns the reminder text and idempotent append.
+- `extensions/rules/index.ts` composes the guidelines rule gate;
+  `extensions/rules/catalog.ts` owns rule severities and language detection;
+  `extensions/rules/model.ts` owns added-line diffing and result formatting;
+  `extensions/rules/checks.ts` owns the per-rule detectors;
+  `extensions/rules/guard.ts` owns blocking, warning notes, and the circuit
+  breaker.
+- `extensions/done/index.ts` composes the finish gate; `extensions/done/detect.ts`
+  owns per-ecosystem check-command detection; `extensions/done/guard.ts` owns
+  run state and steering.
 - `skills/sideroom-guidelines/SKILL.md` owns the Do/Don't table and language map;
   `skills/sideroom-guidelines/references/languages/` owns complete per-language guides.
 
@@ -79,3 +88,10 @@ Biome requires braces around every `if` body. Do not disable
 - `guidelines` injects a short reminder and blocks `write`/`edit` until exact
   full-file reads load the packaged skill body and one complete language guide. Do not add a slash
   command or a writer subagent.
+- `sideroom_rules` checks only lines added by a `write`/`edit`, blocks braceless
+  conditionals and swallowed errors, notes softer violations on the result, and
+  degrades a repeatedly firing block. It writes no files and reads no project
+  config; the catalog ships with the package.
+- `sideroom_done` steers, never blocks, and does nothing when no check command
+  is detected. It clears green after any later successful mutation and caps its
+  steering.

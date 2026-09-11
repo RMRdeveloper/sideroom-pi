@@ -1,2 +1,2 @@
 npm run types --silent || exit 1
-npx biome check src package.json biome.json
+npx biome check extensions scripts package.json biome.json commitlint.config.mjs .changeset/config.json

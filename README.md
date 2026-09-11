@@ -6,9 +6,10 @@
 
 > Coding agents fail in predictable ways: they guess instead of asking, they
 > bury progress in chat scroll, they litter your repo with `TODO.md` files,
-> and every session writes code in a slightly different style.
+> every session writes code in a slightly different style, and they declare
+> victory while the project checks are still red.
 >
-> **Sideroom fixes all four — without touching your repository.**
+> **Sideroom fixes all of it — without touching your repository.**
 
 Sideroom Pi is a global [Pi package](https://pi.dev/docs/latest/packages)
 that gives the parent agent a *side room* next to your code: a place to ask
@@ -29,6 +30,10 @@ Every long agent session drifts toward the same failure modes:
    and half-abandoned plans committed next to real code.
 4. **Style drift.** Each session reinvents conventions: nesting depth, error
    handling, naming, validation. Review becomes cleanup.
+5. **Unapplied guidelines.** The contract is read, then ignored: a braceless
+   `if`, a swallowed error, `console.log`, and `TODO` land in the diff anyway.
+6. **Premature completion.** The agent announces it is done while the
+   formatter, linter, type checks, or tests were never run.
 
 Sideroom answers each one with a small, opinionated surface:
 
@@ -39,6 +44,8 @@ Sideroom answers each one with a small, opinionated surface:
 | Repo pollution | Session-branch state — the board and history die with the session, never with a commit |
 | Style drift | A pre-edit gate + the on-demand `sideroom-guidelines` skill |
 | Vague plans | `sideroom-grill` — an interview that settles the words before the work |
+| Unapplied guidelines | `sideroom_rules` — mechanical checks that block or flag the lines you add |
+| Premature completion | `sideroom_done` — steers back to the project's check command before finishing |
 
 ## What it feels like
 
@@ -65,6 +72,14 @@ wall of tool calls, it:
   blocked. The guides cover guard clauses, braced conditionals, fail-fast
   errors, focused units, and all 19 canonical rules without dumping them into
   the system prompt.
+- **Cannot sneak sloppy lines past the gate.** Each write and edit is checked
+  against the mechanical rules on the added lines only: braceless
+  conditionals and swallowed errors block the mutation; vague names, stale
+  `TODO`s, commented-out code, and debug output are appended as notes to the
+  result. A rule that keeps firing degrades instead of trapping the agent.
+- **Does not call it done in red.** When files changed and the project's own
+  check command has not passed, the agent is steered back to run it before
+  finishing. If no check command is detectable, the gate stays out of the way.
 
 ## What's inside
 
@@ -118,6 +133,26 @@ language guide under `skills/sideroom-guidelines/references/languages/`.
 Each guide mirrors all 19 rules in the canonical seed with idiomatic examples.
 The seed, `assets/artifacts/GUIDELINES_TEMPLATE.md`, is never pasted into the
 system prompt.
+
+### Rules — enforcement, not advice
+
+The guidelines gate makes the agent read the rules; `sideroom_rules` makes it
+follow them. On every `write`/`edit`, only the added lines are checked against
+the mechanical rules from the canonical seed. Braceless conditionals and
+swallowed errors block the mutation with an actionable reason; banned
+identifiers, stale comments, commented-out code, and debug artifacts are
+appended as notes to the tool result. A per-rule circuit breaker degrades a
+repeatedly firing block to a note so the agent never dead-locks. No files
+written, no config read: the catalog ships with the package.
+
+### Done — done means green
+
+`sideroom_done` detects the project's check command — `package.json` scripts
+(`check` → `test` → `lint` → `typecheck` → `types`) with the right
+package manager, `pytest`, `go test ./...`, `cargo test`, or a `make check`
+target — and watches for it to pass. If files changed without a green run, the
+agent is steered once per turn, up to a cap, to run it before finishing. When
+nothing is detectable, the gate does nothing.
 
 ## Quick path
 
@@ -186,6 +221,27 @@ The extension blocks the mutation until the required reads succeed; unsupported
 languages use the shared table. Do not route around
 the gate through Bash or another file-mutation path. Before finishing, review
 the diff against the loaded guide and run the relevant project checks.
+
+### Rules contract
+
+- Trigger: every `write`/`edit` call, in every mode.
+- Scope: only lines added by the call. For `edit`, each `oldText → newText`
+  pair; for `write`, the new content against the existing file.
+- Blocking rules: braced conditionals (rule 1) and explicit error handling
+  (rule 5). Warning rules: clear names (6), comments (19), and debug artifacts.
+- Blocked calls return the rule id, the reason, and the fix. Warnings are
+  appended to the tool result.
+- A rule that blocks three times in a run degrades to a warning until five
+  clean checks or a new interactive prompt reset it.
+
+### Done contract
+
+- Detected command: `package.json` scripts in priority order with the
+  lockfile's package manager, then `pytest -q` for Python, `go test ./...`,
+  `cargo test`, or `make check`. Detection is cached per working directory.
+- Green means that command ran with a zero exit in this run. A later
+  successful `write`/`edit` clears green again.
+- Steering: once per turn, at most twice per run, then it stops.
 
 ### Grill contract
 
