@@ -4,6 +4,7 @@ import { readdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { GUIDELINE_SKILL_PATH, LANGUAGE_GUIDES } from './catalog.ts';
 import {
   appendGuidelinesReminder,
   GUIDELINES_REMINDER,
@@ -21,18 +22,19 @@ test('appends the reminder once and keeps an existing prompt', () => {
     true,
   );
   assert.match(GUIDELINES_REMINDER, /sideroom-guidelines/);
-  assert.match(GUIDELINES_REMINDER, /blocks write\/edit/);
-  assert.match(GUIDELINES_REMINDER, /Do not bypass the gate/);
+  assert.match(GUIDELINES_REMINDER, /read tool without offset or limit/);
+  assert.match(GUIDELINES_REMINDER, /blocks those mutations/);
+  assert.match(GUIDELINES_REMINDER, /without truncation/);
+  assert.match(GUIDELINES_REMINDER, /do not mutate files through bash/);
+  assert.equal(GUIDELINES_REMINDER.includes(GUIDELINE_SKILL_PATH), true);
+  for (const guide of LANGUAGE_GUIDES) {
+    assert.equal(GUIDELINES_REMINDER.includes(guide.path), true);
+  }
+
   assert.match(
     GUIDELINES_REMINDER,
     /formatter, linter, type checks, and tests/,
   );
-  assert.match(GUIDELINES_REMINDER, /\.java/);
-  assert.match(GUIDELINES_REMINDER, /\.php/);
-  assert.match(GUIDELINES_REMINDER, /\.ts\/\.tsx/);
-  assert.match(GUIDELINES_REMINDER, /\.py/);
-  assert.match(GUIDELINES_REMINDER, /\.go/);
-  assert.match(GUIDELINES_REMINDER, /\.rs/);
 });
 
 test('ships one complete guide per supported language', async () => {
@@ -46,6 +48,12 @@ test('ships one complete guide per supported language', async () => {
 
 test('keeps every language guide in structural parity with the canonical seed', () => {
   const rootDir = join(dirname(fileURLToPath(import.meta.url)), '../..');
+  const skill = readFileSync(
+    join(rootDir, 'skills/sideroom-guidelines/SKILL.md'),
+    'utf8',
+  );
+  assertFitsSingleRead(skill, 'SKILL.md');
+
   const template = readFileSync(
     join(rootDir, 'assets/artifacts/GUIDELINES_TEMPLATE.md'),
     'utf8',
@@ -73,10 +81,14 @@ test('keeps every language guide in structural parity with the canonical seed', 
       /\*\*When in doubt:\*\* fail fast, keep it flat, keep it small\./,
     );
     assert.match(guide, /\*\*Enforcement note:\*\*/);
-    assert.equal(guide.split('\n').length < 2_000, true, file);
-    assert.equal(Buffer.byteLength(guide) < 50 * 1_024, true, file);
+    assertFitsSingleRead(guide, file);
   }
 });
+
+function assertFitsSingleRead(text: string, label: string): void {
+  assert.equal(text.split('\n').length < 2_000, true, label);
+  assert.equal(Buffer.byteLength(text) < 50 * 1_024, true, label);
+}
 
 function extractIndex(text: string): string[] {
   return [...text.matchAll(/^\| (\d+ \| .+)$/gm)].map(

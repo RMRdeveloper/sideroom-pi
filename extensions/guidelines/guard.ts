@@ -1,29 +1,11 @@
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   type ExtensionAPI,
   isReadToolResult,
   isToolCallEventType,
 } from '@earendil-works/pi-coding-agent';
+import { GUIDELINE_SKILL_PATH, LANGUAGE_GUIDES } from './catalog.ts';
 
-const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-export const GUIDELINE_SKILL_PATH = join(
-  PACKAGE_ROOT,
-  'skills/sideroom-guidelines/SKILL.md',
-);
-const LANGUAGE_GUIDE_DIRECTORY = join(
-  PACKAGE_ROOT,
-  'skills/sideroom-guidelines/references/languages',
-);
-const LANGUAGE_GUIDE_BY_EXTENSION: Readonly<Record<string, string>> = {
-  '.go': join(LANGUAGE_GUIDE_DIRECTORY, 'go.md'),
-  '.java': join(LANGUAGE_GUIDE_DIRECTORY, 'java.md'),
-  '.php': join(LANGUAGE_GUIDE_DIRECTORY, 'php-laravel.md'),
-  '.py': join(LANGUAGE_GUIDE_DIRECTORY, 'python.md'),
-  '.rs': join(LANGUAGE_GUIDE_DIRECTORY, 'rust.md'),
-  '.ts': join(LANGUAGE_GUIDE_DIRECTORY, 'typescript.md'),
-  '.tsx': join(LANGUAGE_GUIDE_DIRECTORY, 'typescript.md'),
-};
+export { GUIDELINE_SKILL_PATH } from './catalog.ts';
 
 interface ReadInput {
   readonly path: string;
@@ -56,7 +38,11 @@ export function registerGuidelineGuard(
 
     // SAFETY: Pi validates built-in read arguments before emitting tool_result.
     const input = event.input as unknown as ReadInput;
-    if (input.offset !== undefined || input.limit !== undefined) {
+    if (
+      input.offset !== undefined ||
+      input.limit !== undefined ||
+      event.details?.truncation?.truncated === true
+    ) {
       return;
     }
     recordGuidelineRead(state, input.path);
@@ -70,7 +56,11 @@ export function registerGuidelineGuard(
       return;
     }
 
-    const reason = mutationBlockReason(state, event.input.path);
+    const reason = mutationBlockReason(
+      state,
+      event.input.path,
+      pi.getActiveTools().includes('read'),
+    );
     if (reason === undefined) {
       return;
     }
@@ -92,9 +82,9 @@ export function recordGuidelineRead(
     return;
   }
 
-  for (const guidePath of new Set(Object.values(LANGUAGE_GUIDE_BY_EXTENSION))) {
-    if (normalizedPath === normalizePath(guidePath)) {
-      state.languageGuidesRead.add(guidePath);
+  for (const guide of LANGUAGE_GUIDES) {
+    if (normalizedPath === normalizePath(guide.path)) {
+      state.languageGuidesRead.add(guide.path);
       return;
     }
   }
@@ -103,6 +93,7 @@ export function recordGuidelineRead(
 export function mutationBlockReason(
   state: GuidelineReadState,
   targetPath: string,
+  readToolAvailable = true,
 ): string | undefined {
   const requiredPaths: string[] = [];
   if (!state.skillRead) {
@@ -117,18 +108,18 @@ export function mutationBlockReason(
   if (requiredPaths.length === 0) {
     return undefined;
   }
+  if (!readToolAvailable) {
+    return `Blocked ${targetPath}: the read tool is inactive, so the guidelines gate cannot be satisfied. Enable read, then read ${requiredPaths.join(' and ')} before retrying the mutation.`;
+  }
 
-  return `Blocked ${targetPath}: read ${requiredPaths.join(' and ')} with the read tool in this agent run, then retry the edit.`;
+  return `Blocked ${targetPath}: read ${requiredPaths.join(' and ')} with the read tool in this agent run, then retry the mutation.`;
 }
 
 function languageGuideFor(path: string): string | undefined {
   const normalizedPath = normalizePath(path).toLowerCase();
-  const extension = Object.keys(LANGUAGE_GUIDE_BY_EXTENSION).find((candidate) =>
-    normalizedPath.endsWith(candidate),
-  );
-  return extension === undefined
-    ? undefined
-    : LANGUAGE_GUIDE_BY_EXTENSION[extension];
+  return LANGUAGE_GUIDES.find(({ extensions }) =>
+    extensions.some((extension) => normalizedPath.endsWith(extension)),
+  )?.path;
 }
 
 function normalizePath(path: string): string {

@@ -1,20 +1,20 @@
+import { GUIDELINE_SKILL_PATH, LANGUAGE_GUIDES } from './catalog.ts';
+
+export { LANGUAGE_GUIDE_FILES } from './catalog.ts';
+
 export const GUIDELINES_REMINDER_HEADING =
   'Sideroom coding guidelines (always-on reminder):';
 
-export const GUIDELINES_REMINDER = `${GUIDELINES_REMINDER_HEADING}
-Before the first write or edit in each agent run, use the read tool without offset or limit on the absolute SKILL.md path shown for sideroom-guidelines in Available Skills.
-For .java, .php, .ts/.tsx, .py, .go, or .rs targets, also fully read exactly the matching guide under that skill's references/languages/ directory.
-The extension blocks write/edit until those exact full-file reads succeed. Do not bypass the gate with bash or another mutation tool.
-Before finishing, review changed code against the loaded guide and run the relevant formatter, linter, type checks, and tests.`;
+const LANGUAGE_GUIDE_REMINDERS = LANGUAGE_GUIDES.map(
+  ({ extensions, path }) =>
+    `If a file you will write or edit ends in ${extensions.join(' or ')}, use the read tool without offset or limit to load the exact matching guide at ${path} in full.`,
+).join('\n');
 
-export const LANGUAGE_GUIDE_FILES = [
-  'go.md',
-  'java.md',
-  'php-laravel.md',
-  'python.md',
-  'rust.md',
-  'typescript.md',
-] as const;
+export const GUIDELINES_REMINDER = `${GUIDELINES_REMINDER_HEADING}
+Before the first write or edit in each agent run, use the read tool without offset or limit to load ${GUIDELINE_SKILL_PATH} in full.
+${LANGUAGE_GUIDE_REMINDERS}
+A required read counts only when it succeeds without truncation. Until all required reads succeed, do not call write or edit and do not mutate files through bash or another tool; the extension blocks those mutations.
+After changing files, review the code against the loaded guide and run the relevant formatter, linter, type checks, and tests.`;
 
 export function appendGuidelinesReminder(systemPrompt: string): string {
   if (systemPrompt.includes(GUIDELINES_REMINDER_HEADING)) {

@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
-import { GUIDELINE_SKILL_PATH } from './guard.ts';
+import { LANGUAGE_GUIDES } from './catalog.ts';
+import {
+  createGuidelineReadState,
+  GUIDELINE_SKILL_PATH,
+  mutationBlockReason,
+} from './guard.ts';
 import registerGuidelines from './index.ts';
 import { GUIDELINES_REMINDER_HEADING } from './prompt.ts';
 
@@ -34,9 +39,11 @@ test('injects the guidelines reminder once per system prompt', () => {
   assert.equal(second, undefined);
 });
 
-test('blocks write and edit until the required guides were read successfully', () => {
+test('requires completed reads before a later tool round can mutate', () => {
   const handlers = new Map<string, EventHandler>();
+  let activeTools = ['read', 'edit', 'write'];
   const api = {
+    getActiveTools: () => activeTools,
     on(name: string, handler: EventHandler) {
       handlers.set(name, handler);
     },
@@ -80,6 +87,12 @@ test('blocks write and edit until the required guides were read successfully', (
     input: { path: GUIDELINE_SKILL_PATH },
     isError: true,
   } as never);
+  toolResult({
+    toolName: 'read',
+    input: { path: GUIDELINE_SKILL_PATH },
+    isError: false,
+    details: { truncation: { truncated: true } },
+  } as never);
   assert.match(
     (toolCall(typescriptWrite) as GuardResult)?.reason ?? '',
     /SKILL\.md/,
@@ -116,15 +129,25 @@ test('blocks write and edit until the required guides were read successfully', (
   assert.equal(toolCall(typescriptWrite), undefined);
 
   beforeAgentStart({ systemPrompt: 'base prompt' } as never);
-  assert.equal(
-    (
-      toolCall({
-        toolName: 'write',
-        input: { path: 'README.md' },
-      } as never) as GuardResult
-    )?.block,
-    true,
-  );
+  activeTools = ['edit', 'write'];
+  const inactiveRead = toolCall({
+    toolName: 'write',
+    input: { path: 'README.md' },
+  } as never) as GuardResult;
+  assert.equal(inactiveRead?.block, true);
+  assert.match(inactiveRead?.reason ?? '', /read tool is inactive/);
+});
+
+test('maps every catalog extension to its language guide', () => {
+  const readState = createGuidelineReadState();
+  readState.skillRead = true;
+
+  for (const guide of LANGUAGE_GUIDES) {
+    for (const extension of guide.extensions) {
+      const reason = mutationBlockReason(readState, `src/example${extension}`);
+      assert.equal(reason?.includes(guide.fileName), true, guide.fileName);
+    }
+  }
 });
 
 type EventHandler = (event: never) => unknown;
