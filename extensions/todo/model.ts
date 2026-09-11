@@ -27,6 +27,11 @@ const TodoStatusSchema = Type.Union([
   Type.Literal(TODO_STATUS.cancelled),
 ]);
 
+const TodoActionSchema = Type.Union([
+  Type.Literal(TODO_ACTION.propose),
+  Type.Literal(TODO_ACTION.update),
+]);
+
 const TodoItemSchema = Type.Object({
   id: Type.String({ description: 'Stable identifier for this item' }),
   content: Type.String({ description: 'Short description of the work' }),
@@ -41,28 +46,53 @@ const TodoPatchSchema = Type.Object({
   ),
 });
 
+const TodoItemsField = Type.Array(TodoItemSchema, {
+  maxItems: MAX_TODO_ITEMS,
+  description: 'Replacement board for propose, with at most 20 items',
+});
+
+const TodoPatchesField = Type.Array(TodoPatchSchema, {
+  minItems: 1,
+  description: 'Patches to apply for update',
+});
+
 const ProposeParamsSchema = Type.Object({
   action: Type.Literal(TODO_ACTION.propose),
-  items: Type.Array(TodoItemSchema, {
-    maxItems: MAX_TODO_ITEMS,
-    description: 'Replacement board, with at most 20 items',
-  }),
+  items: TodoItemsField,
 });
 
 const UpdateParamsSchema = Type.Object({
   action: Type.Literal(TODO_ACTION.update),
-  patches: Type.Array(TodoPatchSchema, {
-    minItems: 1,
-    description: 'Patches to apply together',
-  }),
+  patches: TodoPatchesField,
 });
 
+/**
+ * Strict validator and types for sideroom_todo arguments. Kept as a
+ * discriminated union so invalid action/field combinations are rejected
+ * exactly. This schema is not registered with Pi; see
+ * TodoToolParametersSchema.
+ */
 export const TodoParamsSchema = Type.Union([
   ProposeParamsSchema,
   UpdateParamsSchema,
 ]);
 
+/**
+ * Tool-facing schema registered with Pi. It must stay a top-level object:
+ * Claude Code silently drops every tool of an MCP server when one tool's
+ * inputSchema has a non-object top level (anyOf/oneOf/allOf), which is exactly
+ * what TodoParamsSchema emits. The discriminated union is still enforced at
+ * runtime by parseTodoParams. See docs/extensions/todo.md ("Tool schema
+ * compatibility") for the bug references and the condition to revert.
+ */
+export const TodoToolParametersSchema = Type.Object({
+  action: TodoActionSchema,
+  items: Type.Optional(TodoItemsField),
+  patches: Type.Optional(TodoPatchesField),
+});
+
 export type TodoParams = Static<typeof TodoParamsSchema>;
+export type TodoToolParameters = Static<typeof TodoToolParametersSchema>;
 export type TodoAction = (typeof TODO_ACTION)[keyof typeof TODO_ACTION];
 export type TodoStatus = (typeof TODO_STATUS)[keyof typeof TODO_STATUS];
 
@@ -127,8 +157,8 @@ type JsonWireValue =
   | readonly JsonWireValue[]
   | JsonWireObject;
 
-export function prepareTodoArguments(args: unknown): TodoParams {
-  return decodeTodoWireArgs(args) as TodoParams;
+export function prepareTodoArguments(args: unknown): TodoToolParameters {
+  return decodeTodoWireArgs(args) as TodoToolParameters;
 }
 
 function decodeTodoWireArgs(args: unknown): JsonWireValue {

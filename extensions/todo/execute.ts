@@ -5,7 +5,7 @@ import {
   TODO_ACTION,
   type TodoAction,
   type TodoItem,
-  type TodoParams,
+  type TodoToolParameters,
   UI_UNAVAILABLE,
 } from './model.ts';
 
@@ -21,7 +21,7 @@ export interface TodoToolResult {
 }
 
 export function executeTodo(
-  params: TodoParams,
+  params: TodoToolParameters,
   ctx: Pick<ExtensionContext, 'mode'>,
   currentItems: readonly TodoItem[],
 ): TodoToolResult {

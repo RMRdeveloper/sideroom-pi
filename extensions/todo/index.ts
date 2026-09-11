@@ -2,7 +2,11 @@ import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { Text } from '@earendil-works/pi-tui';
 import { executeTodo, type TodoToolDetails } from './execute.ts';
 import { registerGuardEvents } from './guards.ts';
-import { prepareTodoArguments, TOOL_NAME, TodoParamsSchema } from './model.ts';
+import {
+  prepareTodoArguments,
+  TOOL_NAME,
+  TodoToolParametersSchema,
+} from './model.ts';
 import {
   type BoardLifecycle,
   commitBoard,
@@ -59,7 +63,7 @@ function registerTodoTool(
     description: TODO_DESCRIPTION,
     promptSnippet: TODO_PROMPT_SNIPPET,
     promptGuidelines: TODO_PROMPT_GUIDELINES,
-    parameters: TodoParamsSchema,
+    parameters: TodoToolParametersSchema,
     prepareArguments: prepareTodoArguments,
     executionMode: 'sequential',
     execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {

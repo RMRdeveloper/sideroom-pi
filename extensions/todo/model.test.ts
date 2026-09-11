@@ -9,6 +9,7 @@ import {
   shouldWatchdogUpdate,
   type TodoItem,
   type TodoParams,
+  TodoToolParametersSchema,
 } from './model.ts';
 
 const board: readonly TodoItem[] = [
@@ -20,6 +21,19 @@ const board: readonly TodoItem[] = [
 function propose(items: TodoItem[]): TodoParams {
   return { action: 'propose', items };
 }
+
+test('keeps the registered tool schema a top-level object for Claude Code', () => {
+  const schema = TodoToolParametersSchema as unknown as Record<string, unknown>;
+  assert.equal(schema.type, 'object');
+  assert.equal('anyOf' in schema, false);
+  assert.equal('oneOf' in schema, false);
+  assert.equal('allOf' in schema, false);
+  assert.deepEqual(Object.keys(schema.properties as object).sort(), [
+    'action',
+    'items',
+    'patches',
+  ]);
+});
 
 test('normalizes proposed ids and content while preserving caller ids and order', () => {
   const parsed = parseTodoParams(
@@ -256,6 +270,8 @@ test('decodes JSON-string items and patches then applies the strict schema', () 
 
 test('still rejects invalid JSON strings and decoded values that fail the schema', () => {
   const cases: unknown[] = [
+    { action: 'propose' },
+    { action: 'update' },
     { action: 'propose', items: '[{' },
     { action: 'propose', items: '{}' },
     { action: 'propose', items: JSON.stringify([{ id: 'auth' }]) },
