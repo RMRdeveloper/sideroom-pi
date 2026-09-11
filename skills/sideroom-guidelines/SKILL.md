@@ -1,6 +1,6 @@
 ---
 name: sideroom-guidelines
-description: "Apply Sideroom's mandatory coding workflow before implementing, refactoring, or fixing Java, Laravel/PHP, TypeScript/TSX, Python, Go, or Rust code. Load this skill and the exact language guide before mutation. Do not use for unrelated prose or domain-only discussions."
+description: "Apply Sideroom's mandatory coding workflow before implementing, refactoring, or fixing Java, Laravel/PHP, JavaScript/JSX, TypeScript/TSX, Python, Go, or Rust code. Load this skill and the exact language guide before mutation. Do not use for unrelated prose or domain-only discussions."
 license: MIT
 metadata:
   author: RMRdeveloper
@@ -26,6 +26,7 @@ Load this whole skill with `read`, without `offset` or `limit`, before the first
 | Path | Read |
 | ------ | ------ |
 | `.java` | `references/languages/java.md` |
+| `.js` `.jsx` `.mjs` `.cjs` | `references/languages/javascript.md` |
 | `.php` | `references/languages/php-laravel.md` |
 | `.ts` `.tsx` | `references/languages/typescript.md` |
 | `.py` | `references/languages/python.md` |
@@ -74,6 +75,7 @@ Changed code follows every applicable rule in the loaded complete guide. The fin
 ## References
 
 - `references/languages/java.md`
+- `references/languages/javascript.md`
 - `references/languages/php-laravel.md`
 - `references/languages/typescript.md`
 - `references/languages/python.md`

@@ -21,6 +21,7 @@ export interface LanguageGuide {
 export const LANGUAGE_GUIDES: readonly LanguageGuide[] = [
   languageGuide('go.md', ['.go']),
   languageGuide('java.md', ['.java']),
+  languageGuide('javascript.md', ['.js', '.jsx', '.mjs', '.cjs']),
   languageGuide('php-laravel.md', ['.php']),
   languageGuide('python.md', ['.py']),
   languageGuide('rust.md', ['.rs']),
