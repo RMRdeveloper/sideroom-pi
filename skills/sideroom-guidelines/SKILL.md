@@ -1,6 +1,6 @@
 ---
 name: sideroom-guidelines
-description: "Trigger: write, edit, coding, Java, Laravel, TypeScript, Python, Go, Rust. Apply Sideroom coding principles before changing code."
+description: "Apply Sideroom's mandatory coding workflow before implementing, refactoring, or fixing Java, Laravel/PHP, TypeScript/TSX, Python, Go, or Rust code. Load this skill and the exact language guide before mutation. Do not use for unrelated prose or domain-only discussions."
 license: MIT
 metadata:
   author: RMRdeveloper

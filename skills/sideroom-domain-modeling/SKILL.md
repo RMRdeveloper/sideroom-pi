@@ -1,6 +1,6 @@
 ---
 name: sideroom-domain-modeling
-description: "Trigger: ubiquitous language, domain term, CONTEXT.md, ADR, vague word, naming conflict. Sharpen the project's domain language while designing: challenge vague terms, split overloaded ones, and write the settled vocabulary into the repo."
+description: "Resolve domain-language conflicts and naming decisions. Use when terms are ambiguous, overloaded, or used inconsistently; when deciding what belongs in CONTEXT.md; or when a domain choice may need an ADR. Use for one or a few terms, not for simply reading CONTEXT.md, scanning an entire repository, or reshaping modules."
 license: MIT
 metadata:
   author: RMRdeveloper

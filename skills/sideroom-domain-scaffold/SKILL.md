@@ -1,6 +1,6 @@
 ---
 name: sideroom-domain-scaffold
-description: "Trigger: document my repo, scaffold CONTEXT.md, brownfield glossary, survey domain. Read the central domain code as source of truth and build or complete CONTEXT.md without interviewing anyone; conflicting terms are collected and grilled once, at the end."
+description: "Build or complete a code-first CONTEXT.md for a repository with missing or thin domain vocabulary. Use when the user asks to document or survey the repo, scaffold a brownfield glossary, or derive domain terms from central business code. Do not use for resolving one naming conflict or conducting an interactive design interview."
 license: MIT
 metadata:
   author: RMRdeveloper

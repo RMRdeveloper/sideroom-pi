@@ -1,6 +1,6 @@
 ---
 name: sideroom-grill
-description: "Trigger: fuzzy plan, design review, grilling, CONTEXT.md, ADR, domain language. Interview the user in rounds until you share one understanding, then write the vocabulary and the hard decisions into the repo."
+description: "Interview the user in rounds to resolve a fuzzy plan, design decision, or domain-language conflict before implementation. Use when the user asks to be grilled, wants clarifying questions, or says the plan or terms are not settled. Do not use for a code-first repository scan or a simple glossary lookup."
 license: MIT
 metadata:
   author: RMRdeveloper
