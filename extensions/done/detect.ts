@@ -7,6 +7,21 @@ export interface CheckCommand {
   readonly display: string;
 }
 
+const SHELL_OPERATOR = {
+  and: '&&',
+  or: '||',
+  pipe: '|',
+  sequence: ';',
+  background: '&',
+} as const;
+
+type ShellOperator = (typeof SHELL_OPERATOR)[keyof typeof SHELL_OPERATOR];
+
+interface ShellSegment {
+  readonly text: string;
+  readonly operatorBefore: ShellOperator | undefined;
+}
+
 export const PACKAGE_MANAGER = {
   npm: 'npm',
   pnpm: 'pnpm',
@@ -48,14 +63,98 @@ export function detectCheckCommand(cwd: string): CheckCommand | undefined {
 }
 
 export function commandMatches(text: string, check: CheckCommand): boolean {
-  const normalized = collapseWhitespace(text.trim());
   const target = collapseWhitespace(check.display);
+  const segments = splitShellCommand(text);
+  const hasUnsafeOperator = segments.some(
+    ({ operatorBefore }) =>
+      operatorBefore !== undefined && operatorBefore !== SHELL_OPERATOR.and,
+  );
+  if (hasUnsafeOperator) {
+    return false;
+  }
+
+  return segments.some(({ text: segmentText }) =>
+    simpleCommandMatches(segmentText, target),
+  );
+}
+
+function simpleCommandMatches(text: string, target: string): boolean {
+  const normalized = collapseWhitespace(text.trim());
   if (normalized === target) {
     return true;
   }
-  return [' ', '&', '|', ';'].some((separator) =>
-    normalized.startsWith(`${target}${separator}`),
-  );
+  return normalized.startsWith(`${target} `);
+}
+
+function splitShellCommand(commandText: string): ShellSegment[] {
+  const segments: ShellSegment[] = [];
+  let segmentStart = 0;
+  let operatorBefore: ShellOperator | undefined;
+  let quote = '';
+
+  for (let index = 0; index < commandText.length; index += 1) {
+    const character = commandText[index] ?? '';
+    if (quote.length > 0) {
+      if (character === '\\' && quote === '"') {
+        index += 1;
+        continue;
+      }
+      if (character === quote) {
+        quote = '';
+      }
+      continue;
+    }
+
+    const startsQuote =
+      character === "'" || character === '"' || character === '`';
+    if (startsQuote) {
+      quote = character;
+      continue;
+    }
+
+    const operator = shellOperatorAt(commandText, index);
+    if (operator === undefined) {
+      continue;
+    }
+    segments.push({
+      text: commandText.slice(segmentStart, index),
+      operatorBefore,
+    });
+    operatorBefore = operator;
+    index += operator.length - 1;
+    segmentStart = index + 1;
+  }
+
+  segments.push({
+    text: commandText.slice(segmentStart),
+    operatorBefore,
+  });
+  return segments;
+}
+
+function shellOperatorAt(
+  commandText: string,
+  index: number,
+): ShellOperator | undefined {
+  const twoCharacterOperator = commandText.slice(index, index + 2);
+  if (twoCharacterOperator === SHELL_OPERATOR.and) {
+    return SHELL_OPERATOR.and;
+  }
+  if (twoCharacterOperator === SHELL_OPERATOR.or) {
+    return SHELL_OPERATOR.or;
+  }
+
+  const character = commandText[index];
+  if (character === SHELL_OPERATOR.pipe) {
+    return SHELL_OPERATOR.pipe;
+  }
+  if (character === SHELL_OPERATOR.sequence) {
+    return SHELL_OPERATOR.sequence;
+  }
+  if (character === SHELL_OPERATOR.background) {
+    return SHELL_OPERATOR.background;
+  }
+  return undefined;
 }
 
 function detectPackageCommand(cwd: string): CheckCommand | undefined {

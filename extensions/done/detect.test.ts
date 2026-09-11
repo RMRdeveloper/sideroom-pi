@@ -70,7 +70,7 @@ test('returns undefined when nothing is detectable', () => {
   });
 });
 
-test('matches the exact command, arguments, and shell joins', () => {
+test('matches safe command chains without matching unsafe shell joins', () => {
   const check = {
     executable: 'npm',
     args: ['run', 'check'],
@@ -80,6 +80,11 @@ test('matches the exact command, arguments, and shell joins', () => {
   assert.equal(commandMatches('  npm   run check  ', check), true);
   assert.equal(commandMatches('npm run check --silent', check), true);
   assert.equal(commandMatches('npm run check && npm test', check), true);
+  assert.equal(commandMatches('cd packages/api && npm run check', check), true);
   assert.equal(commandMatches('npm run check:ci', check), false);
   assert.equal(commandMatches('npm run checklint', check), false);
+  assert.equal(commandMatches('npm run check; echo done', check), false);
+  assert.equal(commandMatches('npm run check | tee check.log', check), false);
+  assert.equal(commandMatches('npm run check || true', check), false);
+  assert.equal(commandMatches('echo "npm run check"', check), false);
 });
