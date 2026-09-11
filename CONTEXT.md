@@ -29,3 +29,15 @@ _Avoid: changed files, Git changes._
 A Pi session created from a point in an original session. It inherits the board visible at that point, then persists subsequent board changes independently from the original session.
 
 _Avoid: child session, parent/child session._
+
+## Added line
+
+A line a `write` or `edit` introduces, computed from each `oldText → newText` pair or, for a full write, against the existing file. The rules extension checks only added lines, never the rest of the file.
+
+_Avoid: changed line, new code._
+
+## Detected check command
+
+The single project command that the done extension watches to decide whether the session is green, chosen from package manager scripts and known ecosystem defaults. It is detected from the working directory, not configured.
+
+_Avoid: test command, build command._
