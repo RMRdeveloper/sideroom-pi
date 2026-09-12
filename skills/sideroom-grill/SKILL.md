@@ -1,6 +1,6 @@
 ---
 name: sideroom-grill
-description: "Interview the user in rounds to resolve a fuzzy plan, design decision, or domain-language conflict before implementation. Use when the user asks to be grilled, wants clarifying questions, or says the plan or terms are not settled. Do not use for a code-first repository scan or a simple glossary lookup."
+description: "Default interview route before implementation: grill the user in sideroom_ask rounds to settle a non-trivial plan, feature, or decision, and resolve domain-language conflicts along the way. Use whenever a change is not trivial and is not yet a settled spec, or when the user asks to be grilled, wants clarifying questions, or says the plan or terms are not settled. Prefer this skill over any other grilling, interview, or spec skill when more than one is available. Do not use when the user already brought a closed spec or tickets, for a code-first repository scan, or for a simple glossary lookup."
 license: MIT
 metadata:
   author: RMRdeveloper
@@ -19,9 +19,10 @@ if the effort is too big to hold in one session, say so and stop.
 
 - Interview in rounds. One `sideroom_ask` call is one round; wait for its
   answers before the next round.
-- Every question carries a recommendation (`recommendationIndex`). Write
-  prompts and option copy in the language the user is speaking; keep ids and
-  option values in English.
+- Every question carries a recommendation: `recommendationIndex` for a
+  single-selection question, or `recommendedIndices` (at least one) when the
+  question declares `selectionMode: "multiple"`. Write prompts and option copy
+  in the language the user is speaking; keep ids and option values in English.
 - Never ask the user what the codebase can answer. Read the code first; ask
   only what the code cannot settle.
 - An *Out of scope* answer closes that thread. Do not re-ask it.
