@@ -70,8 +70,10 @@ wall of tool calls, it:
 - **Works in the open.** A compact board sits above the editor:
   `pending → in_progress → completed`. Exactly one step is active at a
   time; the agent completes the current step and starts the next one in the
-  same move, so skipped steps become structurally hard. The board survives
-  reload, tree navigation, and compaction.
+  same move, so skipped steps become structurally hard. The widget shows at
+  most five rows, keeps the active step visible, and `F9` opens the full
+  read-only board. The board survives reload, tree navigation, and
+  compaction.
 - **Shows its traces.** Below the board, the last edited files appear as
   clickable `file://` links. `F8` opens the full session history; `R` clears
   it. Only successful Pi `write`/`edit` calls are tracked — no guesses from
@@ -114,6 +116,10 @@ chat. It never creates a repository task file or a `/todos` command.
 - `update` patches `{ id, status?, content? }` items and works everywhere,
   including headless modes.
 - Invariant: while anything is pending, exactly one item is `in_progress`.
+- Widget: at most five rows — open items before resolved ones, the
+  `in_progress` row always visible — plus a `…+N more · F9: view all` hint.
+  `F9` opens the full board as a read-only overlay, so the widget stays small
+  without hiding work from you; the agent still gets every item in its prompt.
 
 ### Edited files — proof, not promises
 
@@ -212,6 +218,13 @@ Items have stable string ids, short content, and one of `pending`,
 `in_progress`, `completed`, or `cancelled`. Complete the current item and
 start the next one in the same `update` call. Snapshots live in the active
 session branch and are rebuilt after navigation and compaction.
+
+- Widget: max five rows. Open items win the cap over resolved ones, the
+  `in_progress` row is always shown, and a `…+N more · F9: view all` line
+  appears when rows are hidden.
+- Extended view: `F9` toggles a read-only overlay. `↑`/`↓` and `PgUp`/`PgDn`
+  scroll; `Esc` or `F9` closes. It never mutates the board.
+- The cap is display-only: every item still reaches the system prompt.
 
 A forked session inherits the board visible at its fork point. Later board
 updates are reconstructed from each session's active branch, so the fork and
