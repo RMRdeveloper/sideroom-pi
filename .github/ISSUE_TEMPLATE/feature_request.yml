@@ -1,0 +1,67 @@
+name: Feature request
+description: Propose a capability, a new mechanical rule, or a new extension.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Sideroom Pi is opinionated on purpose. A useful request says which
+        failure mode it removes, because a capability that fights the design
+        rules in `CONTRIBUTING.md` will not be merged.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: Which failure mode does this close? Describe the session where you noticed it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: What should happen, and where — which tool, which mode, which moment.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which part would change
+      multiple: true
+      options:
+        - sideroom_ask
+        - sideroom_todo
+        - modified-files tracking
+        - guidelines gate or a language guide
+        - sideroom_rules
+        - sideroom_done
+        - A skill
+        - A new extension
+        - Packaging or documentation
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What you tried instead, and why it was not enough. "Nothing" is a valid answer when it is true.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: design
+    attributes:
+      label: Design rules
+      options:
+        - label: This does not need a slash command, a standalone CLI, or a subprocess wrapper around Pi.
+          required: true
+        - label: This does not write Sideroom state into the target repository.
+          required: true
+        - label: I searched the existing issues and the documentation first.
+          required: true
+        - label: I can open a pull request for this.
+          required: false

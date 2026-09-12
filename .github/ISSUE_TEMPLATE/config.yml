@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation and architecture
+    url: https://github.com/RMRdeveloper/sideroom-pi/blob/main/docs/README.md
+    about: How the package loads in Pi, one page per extension, and the ADRs.
+  - name: Contributing guide
+    url: https://github.com/RMRdeveloper/sideroom-pi/blob/main/CONTRIBUTING.md
+    about: Setup, commands, design rules, and the pull request flow.
+  - name: Report a security vulnerability
+    url: https://github.com/RMRdeveloper/sideroom-pi/security/advisories/new
+    about: Report privately through GitHub. Do not open a public issue.
