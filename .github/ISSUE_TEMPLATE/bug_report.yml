@@ -1,0 +1,121 @@
+name: Bug report
+description: Something in Sideroom Pi behaves differently than documented.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Sideroom Pi is a set of Pi extensions that run in
+        the Pi process, so version and mode details are usually what makes a bug
+        reproducible. Please fill every required field.
+
+  - type: input
+    id: sideroom-version
+    attributes:
+      label: Sideroom Pi version
+      description: "`npm view @rmrdeveloper/sideroom-pi version`, or the version shown by `pi list`."
+      placeholder: 8.2.0
+    validations:
+      required: true
+
+  - type: input
+    id: pi-version
+    attributes:
+      label: Pi version
+      description: Output of `pi --version`.
+      placeholder: 0.84.4
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Node version and operating system
+      description: Output of `node --version` plus your OS and terminal emulator.
+      placeholder: v22.19.0 on macOS 15, Ghostty
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Pi mode
+      description: Several tools are TUI-only by design and fail fast elsewhere.
+      options:
+        - Interactive TUI
+        - print
+        - JSON
+        - RPC
+        - Other or unknown
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which part is affected
+      multiple: true
+      options:
+        - sideroom_ask
+        - sideroom_todo
+        - modified-files tracking
+        - guidelines gate
+        - sideroom_rules
+        - sideroom_done
+        - sideroom-grill skill
+        - Packaging, install, or update
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The behavior you saw, in one or two sentences.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: The exact prompt or tool call, and the smallest sequence that shows the problem.
+      placeholder: |
+        1. Run `pi -e /path/to/sideroom-pi` in a fresh repository.
+        2. Ask the agent to do X.
+        3. Observe Y.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected instead, and where it is documented if you can point at it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, screenshots, or recordings
+      description: Paste them inside the fence below. Remove secrets and private repository content first.
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I am running the latest release of Sideroom Pi.
+          required: true
+        - label: I read CONTRIBUTING.md and searched the existing issues first.
+          required: true
+        - label: This report contains no tokens, session files, or private code.
+          required: true
+        - label: This is not a security vulnerability (those go through SECURITY.md).
+          required: true

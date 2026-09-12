@@ -57,6 +57,14 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   around Pi.- `skills/sideroom-guidelines/SKILL.md` owns the Do/Don't table and language map;
   `skills/sideroom-guidelines/references/languages/` owns complete per-language guides.
 
+- `CONTRIBUTING.md` owns the contributor contract: setup, commands, design
+  rules, commit and branch conventions, the changeset requirement, the extension
+  recipe, and how to report an issue.
+- `.github/ISSUE_TEMPLATE/` owns the issue forms and the contact links;
+  `.github/pull_request_template.md` owns the pull request checklist.
+- `CODE_OF_CONDUCT.md` owns community standards; `SECURITY.md` owns supported
+  versions and private vulnerability reporting.
+
 Add a tool by creating `extensions/<name>/index.ts`. Pi discovers
 `extensions/*/index.ts`; helper files in that folder are not extensions.
 
