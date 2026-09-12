@@ -36,6 +36,12 @@ The session-backed, user-visible list of work items maintained through `sideroom
 
 _Avoid: todo list, project backlog._
 
+## Open item
+
+A work-board item whose status is `in_progress` or `pending`, as opposed to a _resolved item_ (`completed` or `cancelled`). The compact board widget hides resolved items before open ones when the board exceeds its row cap.
+
+_Avoid: active item, unfinished item._
+
 ## Edited-file history
 
 The session-backed list of paths from successful Pi `write` and `edit` results. It records agent editing activity, not the repository working tree or Git diff.

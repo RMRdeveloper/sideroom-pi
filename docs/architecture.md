@@ -103,6 +103,11 @@ Widgets are installed with `ctx.ui.setWidget(key, factory)`; passing `undefined`
 removes one. Pi renders widgets in registration order, so the modified-files
 compact widget must reapply *after* the todo board to stay below it.
 
+Both compact widgets are capped and both offer a read-only overlay through
+`ctx.ui.custom()`: the todo board shows five rows and opens with `F9`, the
+edited-file list shows five paths and opens with `F8`. Neither overlay mutates
+session state.
+
 `todo` emits a cross-extension event after every board refresh:
 
 ```ts

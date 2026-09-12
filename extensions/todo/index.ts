@@ -18,6 +18,7 @@ import {
   TODO_WIDGET_REFRESH_EVENT,
   type TodoStore,
 } from './session.ts';
+import { createTodoBoardOverlayController } from './ui.ts';
 
 export const TODO_DESCRIPTION =
   'Maintain a live, user-visible work board. propose replaces the full board; update patches existing items by id.';
@@ -32,9 +33,12 @@ export const TODO_PROMPT_GUIDELINES = [
   'propose is interactive-TUI-only; update also works in print, JSON, and RPC modes.',
 ];
 
+const BOARD_SHORTCUT = 'f9';
+
 // Pi loads extensions/*/index.ts through export default.
 export default function registerTodo(pi: ExtensionAPI): void {
   const store = createTodoStore();
+  const overlay = createTodoBoardOverlayController(() => store.items);
   const restore: BoardLifecycle = (ctx) => {
     restoreBoard(store, ctx);
   };
@@ -50,6 +54,10 @@ export default function registerTodo(pi: ExtensionAPI): void {
   registerGuardEvents(pi, store, restore);
   registerBoardContext(pi, store, restoreAndRefresh);
   registerTodoTool(pi, store, notifyWidgetRefresh);
+  pi.registerShortcut(BOARD_SHORTCUT, {
+    description: 'Toggle the work board',
+    handler: (ctx) => overlay.toggle(ctx),
+  });
 }
 
 function registerTodoTool(

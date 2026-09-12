@@ -29,7 +29,8 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   and injects the compact board.
 - `extensions/todo/guards.ts` owns skip-prevention steers.
 - `extensions/todo/model.ts` owns the board schema, normalization, patches, and
-  state invariants; `extensions/todo/ui.ts` owns its display-only widget.
+  state invariants; `extensions/todo/ui.ts` owns its display-only widget, the
+  five-row cap, the hidden-row hint, and the `F9` overlay.
 - `extensions/modified-files/index.ts` composes successful edit/write tracking,
   session restoration, and the `F8` view.
 - `extensions/modified-files/session.ts` owns snapshots and widget refreshes;
@@ -92,7 +93,9 @@ Biome requires braces around every `if` body. Do not disable
   English. TUI chrome stays English.
 - Non-TUI calls fail with an explicit UI-not-available error.
 - The tool must not write Sideroom state into the target repository.
-- `sideroom_todo` is a display-only work board. `propose` replaces it and is
+- `sideroom_todo` is a display-only work board. Its compact widget shows at
+  most five rows, open items first, and `F9` opens the read-only overlay. The
+  cap never reaches the injected system prompt. `propose` replaces the board and is
   TUI-only; `update` patches ids in every mode. Persist snapshots with
   `appendEntry`, reconstruct from `getBranch()`, and never take over
   `session_before_compact` or add `/todos`.

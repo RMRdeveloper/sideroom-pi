@@ -91,7 +91,21 @@ Marks: `>` in progress, `-` pending, `✓` completed, `~` cancelled.
 ## Widget
 
 `ctx.ui.setWidget('sideroom-todo', …)` renders a header
-(`Sideroom board (N active, M queued)`) plus one row per item, colored by status.
+(`Sideroom board (N active, M queued)`) plus **at most five** item rows colored
+by status, and a dim `…+N more · F9: view all` line when rows are hidden.
+
+- *Open items* (`in_progress` and `pending`) survive the cap first; resolved
+  items (`completed` and `cancelled`) are hidden before them.
+- Visible rows keep their board order, and the single `in_progress` item always
+  gets a row even when it falls outside the first five.
+- The cap is display-only: `formatBoardBlock()` still injects every item into
+  the system prompt.
+
+`F9` opens a read-only overlay with 12 visible rows, `↑`/`↓` and `PgUp`/`PgDn`
+scrolling, and `Esc`/`F9` to close. It mutates nothing; `propose` and `update`
+stay the only writers. The overlay is only offered in TUI mode and when the
+terminal is at least 60 columns wide.
+
 An empty board removes the widget. It refreshes on `session_start`,
 `session_tree`, `session_compact`, and after each successful tool call. After
 each refresh, todo emits `sideroom:todo-widget-refreshed` so `modified-files`
@@ -141,11 +155,13 @@ and are tagged so their own continuation does not retrigger them.
 | `extensions/todo/execute.ts` | Builds propose/update results without mutating the store. |
 | `extensions/todo/session.ts` | Snapshot reconstruction, widget refresh, prompt injection, refresh event. |
 | `extensions/todo/guards.ts` | Nudge and watchdog steers. |
-| `extensions/todo/ui.ts` | Read-only widget rendering. |
+| `extensions/todo/ui.ts` | Read-only widget, row cap, hidden-row hint, and `F9` overlay. |
 
 ## Tests
 
 `model.test.ts` covers limits, normalization, patches, duplicates, unknown ids,
 and invariants. `execute.test.ts` covers TUI vs. non-TUI. `session.test.ts`
 covers snapshot reconstruction, including the canonical empty list.
-`index.test.ts` covers persistence, injection, refresh, and guard behavior.
+`ui.test.ts` covers the row cap, the hidden-row hint, and the overlay.
+`index.test.ts` covers persistence, injection, refresh, shortcut registration,
+and guard behavior.

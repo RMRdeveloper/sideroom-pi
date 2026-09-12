@@ -23,9 +23,13 @@ test('registers a sequential tool that snapshots and injects the live board', as
   const steers: Array<{ message: unknown; options: unknown }> = [];
   const widgets: Array<{ key: string; content: unknown }> = [];
   const widgetRefreshes: unknown[] = [];
+  const shortcutKeys: string[] = [];
   const api = {
     registerTool(tool: RegisteredTool) {
       registered.tool = tool;
+    },
+    registerShortcut(key: string) {
+      shortcutKeys.push(key);
     },
     on(name: string, handler: EventHandler) {
       handlers.set(name, handler);
@@ -75,6 +79,7 @@ test('registers a sequential tool that snapshots and injects the live board', as
   assert.deepEqual(snapshots, [{ items: initialItems }]);
   assert.equal(widgets.at(-1)?.key, 'sideroom-todo');
   assert.deepEqual(widgetRefreshes, [ctx]);
+  assert.deepEqual(shortcutKeys, ['f9']);
 
   const beforeAgentStart = handlers.get('before_agent_start');
   assert.ok(beforeAgentStart);
@@ -115,6 +120,7 @@ test('nudges only once when mutating an empty board', () => {
   const steers: unknown[] = [];
   const api = {
     registerTool() {},
+    registerShortcut() {},
     on(name: string, handler: EventHandler) {
       handlers.set(name, handler);
     },
@@ -157,6 +163,7 @@ test('prepares stringified items before execute sees native arrays', () => {
     registerTool(tool: RegisteredTool) {
       registered.tool = tool;
     },
+    registerShortcut() {},
     on() {},
     appendEntry() {},
     sendMessage() {},
