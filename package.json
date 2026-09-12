@@ -16,7 +16,7 @@
     "version-packages": "changeset version",
     "commitlint": "commitlint",
     "types": "tsc --noEmit",
-    "test": "node --test 'extensions/**/*.test.ts'",
+    "test": "node --test 'extensions/**/*.test.ts' 'scripts/**/*.test.mjs'",
     "lint": "biome lint extensions scripts commitlint.config.mjs",
     "lint:fix": "biome lint --write extensions scripts commitlint.config.mjs",
     "format": "biome format --write extensions scripts package.json biome.json commitlint.config.mjs .changeset/config.json",

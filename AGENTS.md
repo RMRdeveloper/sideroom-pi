@@ -45,10 +45,15 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
 - `extensions/done/index.ts` composes the finish gate; `extensions/done/detect.ts`
   owns per-ecosystem check-command detection; `extensions/done/guard.ts` owns
   run state and steering.
-- `scripts/render-preview.mjs` drives the real widgets offline and renders
-  `media/preview.png` and `media/preview.mp4`, the gallery's `pi.image` and
-  `pi.video`. It needs ffmpeg and the packaged skills; it is a maintainer tool,
-  not an extension and not a wrapper around Pi.- `skills/sideroom-guidelines/SKILL.md` owns the Do/Don't table and language map;
+- `scripts/render-preview.mjs` is the entry that renders `media/preview.png`
+  and `media/preview.mp4`, the gallery's `pi.image` and `pi.video`.
+  `scripts/preview/` holds the pipeline: `ansi.mjs` turns SGR and OSC 8 into
+  styled runs, `theme.mjs` owns pi's dark palette, `svg.mjs` owns panel geometry
+  and serialization, `ffmpeg.mjs` is the external tool boundary, `scenes.mjs`
+  owns the demo and drives the widgets, and `media-manifest.mjs` owns the
+  manifest contract that every run asserts. Pure modules carry `*.test.mjs`. It
+  needs ffmpeg; it is a maintainer tool, not an extension and not a wrapper
+  around Pi.- `skills/sideroom-guidelines/SKILL.md` owns the Do/Don't table and language map;
   `skills/sideroom-guidelines/references/languages/` owns complete per-language guides.
 
 Add a tool by creating `extensions/<name>/index.ts`. Pi discovers
