@@ -1,6 +1,6 @@
 {
   "name": "@rmrdeveloper/sideroom-pi",
-  "version": "8.1.1",
+  "version": "8.2.0",
   "description": "Pi coding-agent package that asks clarifying questions, shows a live todo board, enforces coding guidelines, and will not call it done while your checks are red.",
   "type": "module",
   "files": [
