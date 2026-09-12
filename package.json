@@ -1,7 +1,7 @@
 {
   "name": "@rmrdeveloper/sideroom-pi",
   "version": "8.1.1",
-  "description": "A global Pi package with a questionnaire, work board, edited-file view, coding guidelines, rule enforcement, and a finish gate for parent agents.",
+  "description": "Pi coding-agent package that asks clarifying questions, shows a live todo board, enforces coding guidelines, and will not call it done while your checks are red.",
   "type": "module",
   "files": [
     "extensions",
@@ -21,6 +21,7 @@
     "lint:fix": "biome lint --write extensions scripts commitlint.config.mjs",
     "format": "biome format --write extensions scripts package.json biome.json commitlint.config.mjs .changeset/config.json",
     "format:check": "biome format extensions scripts package.json biome.json commitlint.config.mjs .changeset/config.json",
+    "preview": "node scripts/render-preview.mjs",
     "check:if-blocks": "node scripts/check-if-blocks.mjs",
     "check": "npm run types && npm run check:if-blocks && biome check extensions scripts package.json biome.json commitlint.config.mjs .changeset/config.json && npm test"
   },
@@ -31,13 +32,31 @@
     "pi",
     "pi-package",
     "pi-extension",
+    "pi-skill",
+    "coding-agent",
+    "questions",
+    "clarifying-questions",
     "questionnaire",
+    "planning",
+    "spec",
     "todo",
+    "task-board",
+    "progress",
     "edited-files",
-    "sideroom_ask",
-    "sideroom_todo",
     "guidelines",
-    "typescript"
+    "code-style",
+    "code-quality",
+    "guardrails",
+    "rules",
+    "linting",
+    "testing",
+    "done",
+    "skills",
+    "typescript",
+    "tui",
+    "claude",
+    "sideroom_ask",
+    "sideroom_todo"
   ],
   "license": "MIT",
   "repository": {
@@ -53,7 +72,9 @@
     ],
     "skills": [
       "./skills"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/RMRdeveloper/sideroom-pi/main/media/preview.png",
+    "video": "https://raw.githubusercontent.com/RMRdeveloper/sideroom-pi/main/media/preview.mp4"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",

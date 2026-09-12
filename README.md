@@ -4,6 +4,15 @@
 [![npm monthly downloads](https://img.shields.io/npm/dm/@rmrdeveloper/sideroom-pi?label=downloads&logo=npm)](https://www.npmjs.com/package/@rmrdeveloper/sideroom-pi)
 [![npm license](https://img.shields.io/npm/l/@rmrdeveloper/sideroom-pi?label=license)](https://www.npmjs.com/package/@rmrdeveloper/sideroom-pi)
 
+**Asks before it guesses. Shows the plan. Enforces the style. Refuses to
+call it done in red.**
+
+```bash
+pi install npm:@rmrdeveloper/sideroom-pi
+```
+
+![Sideroom asking a multi-question batch and keeping the live board below it](https://raw.githubusercontent.com/RMRdeveloper/sideroom-pi/main/media/preview.png)
+
 > Coding agents fail in predictable ways: they guess instead of asking, they
 > bury progress in chat scroll, they litter your repo with `TODO.md` files,
 > every session writes code in a slightly different style, and they declare

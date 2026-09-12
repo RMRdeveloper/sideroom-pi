@@ -45,7 +45,10 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
 - `extensions/done/index.ts` composes the finish gate; `extensions/done/detect.ts`
   owns per-ecosystem check-command detection; `extensions/done/guard.ts` owns
   run state and steering.
-- `skills/sideroom-guidelines/SKILL.md` owns the Do/Don't table and language map;
+- `scripts/render-preview.mjs` drives the real widgets offline and renders
+  `media/preview.png` and `media/preview.mp4`, the gallery's `pi.image` and
+  `pi.video`. It needs ffmpeg and the packaged skills; it is a maintainer tool,
+  not an extension and not a wrapper around Pi.- `skills/sideroom-guidelines/SKILL.md` owns the Do/Don't table and language map;
   `skills/sideroom-guidelines/references/languages/` owns complete per-language guides.
 
 Add a tool by creating `extensions/<name>/index.ts`. Pi discovers
@@ -60,6 +63,7 @@ npm run lint
 npm run format:check
 npm test
 npm run check
+npm run preview
 npm run changeset
 npm run changeset:status
 npm run version-packages
