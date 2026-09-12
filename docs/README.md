@@ -20,18 +20,14 @@ Hard choices that passed the ADR gates, kept under `docs/adr/`.
 
 - [adr/0001-ask-multiple-selection-contract.md](./adr/0001-ask-multiple-selection-contract.md) — multiple-selection questions in `sideroom_ask`.
 - [adr/0002-capped-board-widget.md](./adr/0002-capped-board-widget.md) — row cap, `F9` overlay, and the uncapped injected board.
-
-## Design contracts (historical)
-
-These two documents predate the implementation and are kept as the maintenance
-contracts they describe. They are more granular than the reference above.
-
-- [modified-files-plan.md](./modified-files-plan.md)
-- [sideroom-todo-plan.md](./sideroom-todo-plan.md)
+- [adr/0003-contribution-and-release-flow.md](./adr/0003-contribution-and-release-flow.md) — `develop` as the integration branch and release-only `main`.
 
 ## Related top-level documents
 
 - [`README.md`](../README.md) — product overview and install instructions.
+- [`CONTRIBUTING.md`](../CONTRIBUTING.md) — setup, commands, design rules, and the pull request flow.
 - [`AGENTS.md`](../AGENTS.md) — source of truth for tools, paths, and commands.
 - [`CONTEXT.md`](../CONTEXT.md) — domain glossary.
+- [`CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md) — community standards and enforcement.
+- [`SECURITY.md`](../SECURITY.md) — supported versions and private vulnerability reporting.
 - [`CHANGELOG.md`](../CHANGELOG.md) — released changes.
