@@ -37,12 +37,25 @@ on npm.
 5. The version pull request created by the Release workflow remains the only
    automated writer of `main`, and publishing stays impossible from a local
    machine.
+6. `develop` is also the repository default branch, so a new pull request and
+   every web edit start from the integration branch. `main` stops being default
+   but keeps its role: it is what releases are cut from.
 
 ## Consequences
 
 - `main` history is a sequence of release-intent merges, so a push to `main`
   always means "prepare a release". A feature can sit in `develop` without
   arming the release workflow.
+- A fresh clone checks out `develop`. GitHub resolves `CONTRIBUTING.md`,
+  `CODE_OF_CONDUCT.md`, `SECURITY.md`, the issue forms, and the pull request
+  template from the default branch, so those files have to reach `develop`
+  before the repository UI links them. Contributor-facing links in
+  `.github/ISSUE_TEMPLATE/config.yml` therefore point at `develop`, while
+  `README.md` and `package.json` keep pointing at `main` for the released
+  gallery assets.
+- `.changeset/config.json` keeps `baseBranch: main`. Version pull requests still
+  target the release branch, and the Changesets action keeps reading that config
+  rather than the repository default.
 - After a release, `main` holds the `Version Packages` commit that `develop`
   does not. The maintainer merges `main` back into `develop` before the next
   `develop` → `main` pull request, or the next release re-applies the same
