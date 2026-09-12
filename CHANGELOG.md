@@ -1,5 +1,14 @@
 # Changelog
 
+## 8.3.0
+
+### Minor Changes
+
+- 46dde32: Cap the `sideroom_todo` board widget at five rows, preferring open items and
+  always keeping the `in_progress` row, add a `…+N more · F9: view all` hint, and
+  add a read-only `F9` overlay with the full board. The injected system-prompt
+  block is unchanged.
+
 ## 8.2.0
 
 ### Minor Changes
