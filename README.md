@@ -293,6 +293,17 @@ Maintainer reference lives in [`docs/`](docs/README.md): the
 [architecture](docs/architecture.md) and one page per
 [extension](docs/extensions/ask.md).
 
+## Contributing
+
+Contributions are welcome: bug reports, feature requests, language guides, and
+pull requests. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, the
+commands, the design rules, and the branch and release flow — pull requests
+target `develop`, and `main` only carries releases.
+
+- [Report a bug](https://github.com/RMRdeveloper/sideroom-pi/issues/new?template=bug_report.yml) or [request a feature](https://github.com/RMRdeveloper/sideroom-pi/issues/new?template=feature_request.yml).
+- Report vulnerabilities privately through [`SECURITY.md`](SECURITY.md).
+- Participation is covered by the [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
+
 ## License
 
 MIT.
