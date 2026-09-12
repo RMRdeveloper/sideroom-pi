@@ -11,9 +11,11 @@ import {
   type AskAnswer,
   type AskQuestion,
   type AskResult,
+  MULTIPLE_SELECTION_MODE,
   type RenderOption,
   renderOptions,
 } from './model.ts';
+import { answerFromSelections, toggleSelection } from './selection.ts';
 
 export async function runAskUi(
   ui: Pick<ExtensionUIContext, 'custom'>,
@@ -25,8 +27,7 @@ export async function runAskUi(
   return ui.custom<AskResult>((tui, theme, _keybindings, done) => {
     let currentTab = 0;
     const firstQuestion = questions[0];
-    let optionIndex =
-      firstQuestion === undefined ? 0 : firstQuestion.recommendationIndex;
+    let optionIndex = firstQuestion?.recommendedIndices[0] ?? 0;
     let inputMode = false;
     let inputQuestionId: string | null = null;
     let cachedLines: string[] | undefined;
@@ -82,11 +83,10 @@ export async function runAskUi(
         return;
       }
       const saved = answers.get(question.id);
-      if (saved?.index !== undefined) {
-        optionIndex = saved.index - 1;
-      } else {
-        optionIndex = question.recommendationIndex;
-      }
+      optionIndex =
+        saved?.index !== undefined
+          ? saved.index - 1
+          : (question.recommendedIndices[0] ?? 0);
       refresh();
     }
 
@@ -104,6 +104,45 @@ export async function runAskUi(
 
     function saveAnswer(answer: AskAnswer): void {
       answers.set(answer.id, answer);
+    }
+
+    function selectedIndices(question: AskQuestion): readonly number[] {
+      const saved = answers.get(question.id);
+      if (saved?.selections === undefined) {
+        return [];
+      }
+      return saved.selections.map((selection) => selection.index - 1);
+    }
+
+    function answerSummary(answer: AskAnswer): string {
+      if (answer.selections === undefined || answer.selections.length === 0) {
+        return answer.label;
+      }
+      return answer.selections.map((selection) => selection.label).join(', ');
+    }
+
+    function isReservedOption(opt: RenderOption): boolean {
+      return opt.isOther === true || opt.isOutOfScope === true;
+    }
+
+    function activateReservedOption(
+      question: AskQuestion,
+      opt: RenderOption,
+      index: number,
+    ): void {
+      if (opt.isOther === true) {
+        openCustomEditor(question);
+        return;
+      }
+      saveAnswer({
+        id: question.id,
+        value: opt.value,
+        label: opt.label,
+        wasCustom: false,
+        outOfScope: true,
+        index: index + 1,
+      });
+      advanceAfterAnswer();
     }
 
     function openCustomEditor(question: AskQuestion): void {
@@ -127,20 +166,8 @@ export async function runAskUi(
       if (opt === undefined) {
         return;
       }
-      if (opt.isOther === true) {
-        openCustomEditor(question);
-        return;
-      }
-      if (opt.isOutOfScope === true) {
-        saveAnswer({
-          id: question.id,
-          value: opt.value,
-          label: opt.label,
-          wasCustom: false,
-          outOfScope: true,
-          index: index + 1,
-        });
-        advanceAfterAnswer();
+      if (isReservedOption(opt)) {
+        activateReservedOption(question, opt, index);
         return;
       }
       const original = question.options[index];
@@ -152,6 +179,49 @@ export async function runAskUi(
         outOfScope: false,
         index: index + 1,
       });
+      advanceAfterAnswer();
+    }
+
+    function toggleMultipleOption(
+      question: AskQuestion,
+      opts: readonly RenderOption[],
+      index: number,
+    ): void {
+      const opt = opts[index];
+      if (opt === undefined) {
+        return;
+      }
+      if (isReservedOption(opt)) {
+        activateReservedOption(question, opt, index);
+        return;
+      }
+      const next = toggleSelection(selectedIndices(question), index);
+      if (next.length === 0) {
+        answers.delete(question.id);
+        refresh();
+        return;
+      }
+      answers.set(question.id, answerFromSelections(question, next));
+      refresh();
+    }
+
+    function confirmMultipleSelection(
+      question: AskQuestion,
+      opts: readonly RenderOption[],
+      index: number,
+    ): void {
+      const opt = opts[index];
+      if (opt === undefined) {
+        return;
+      }
+      if (isReservedOption(opt)) {
+        activateReservedOption(question, opt, index);
+        return;
+      }
+      if (selectedIndices(question).length === 0) {
+        refresh();
+        return;
+      }
       advanceAfterAnswer();
     }
 
@@ -232,15 +302,31 @@ export async function runAskUi(
         return;
       }
 
+      if (
+        question?.selectionMode === MULTIPLE_SELECTION_MODE &&
+        matchesKey(data, Key.space)
+      ) {
+        toggleMultipleOption(question, opts, optionIndex);
+        return;
+      }
+
       const digit = optionIndexFromDigit(data, opts.length);
       if (digit !== undefined && question !== undefined) {
         optionIndex = digit;
-        confirmOption(question, opts, digit);
+        if (question.selectionMode === MULTIPLE_SELECTION_MODE) {
+          toggleMultipleOption(question, opts, digit);
+        } else {
+          confirmOption(question, opts, digit);
+        }
         return;
       }
 
       if (matchesKey(data, Key.enter) && question !== undefined) {
-        confirmOption(question, opts, optionIndex);
+        if (question.selectionMode === MULTIPLE_SELECTION_MODE) {
+          confirmMultipleSelection(question, opts, optionIndex);
+        } else {
+          confirmOption(question, opts, optionIndex);
+        }
         return;
       }
 
@@ -310,7 +396,10 @@ export async function runAskUi(
         lines.push('');
       }
 
-      function renderOptionList(): void {
+      function renderOptionList(questionForList: AskQuestion): void {
+        const isMultipleAnswer =
+          questionForList.selectionMode === MULTIPLE_SELECTION_MODE;
+        const selected = selectedIndices(questionForList);
         for (let index = 0; index < opts.length; index += 1) {
           const opt = opts[index];
           if (opt === undefined) {
@@ -319,10 +408,16 @@ export async function runAskUi(
           if (opt.isOutOfScope === true) {
             lines.push('');
           }
-          const selected = index === optionIndex;
-          const prefix = selected ? theme.fg('accent', '> ') : '  ';
-          const color = selected ? 'accent' : 'text';
-          let line = theme.fg(color, `${String(index + 1)}. ${opt.label}`);
+          const focused = index === optionIndex;
+          const prefix = focused ? theme.fg('accent', '> ') : '  ';
+          const color = focused ? 'accent' : 'text';
+          let line = '';
+          if (isMultipleAnswer && !isReservedOption(opt)) {
+            line += selected.includes(index)
+              ? theme.fg('success', '[x] ')
+              : theme.fg('dim', '[ ] ');
+          }
+          line += theme.fg(color, `${String(index + 1)}. ${opt.label}`);
           if (opt.isRecommended === true) {
             line = `${line} ${theme.fg('dim', 'recommended')}`;
           }
@@ -367,7 +462,7 @@ export async function runAskUi(
           }
           addWrappedWithPrefix(
             ' ',
-            `${name}${theme.fg('dim', kind)}${theme.fg('text', answer.label)}`,
+            `${name}${theme.fg('dim', kind)}${theme.fg('text', answerSummary(answer))}`,
           );
         }
         lines.push('');
@@ -395,19 +490,31 @@ export async function runAskUi(
         if (saved !== undefined) {
           addWrappedWithPrefix(
             ' ',
-            theme.fg('muted', `Current: ${saved.label}`),
+            theme.fg('muted', `Current: ${answerSummary(saved)}`),
           );
         }
         lines.push('');
-        renderOptionList();
+        renderOptionList(question);
       }
 
       if (!inputMode && currentTab !== questions.length) {
         lines.push('');
+        if (
+          question?.selectionMode === MULTIPLE_SELECTION_MODE &&
+          selectedIndices(question).length === 0
+        ) {
+          addWrappedWithPrefix(
+            ' ',
+            theme.fg('warning', 'Select at least one option'),
+          );
+        }
         const count = String(opts.length);
-        const help = isMulti
-          ? `↑↓ or 1–${count} · Enter · Tab next · Esc cancel`
-          : `↑↓ or 1–${count} · Enter select · Esc cancel`;
+        let help = `↑↓ or 1–${count} · Enter select · Esc cancel`;
+        if (question?.selectionMode === MULTIPLE_SELECTION_MODE) {
+          help = `↑↓ or 1–${count} toggle · Space toggle · Enter confirm · Esc cancel`;
+        } else if (isMulti) {
+          help = `↑↓ or 1–${count} · Enter · Tab next · Esc cancel`;
+        }
         addWrappedWithPrefix(' ', theme.fg('dim', help));
       }
       lines.push(theme.fg('accent', '─'.repeat(renderWidth)));

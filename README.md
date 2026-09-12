@@ -54,9 +54,10 @@ wall of tool calls, it:
 
 - **Asks like a senior would.** A clean TUI questionnaire appears — tabs for
   several questions, a simple list for one. Every question carries a
-  recommendation, you can always answer *Out of scope* or write your own,
-  and everything is written in your language. Escape cancels the whole
-  batch. No guessing, no twenty follow-up clarifications in chat.
+  recommendation, and a plural one lets you tick several answers at once. You
+  can always answer *Out of scope* or write your own, and everything is written
+  in your language. Escape cancels the whole batch. No guessing, no twenty
+  follow-up clarifications in chat.
 - **Works in the open.** A compact board sits above the editor:
   `pending → in_progress → completed`. Exactly one step is active at a
   time; the agent completes the current step and starts the next one in the
@@ -86,9 +87,11 @@ wall of tool calls, it:
 ### `sideroom_ask` — decisions, not interrogations
 
 One call is one 1–N question batch. Each question needs an `id`, a `prompt`,
-at least two `{ value, label }` options, and a `recommendationIndex` pointing
-at the recommended option. The UI adds the rest: the recommended mark, the
-always-on *Out of scope* row, and a custom answer.
+at least two `{ value, label }` options, and a recommendation:
+`recommendationIndex` for the default single answer, or
+`selectionMode: "multiple"` with `recommendedIndices` when the question accepts
+several. The UI adds the rest: the recommended mark, the always-on *Out of
+scope* row, and a custom answer.
 
 TUI-only by design. In print, JSON, or RPC modes it fails fast with
 `UI not available` instead of hanging.
@@ -185,9 +188,10 @@ pi update --extension npm:@rmrdeveloper/sideroom-pi
 ### Questionnaire contract
 
 Each batch accepts one to four questions, with two to four caller-provided
-options per question. Tab labels accept at most 16 characters and option
-labels at most 60. Inputs that exceed a limit are rejected rather than
-truncated.
+options per question. A question takes one answer unless it declares
+`selectionMode: "multiple"`, which requires `recommendedIndices` and at least
+one selection. Tab labels accept at most 16 characters and option labels at
+most 60. Inputs that exceed a limit are rejected rather than truncated.
 
 Write prompts, tab labels, and option copy in the language the user is
 speaking; keep ids, option values, and TUI chrome in English. Do not send
@@ -249,6 +253,17 @@ Load the skill at the start of a change with a fuzzy plan.
 Single-session scope only. Files are created lazily: nothing exists until
 the first term or decision crystallises. A session with a sharper glossary
 and zero ADRs is working as designed.
+
+### Coexisting with other grilling skills
+
+Pi routes skills by description, not by name, so several grilling skills can
+be installed at once. `sideroom-grill` claims non-trivial plans before
+implementation and states precedence over other grilling, interview, and spec
+skills. If a third-party skill still wins, remove it from routing by adding
+`disable-model-invocation: true` to its frontmatter, or exclude its path with
+`-path` in `settings.skills`. A literal name collision keeps the first skill
+found: project `.pi/skills`, then project `.agents/skills`, then
+`~/.pi/agent/skills`, then `~/.agents/skills`, then packages.
 
 ## Documentation
 

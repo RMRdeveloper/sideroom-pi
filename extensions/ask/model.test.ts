@@ -330,3 +330,160 @@ test('still rejects invalid JSON strings and decoded values that fail the schema
     assert.equal(parsed.ok, false);
   }
 });
+
+test('parses a multiple-selection question and marks every recommendation', () => {
+  const parsed = parseAskParams({
+    questions: [
+      {
+        id: 'concerns',
+        label: 'Concerns',
+        prompt: 'Which concerns should the plan cover?',
+        selectionMode: 'multiple',
+        options: [
+          { value: 'perf', label: 'Performance' },
+          { value: 'a11y', label: 'Accessibility' },
+        ],
+        recommendedIndices: [1],
+      },
+    ],
+  });
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) {
+    return;
+  }
+  const [question] = parsed.questions;
+  assert.ok(question);
+  assert.equal(question.selectionMode, 'multiple');
+  assert.deepEqual(question.recommendedIndices, [1]);
+  assert.equal(renderOptions(question)[0]?.isRecommended, false);
+  assert.equal(renderOptions(question)[1]?.isRecommended, true);
+});
+
+test('rejects a recommendation field that does not match the selection mode', () => {
+  const singleOptions = [
+    { value: 'pilot', label: 'Pilot with one team' },
+    { value: 'all', label: 'Roll out to every team now' },
+  ];
+  const cases: ReadonlyArray<{
+    readonly question: Record<string, unknown>;
+    readonly expectedMessage: string;
+  }> = [
+    {
+      question: {
+        id: 'scope',
+        prompt: 'Who should receive the first rollout?',
+        options: singleOptions,
+      },
+      expectedMessage: "Error: Question 'scope' requires recommendationIndex",
+    },
+    {
+      question: {
+        id: 'scope',
+        prompt: 'Who should receive the first rollout?',
+        options: singleOptions,
+        recommendationIndex: 0,
+        recommendedIndices: [0],
+      },
+      expectedMessage:
+        "Error: Question 'scope' is a single-selection question; remove recommendedIndices",
+    },
+    {
+      question: {
+        id: 'concerns',
+        prompt: 'Which concerns should the plan cover?',
+        selectionMode: 'multiple',
+        options: singleOptions,
+      },
+      expectedMessage:
+        "Error: Question 'concerns' is a multiple-selection question and requires recommendedIndices",
+    },
+    {
+      question: {
+        id: 'concerns',
+        prompt: 'Which concerns should the plan cover?',
+        selectionMode: 'multiple',
+        options: singleOptions,
+        recommendationIndex: 0,
+        recommendedIndices: [0],
+      },
+      expectedMessage:
+        "Error: Question 'concerns' is a multiple-selection question; remove recommendationIndex",
+    },
+    {
+      question: {
+        id: 'concerns',
+        prompt: 'Which concerns should the plan cover?',
+        selectionMode: 'multiple',
+        options: singleOptions,
+        recommendedIndices: [3],
+      },
+      expectedMessage:
+        "Error: recommendedIndices 3 is out of range for question 'concerns'",
+    },
+  ];
+
+  for (const { question, expectedMessage } of cases) {
+    const parsed = parseAskParams({ questions: [question] });
+    assert.equal(parsed.ok, false);
+    if (!parsed.ok) {
+      assert.equal(parsed.message, expectedMessage);
+    }
+  }
+});
+
+test('rejects an empty recommendedIndices list with a specific message', () => {
+  const parsed = parseAskParams({
+    questions: [
+      {
+        id: 'concerns',
+        prompt: 'Which concerns should the plan cover?',
+        selectionMode: 'multiple',
+        options: [
+          { value: 'perf', label: 'Performance' },
+          { value: 'a11y', label: 'Accessibility' },
+        ],
+        recommendedIndices: [],
+      },
+    ],
+  });
+  assert.equal(parsed.ok, false);
+  if (!parsed.ok) {
+    assert.equal(
+      parsed.message,
+      "Error: Question 'concerns' must mark at least one recommended option",
+    );
+  }
+});
+
+test('formats every selection of a multiple-selection answer', () => {
+  const questions = normalizeQuestions([
+    {
+      id: 'concerns',
+      label: 'Concerns',
+      prompt: 'Which concerns should the plan cover?',
+      selectionMode: 'multiple',
+      options: [
+        { value: 'perf', label: 'Performance' },
+        { value: 'a11y', label: 'Accessibility' },
+      ],
+      recommendedIndices: [0, 1],
+    },
+  ]);
+  const lines = formatAnswerLines(questions, [
+    {
+      id: 'concerns',
+      value: 'perf',
+      label: 'Performance',
+      wasCustom: false,
+      outOfScope: false,
+      index: 1,
+      selections: [
+        { value: 'perf', label: 'Performance', index: 1 },
+        { value: 'a11y', label: 'Accessibility', index: 2 },
+      ],
+    },
+  ]);
+  assert.deepEqual(lines, [
+    'Concerns: user selected: 1. Performance, 2. Accessibility',
+  ]);
+});

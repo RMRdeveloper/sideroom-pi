@@ -9,16 +9,18 @@ import {
 } from './model.ts';
 
 export const ASK_DESCRIPTION =
-  'Ask the user one or more questions in the language they are speaking. Use for clarifying requirements, getting preferences, or confirming decisions. Each question must include a recommended option. For a single question, shows a simple option list. For multiple questions, shows a tab-based interface.';
+  'Ask the user one or more questions in the language they are speaking. Use for clarifying requirements, getting preferences, or confirming decisions. Each question must include a recommended option, or several recommended options when it accepts multiple selections. For a single question, shows a simple option list. For multiple questions, shows a tab-based interface.';
 
 export const ASK_PROMPT_SNIPPET =
   'Ask the user one or more questions with a recommended option, in their language.';
 
 export const ASK_PROMPT_GUIDELINES = [
   'Use sideroom_ask to clarify requirements, preferences, or decisions with the user.',
+  'When a non-trivial request is not yet a settled spec, follow the sideroom-grill skill before implementing; it owns the interview and drives sideroom_ask rounds.',
   'Each sideroom_ask question needs an id, a prompt, at least two options, and a recommendationIndex pointing at the recommended option.',
   'Write every sideroom_ask prompt, tab label, and option label or description in the language the user is speaking. Keep ids, option values, and tool code in English.',
-  'sideroom_ask always adds Out of scope and a custom answer; do not include those options yourself.',
+  'sideroom_ask always adds Out of scope and a custom answer; do not include those options yourself, and in a multiple-selection question they replace the selections.',
+  'For a genuinely plural sideroom_ask question, set selectionMode "multiple" with recommendedIndices (at least one) instead of recommendationIndex; never send both fields, and keep the single default otherwise.',
   'One sideroom_ask call is one batch; call it again if another round of questions is needed.',
   'sideroom_ask only works in the interactive TUI; it returns an error in print, JSON, or RPC modes.',
 ];
@@ -72,6 +74,14 @@ export default function registerAsk(pi: ExtensionAPI): void {
         }
         if (answer.wasCustom) {
           return `${mark}${id}: ${theme.fg('muted', '(wrote) ')}${answer.label}`;
+        }
+        if (answer.selections !== undefined && answer.selections.length > 0) {
+          const picked = answer.selections
+            .map(
+              (selection) => `${String(selection.index)}. ${selection.label}`,
+            )
+            .join(', ');
+          return `${mark}${id}: ${picked}`;
         }
         if (answer.index !== undefined) {
           return `${mark}${id}: ${String(answer.index)}. ${answer.label}`;

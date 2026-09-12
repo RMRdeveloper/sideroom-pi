@@ -14,6 +14,12 @@ Maintainable documentation for the Sideroom Pi package. Start here.
 | [extensions/rules.md](./extensions/rules.md) | Added-line rule checks, blocking, warnings, and the circuit breaker. |
 | [extensions/done.md](./extensions/done.md) | Check-command detection and the green-before-finish steer. |
 
+## Decisions
+
+Hard choices that passed the ADR gates, kept under `docs/adr/`.
+
+- [adr/0001-ask-multiple-selection-contract.md](./adr/0001-ask-multiple-selection-contract.md) — multiple-selection questions in `sideroom_ask`.
+
 ## Design contracts (historical)
 
 These two documents predate the implementation and are kept as the maintenance

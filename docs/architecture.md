@@ -43,11 +43,13 @@ Each tool follows the same split so pure logic can be tested without Pi:
 | `model.ts` | Schemas (TypeBox), types, parsing, normalization, invariants, and pure decisions. No Pi imports. |
 | `execute.ts` | Turns tool parameters into a result object. Prepares changes but does not mutate the store. |
 | `session.ts` | Reconstructs state from the session branch and persists snapshots. |
+| `selection.ts` | Pure multiple-selection reducer: toggling, ordering, and building the answer. No Pi imports. |
 | `guards.ts` | Steers the agent when it skips a required behavior. |
 | `ui.ts` | TUI rendering: widgets, overlays, and custom screens. |
 
-`ask` has no session state and therefore no `session.ts`/`guards.ts`; `rules`
-and `done` are pure guards without a tool.
+`ask` has no session state and therefore no `session.ts`/`guards.ts`; it adds
+`selection.ts` for the multiple-selection reducer. `rules` and `done` are pure
+guards without a tool.
 
 ## Lifecycle events
 
@@ -139,8 +141,9 @@ validation and unwraps nested arrays that some hosts serialise as JSON strings
 
 ## Testing and quality
 
-Pure modules (`model.ts`, `execute.ts`, `session.ts`) are written to be unit
-testable with injected dependencies. Tests use the built-in `node:test` runner.
+Pure modules (`model.ts`, `selection.ts`, `execute.ts`, `session.ts`) are written
+to be unit testable with injected dependencies. Tests use the built-in
+`node:test` runner.
 
 ```bash
 npm run types          # tsc --noEmit

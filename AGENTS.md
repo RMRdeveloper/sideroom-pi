@@ -14,9 +14,13 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
 
 - `extensions/ask/index.ts` registers `sideroom_ask`.
 - `extensions/ask/execute.ts` runs one questionnaire batch.
-- `extensions/ask/model.ts` owns the schema and answer contract.
+- `extensions/ask/model.ts` owns the schema, answer contract, and selection
+  modes.
+- `extensions/ask/selection.ts` owns the multiple-selection reducer: toggling
+  option indexes and building the answer.
 - `extensions/ask/ui.ts` owns the TUI: questionnaire tabs, required
-  recommendation, always-on Out of scope, and a custom answer.
+  recommendation, multiple-selection checkboxes, always-on Out of scope, and a
+  custom answer.
 - `extensions/todo/index.ts` registers `sideroom_todo` and composes its
   collaborators.
 - `extensions/todo/execute.ts` prepares propose/update results without
@@ -71,8 +75,9 @@ Biome requires braces around every `if` body. Do not disable
 ## Design rules
 
 - `sideroom_ask` is a normal parent-agent tool. One call is one 1–N batch.
-- Each question requires `recommendationIndex`. The UI always adds Out of scope
-  and a custom answer; callers must not send those rows.
+- Each question requires `recommendationIndex`, or `recommendedIndices` when it
+  declares `selectionMode: "multiple"`. The UI always adds Out of scope and a
+  custom answer; callers must not send those rows.
 - Write `sideroom_ask` prompts, tab labels, and option labels or descriptions
   in the language the user is speaking. Keep ids, option values, and source in
   English. TUI chrome stays English.

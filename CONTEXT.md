@@ -2,15 +2,33 @@
 
 ## Questionnaire batch
 
-One `sideroom_ask` call containing one to four questions that are answered together, each with two to four caller-provided options. Every question has a recommended option, while Out of scope and a custom answer are system-provided choices rather than caller-provided options.
+One `sideroom_ask` call containing one to four questions that are answered together, each with two to four caller-provided options. Every question carries at least one recommended option, while Out of scope and a custom answer are system-provided choices rather than caller-provided options.
 
 _Avoid: survey, form._
 
+## Single-selection question
+
+A questionnaire question whose answer is exactly one caller-provided option. Its one recommended option is highlighted and initially focused.
+
+_Avoid: radio question, single-choice question._
+
+## Multiple-selection question
+
+A questionnaire question whose answer may be several caller-provided options at once. Its recommended options are all highlighted but none checked, and at least one selection is required; Out of scope remains the way to decline.
+
+_Avoid: multi-select question, multi-answer question._
+
 ## Recommended option
 
-The question option the caller considers the best default. It is highlighted and initially focused, but the user must still choose an answer.
+The question option the caller considers the best default. A single-selection question has exactly one, highlighted and initially focused; a multiple-selection question has one or more, all highlighted and none checked. Either way the user must still choose.
 
 _Avoid: default answer, automatic answer._
+
+## Selection
+
+One option a user picks in a multiple-selection question. A single-selection answer is itself one selection; a multiple-selection answer carries one or more.
+
+_Avoid: choice, pick._
 
 ## Work board
 
