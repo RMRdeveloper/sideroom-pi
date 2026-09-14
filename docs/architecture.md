@@ -28,6 +28,8 @@ extensions/
   guidelines/     pre-edit read gate
   rules/          added-line rule checks
   done/           green-before-finish steer
+  persona/        single built-in voice
+  explain/        end-of-work walkthrough offer
 assets/artifacts/GUIDELINES_TEMPLATE.md   canonical rule seed
 skills/           packaged agent skills and language guides
 scripts/          repository-only tooling (not shipped)
@@ -49,7 +51,8 @@ Each tool follows the same split so pure logic can be tested without Pi:
 
 `ask` has no session state and therefore no `session.ts`/`guards.ts`; it adds
 `selection.ts` for the multiple-selection reducer. `rules` and `done` are pure
-guards without a tool.
+guards without a tool. `persona` persists no profile state, so it ships
+`catalog.ts`, `checks.ts`, and `guard.ts` instead of `session.ts` or `ui.ts`.
 
 ## Lifecycle events
 
@@ -57,14 +60,16 @@ Extensions subscribe through `pi.on(event, handler)`. The events Sideroom uses:
 
 | Event | Used by | Purpose |
 | --- | --- | --- |
-| `input` | todo, rules, done | Reset per-run state on a real user prompt (`source: 'interactive'` or `'rpc'`). |
+| `input` | todo, rules, done, explain | Reset per-run state on a real user prompt (`source: 'interactive'` or `'rpc'`). |
 | `turn_start` | todo, done | Reset per-turn state. |
-| `tool_call` | guidelines, rules, done | Inspect a call before it runs. Return `{ block: true, reason }` to reject it. |
+| `tool_call` | guidelines, rules, done, persona | Inspect a call before it runs. Return `{ block: true, reason }` to reject it. |
 | `tool_execution_start` | todo | Observe any tool starting; drives the propose nudge. |
-| `tool_result` | modified-files, guidelines, rules, done | Observe results. May append content for `rules` warnings or record reads. |
+| `tool_result` | modified-files, guidelines, rules, done, explain | Observe results. May append content for `rules` warnings, record reads, or note a successful mutation. |
 | `turn_end` | todo, done | Inspect the finished turn; drives watchdog and done steering. |
-| `before_agent_start` | todo, guidelines | Return `{ systemPrompt }` to inject the board block or the guidelines reminder. |
-| `session_start`, `session_tree`, `session_compact` | todo, modified-files, guidelines | Rebuild and redraw state after load, branch navigation, or compaction. |
+| `message_end` | persona | Inspect the finished assistant message and steer on a persona violation. |
+| `agent_settled` | explain | Fired once no retry, compaction, or queued continuation is left. `explain` offers the walkthrough here and nowhere else. |
+| `before_agent_start` | todo, guidelines, persona | Return `{ systemPrompt }` to inject the board block, the guidelines reminder, or the persona reminder. |
+| `session_start`, `session_tree`, `session_compact` | todo, modified-files, guidelines, persona, explain | Rebuild and redraw state after load, branch navigation, or compaction; `persona` publishes its footer status. |
 
 `before_agent_start` returns `systemPrompt` (not `message`) for injected
 context. The guidelines guard also resets its read state on `session_compact`
@@ -96,6 +101,8 @@ state files into the target project.
 | modified-files | `sideroom-modified-files` |
 | todo steer types | `sideroom-todo-nudge`, `sideroom-todo-watchdog` |
 | done steer type | `sideroom-done-gate` |
+| persona steer type and status key | `sideroom-persona-steer`, `sideroom-persona` |
+| explain offer type | `sideroom-explain-offer` |
 
 ## Widgets and ordering
 
@@ -137,8 +144,12 @@ not retrigger a nudge or watchdog, and they cap how often they fire per run.
 
 `ask` and `todo propose` need a terminal. They check `ctx.mode === 'tui'` and
 otherwise return the explicit error `Error: UI not available (running in
-non-interactive mode)`. `todo update`, `guidelines`, `rules`, and `done` work in
-every mode.
+non-interactive mode)`. `todo update`, `guidelines`, `rules`, `done`, and
+`persona` work in every mode. Persona blocking and steering stay active where
+there is no UI, and only the footer status is skipped.
+
+`explain` also runs in every mode, but it only sends its offer in the TUI: it is
+wrapped around `sideroom_ask`, which rejects every other mode.
 
 Tool parameters arrive as decoded JSON. `prepareArguments` runs before schema
 validation and unwraps nested arrays that some hosts serialise as JSON strings
@@ -173,6 +184,7 @@ language guide; those files are also part of the published package.
 | Skill | Role |
 | --- | --- |
 | `sideroom-guidelines` | The 19-rule contract and per-language guides. |
+| `sideroom-persona` | The single voice contract: Do/Don't table, plain-language bar, and enforcement boundaries. |
 | `sideroom-grill` | Interviews a fuzzy plan in `sideroom_ask` rounds. |
 | `sideroom-domain-modeling` | Resolves language conflicts; writes `CONTEXT.md` and offers ADRs. |
 | `sideroom-domain-scaffold` | Code-first repository scan that builds or completes `CONTEXT.md`. |
