@@ -1,0 +1,89 @@
+# `sideroom_persona`
+
+One built-in voice, always active. Its voice rules govern user-facing prose;
+the decorative-symbol prohibition also checks artifacts. No files are written
+and no project config is read; the persona ships with the package.
+
+## Scope
+
+There are no profiles and nothing to switch. No profile state is persisted and
+`appendEntry` is not used. Block and steer counters exist only in memory. The
+footer status is derived from the catalog.
+
+## Voice rules
+
+| Rule id | Instruction |
+| --- | --- |
+| `direct` | Direct and dry. Short sentences. No preamble, no closing summary. |
+| `no-filler` | Never restate what was just said and never announce what is about to be said. |
+| `plain-language` | Leave no doubt about what is being discussed: name the subject and the goal before the detail, define an unfamiliar term in one line, and be explicit without becoming redundant. |
+| `no-invented-terms` | Name things as they are. No intermediate terms, abbreviations, or codenames the user did not ask for. |
+| `short-prose` | Prose by default; lists or tables only to compare options or list more than three items. |
+| `user-language` | Answer in the user's language and variant. |
+
+## Hard prohibitions
+
+| Prohibition id | Scope |
+| --- | --- |
+| `decorative-symbols` | prose + artifact |
+| `flattery-and-filler` | prose |
+| `hedging-and-apology` | prose |
+| `ai-meta-commentary` | prose |
+
+A prohibition only fires where its scope applies: `findViolations(text, scope)`
+skips every prohibition that does not list the scope. The catalog rule text
+stays authoritative; the detectors in `checks.ts` are heuristics, so a
+prohibition may be stated without being detected.
+
+## Injection
+
+`before_agent_start` appends `PERSONA_REMINDER` to the system prompt, chained
+after the other extensions and skipped when the heading is already present.
+Because it runs on every user prompt, the reminder comes back after compaction
+with no extra hook. The reminder restates the catalog instead of duplicating
+it, so catalog edits propagate. The tool deliberately has no
+`promptGuidelines`: they repeated the same rules in another system-prompt
+section without changing the result.
+
+`sideroom_persona` takes no arguments and returns the full detail: every voice
+rule and every prohibition with its enforcement mode. With one voice there is
+nothing to select, so the tool has no action parameter.
+
+## Enforcement
+
+- **Artifacts.** `tool_call` inspects only the lines a `write` or `edit` adds.
+  For `write` the new content is compared against the existing file; for `edit`
+  each `oldText → newText` pair is compared. `addedLinesMissingFrom` trims each
+  line and subtracts a multiset of the previous lines, so pre-existing content
+  is never re-flagged. A hit rejects the call with `{ block: true, reason }`;
+  after degradation the mutation passes and a steer asks for a corrective edit.
+- **Prose.** `message_end` inspects the finished assistant message through
+  `assistantMessageText` and sends one corrective steer per violating message.
+
+### Circuit breaker
+
+- Each block increments a per-prohibition fire count.
+- At `BLOCK_DEGRADE_AFTER = 3` fires the prohibition degrades to a steer.
+- `CLEAN_RESET_AFTER = 5` clean mutations clear all counters; degraded
+  violations do not count as clean.
+- Steers stop after `STEER_LIMIT_PER_RUN = 3` per agent run; the counter resets
+  on `before_agent_start`.
+
+## Files
+
+| File | Role |
+| --- | --- |
+| `extensions/persona/index.ts` | Composes the extension, registers the tool and the footer status. |
+| `extensions/persona/catalog.ts` | Voice rules, prohibitions, scopes, and packaged paths. |
+| `extensions/persona/checks.ts` | Detectors and added-line extraction. |
+| `extensions/persona/model.ts` | Tool detail, block reason, steer, and message text. |
+| `extensions/persona/execute.ts` | Builds the tool result. |
+| `extensions/persona/guard.ts` | Artifact blocking, prose steering, and the circuit breaker. |
+| `skills/sideroom-persona/SKILL.md` | Complete guide with Do/Don't examples. |
+
+## Tests
+
+`checks.test.ts` covers hits, misses, and scope filtering. `prompt.test.ts`
+covers the idempotent append. `model.test.ts` covers the formatters and message
+extraction. `index.test.ts` covers blocking, degradation, the steer cap, and the
+status.

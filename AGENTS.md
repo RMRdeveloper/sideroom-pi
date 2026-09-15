@@ -46,6 +46,13 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
 - `extensions/done/index.ts` composes the finish gate; `extensions/done/detect.ts`
   owns per-ecosystem check-command detection; `extensions/done/guard.ts` owns
   run state and steering.
+- `extensions/persona/index.ts` composes the single built-in voice and its
+  status; `extensions/persona/catalog.ts` owns the voice rules and hard
+  prohibitions, `extensions/persona/checks.ts` owns the detectors,
+  `extensions/persona/guard.ts` owns artifact blocking and the prose steer.
+- `extensions/explain/index.ts` composes the end-of-work walkthrough offer;
+  `extensions/explain/model.ts` owns its run state and trigger,
+  `extensions/explain/guard.ts` owns the event wiring.
 - `scripts/render-preview.mjs` is the entry that renders `media/preview.png`
   and `media/preview.mp4`, the gallery's `pi.image` and `pi.video`.
   `scripts/preview/` holds the pipeline: `ansi.mjs` turns SGR and OSC 8 into
@@ -54,8 +61,11 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   owns the demo and drives the widgets, and `media-manifest.mjs` owns the
   manifest contract that every run asserts. Pure modules carry `*.test.mjs`. It
   needs ffmpeg; it is a maintainer tool, not an extension and not a wrapper
-  around Pi.- `skills/sideroom-guidelines/SKILL.md` owns the Do/Don't table and language map;
+  around Pi.
+- `skills/sideroom-guidelines/SKILL.md` owns the Do/Don't table and language map;
   `skills/sideroom-guidelines/references/languages/` owns complete per-language guides.
+- `skills/sideroom-persona/SKILL.md` owns the persona Do/Don't table, the
+  plain-language bar, and the enforcement boundaries.
 
 - `CONTRIBUTING.md` owns the contributor contract: setup, commands, design
   rules, commit and branch conventions, the changeset requirement, the extension
@@ -117,6 +127,15 @@ Biome requires braces around every `if` body. Do not disable
   conditionals and swallowed errors, notes softer violations on the result, and
   degrades a repeatedly firing block. It writes no files and reads no project
   config; the catalog ships with the package.
+- `sideroom_persona` is a single built-in voice: no profiles, no switching, no
+  persisted profile state. A `write`/`edit` whose added lines contain a decorative symbol
+  is blocked and degrades after repeated fires; the other prohibitions are
+  steered, capped per run.
+- `explain` offers a walkthrough through `sideroom_ask` at most once per user
+  prompt, only after a successful `write`/`edit`, and only in the TUI. It fires
+  on `agent_settled`, never `agent_end`, so the offer never lands on work that
+  a retry or a compaction is about to redo. It has no tool and no persisted
+  state.
 - `sideroom_done` steers, never blocks, and does nothing when no check command
   is detected. It clears green after any later successful mutation and caps its
   steering.

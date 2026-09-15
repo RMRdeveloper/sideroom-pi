@@ -54,7 +54,9 @@ Sideroom answers each one with a small, opinionated surface:
 | Style drift | A pre-edit gate + the on-demand `sideroom-guidelines` skill |
 | Vague plans | `sideroom-grill` — an interview that settles the words before the work |
 | Unapplied guidelines | `sideroom_rules` — mechanical checks that block or flag the lines you add |
+| Unclear answers | `sideroom_persona` — one voice: direct, plain, and free of jargon it invented |
 | Premature completion | `sideroom_done` — steers back to the project's check command before finishing |
+| Work left unexplained | `explain` — offers a walkthrough and how to test it once the work settles |
 
 ## What it feels like
 
@@ -163,6 +165,18 @@ appended as notes to the tool result. A per-rule circuit breaker degrades a
 repeatedly firing block to a note so the agent never dead-locks. No files
 written, no config read: the catalog ships with the package.
 
+### Persona — one voice, not a costume
+
+`sideroom_persona` is the agent's voice, and there is exactly one of it. A
+short reminder rides the system prompt on every turn, so it survives
+compaction; the full guide lives in the on-demand `sideroom-persona` skill.
+The voice is direct and dry, free of filler, and plain enough to leave no
+doubt about what is being discussed — while calling things by the names the
+user already uses. Emojis and decorative symbols in the lines a `write`/`edit`
+adds block the mutation; flattering openers, hedging, automatic apologies, and
+AI meta-commentary are answered with a capped steer. No profiles to switch and
+no profile selection to store.
+
 ### Done — done means green
 
 `sideroom_done` detects the project's check command — `package.json` scripts
@@ -171,6 +185,16 @@ package manager, `pytest`, `go test ./...`, `cargo test`, or a `make check`
 target — and watches for it to pass. If files changed without a green run, the
 agent is steered once per turn, up to a cap, to run it before finishing. When
 nothing is detectable, the gate does nothing.
+
+### Explain — the walkthrough offer
+
+When an implementation settles, `explain` steers the agent to offer a
+walkthrough through `sideroom_ask`: explain the changes and how to test them,
+only how to test them, or nothing. It fires on `agent_settled`, the point where
+no retry, compaction, or queued message is left, so the offer never lands on
+work that is about to be redone. Once per prompt, only after a real
+`write`/`edit`, and only in the TUI, because `sideroom_ask` cannot run anywhere
+else. No tool, no widget, no persisted state.
 
 ## Quick path
 
@@ -260,6 +284,21 @@ the diff against the loaded guide and run the relevant project checks.
 - A rule that blocks three times in a run degrades to a warning until five
   clean checks or a new interactive prompt reset it.
 
+### Persona contract
+
+- One built-in voice. No profiles, no switching, and no persisted profile
+  state; runtime guard counters stay in memory. The footer status is derived
+  from the catalog.
+- Injection: a short reminder appended in `before_agent_start`, chained after
+  the other extensions and idempotent by heading, so it returns after
+  compaction.
+- Blocking: decorative symbols in the lines a `write`/`edit` adds. Three fires
+  degrade the prohibition to a steer; five clean mutations reset the counters.
+- Steering: one corrective message per violating assistant message, at most
+  three per run.
+- `sideroom_persona` takes no arguments and returns every rule and every
+  prohibition with its enforcement mode.
+
 ### Done contract
 
 - Detected command: `package.json` scripts in priority order with the
@@ -268,6 +307,17 @@ the diff against the loaded guide and run the relevant project checks.
 - Green means that command ran with a zero exit in this run. A later
   successful `write`/`edit` clears green again.
 - Steering: once per turn, at most twice per run, then it stops.
+
+### Explain contract
+
+- Trigger: `agent_settled` with at least one successful `write`/`edit` since the
+  last user prompt, in TUI mode.
+- The steer names the intent; the agent writes the question in the user's
+  language with three options and one recommendation. `sideroom_ask` still adds
+  *Out of scope* and the custom answer.
+- At most one offer per user prompt. The flag is set before the steer, so the
+  turn the offer triggers cannot re-trigger it.
+- No green-check requirement: red checks still produce the offer.
 
 ### Grill contract
 
