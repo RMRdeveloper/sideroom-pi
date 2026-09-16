@@ -5,14 +5,16 @@ export { LANGUAGE_GUIDE_FILES } from './catalog.ts';
 export const GUIDELINES_REMINDER_HEADING =
   'Sideroom coding guidelines (always-on reminder):';
 
-const LANGUAGE_GUIDE_REMINDERS = LANGUAGE_GUIDES.map(
-  ({ extensions, path }) =>
-    `If a file you will write or edit ends in ${extensions.join(' or ')}, use the read tool without offset or limit to load the exact matching guide at ${path} in full.`,
-).join('\n');
+// One dense index instead of one sentence per language: the same paths and the
+// same requirement, a fraction of the tokens every turn.
+const LANGUAGE_GUIDE_INDEX = LANGUAGE_GUIDES.map(
+  ({ extensions, path }) => `${extensions.join('/')} ${path}`,
+).join('; ');
 
 export const GUIDELINES_REMINDER = `${GUIDELINES_REMINDER_HEADING}
-Before the first write or edit in each agent run, use the read tool without offset or limit to load ${GUIDELINE_SKILL_PATH} in full.
-${LANGUAGE_GUIDE_REMINDERS}
+Before the first write or edit in each agent run, use the read tool without offset or limit to load these files in full:
+- ${GUIDELINE_SKILL_PATH}
+- for the extension of the file you will change, one of: ${LANGUAGE_GUIDE_INDEX}
 A required read counts only when it succeeds without truncation. Until all required reads succeed, do not call write or edit and do not mutate files through bash or another tool; the extension blocks those mutations.
 After changing files, review the code against the loaded guide and run the relevant formatter, linter, type checks, and tests.`;
 

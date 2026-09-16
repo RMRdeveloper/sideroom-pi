@@ -35,6 +35,7 @@ test('appends the reminder once and keeps an existing prompt', () => {
     GUIDELINES_REMINDER,
     /formatter, linter, type checks, and tests/,
   );
+  assert.equal(GUIDELINES_REMINDER.length <= 1400, true);
 });
 
 test('ships one complete guide per supported language', async () => {
