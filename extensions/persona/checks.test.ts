@@ -35,10 +35,17 @@ test('detects each prohibition in prose', () => {
   );
 });
 
-test('stays silent on plain prose', () => {
+test('stays silent on plain prose and semantic text symbols', () => {
   assert.deepEqual(
     idsOf(
       'The guard blocks the write until the emoji is gone.',
+      TEXT_SCOPE.prose,
+    ),
+    [],
+  );
+  assert.deepEqual(
+    idsOf(
+      'Copyright \u00A9 2026, ACME\u2122, registered \u00AE.',
       TEXT_SCOPE.prose,
     ),
     [],
@@ -50,6 +57,10 @@ test('applies a prohibition only where its scope is listed', () => {
   assert.deepEqual(idsOf('Great question!', TEXT_SCOPE.artifact), []);
   assert.deepEqual(idsOf('Sorry for the confusion.', TEXT_SCOPE.artifact), []);
   assert.deepEqual(idsOf('const emoji = "🚀";', TEXT_SCOPE.artifact), [
+    'decorative-symbols',
+  ]);
+  assert.deepEqual(idsOf('Copyright \u00A9 2026', TEXT_SCOPE.artifact), []);
+  assert.deepEqual(idsOf('Copyright \u00A9\uFE0F 2026', TEXT_SCOPE.artifact), [
     'decorative-symbols',
   ]);
 });

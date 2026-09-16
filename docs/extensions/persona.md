@@ -33,7 +33,10 @@ footer status is derived from the catalog.
 A prohibition only fires where its scope applies: `findViolations(text, scope)`
 skips every prohibition that does not list the scope. The catalog rule text
 stays authoritative; the detectors in `checks.ts` are heuristics, so a
-prohibition may be stated without being detected.
+prohibition may be stated without being detected. The decorative-symbol
+detector targets default emoji presentation, emoji variation selectors, and
+explicit check or cross marks. Semantic text symbols used for copyright,
+trademark, or registration stay valid.
 
 ## Injection
 
@@ -52,10 +55,11 @@ nothing to select, so the tool has no action parameter.
 ## Enforcement
 
 - **Artifacts.** `tool_call` inspects only the lines a `write` or `edit` adds.
-  For `write` the new content is compared against the existing file; for `edit`
-  each `oldText → newText` pair is compared. `addedLinesMissingFrom` trims each
-  line and subtracts a multiset of the previous lines, so pre-existing content
-  is never re-flagged. A hit rejects the call with `{ block: true, reason }`;
+  For `write`, the shared file-path resolver follows Pi's built-in aliases and
+  canonicalizes an existing file before comparing its content. For `edit`, each
+  `oldText → newText` pair is compared. `addedLinesMissingFrom` trims each line
+  and subtracts a multiset of the previous lines, so pre-existing content is
+  never re-flagged. A hit rejects the call with `{ block: true, reason }`;
   after degradation the mutation passes and a steer asks for a corrective edit.
 - **Prose.** `message_end` inspects the finished assistant message through
   `assistantMessageText` and sends one corrective steer per violating message.
@@ -79,11 +83,12 @@ nothing to select, so the tool has no action parameter.
 | `extensions/persona/model.ts` | Tool detail, block reason, steer, and message text. |
 | `extensions/persona/execute.ts` | Builds the tool result. |
 | `extensions/persona/guard.ts` | Artifact blocking, prose steering, and the circuit breaker. |
+| `extensions/shared/file-path.ts` | Pi-compatible path aliases and canonical file identity. |
 | `skills/sideroom-persona/SKILL.md` | Complete guide with Do/Don't examples. |
 
 ## Tests
 
-`checks.test.ts` covers hits, misses, and scope filtering. `prompt.test.ts`
-covers the idempotent append. `model.test.ts` covers the formatters and message
-extraction. `index.test.ts` covers blocking, degradation, the steer cap, and the
-status.
+`checks.test.ts` covers hits, semantic text symbols, misses, and scope
+filtering. `prompt.test.ts` covers the idempotent append. `model.test.ts` covers
+the formatters and message extraction. `index.test.ts` covers blocking, path
+aliases, degradation, the steer cap, and the status.
