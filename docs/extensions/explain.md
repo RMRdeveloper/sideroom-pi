@@ -2,15 +2,15 @@
 
 Once an implementation settles, the agent offers to explain what changed and how
 to test it, through `sideroom_ask`. There is no tool, widget, or persisted
-state. Two in-memory booleans decide when to send one steer.
+state. Two in-memory values decide when to send one steer.
 
 ## Trigger
 
 | Moment | Effect |
 | --- | --- |
-| `input` from `interactive` or `rpc` | Clears the run state, so a new user prompt re-arms the offer. |
-| `tool_result` for a successful `write`/`edit` | Marks that the run changed files. |
-| `agent_settled` | Sends the offer when the run mutated files, nothing was offered yet, and the mode is `tui`. |
+| `input` from `interactive` or `rpc` | Clears the turn state, so a new user prompt re-arms the offer. |
+| `tool_result` for a successful `write`/`edit` | Adds the resolved file path to the turn's mutated files. |
+| `agent_settled` | Sends the offer when the turn mutated at least five distinct files, nothing was offered yet, and the mode is `tui`. |
 
 `agent_end` is deliberately not used. Pi may still retry, auto-compact, or drain
 queued messages after it, so an offer there could land on work that is about to
@@ -18,8 +18,14 @@ be redone. `agent_settled` is the documented point where none of that is left.
 
 ## Limits
 
-- **Once per user prompt.** The flag is set before the steer is sent, so the
-  turn the offer itself triggers cannot re-trigger it.
+- **Once per turn.** The flag is set before the steer is sent, so the turn the
+  offer itself triggers cannot re-trigger it.
+- **At least five distinct files.** `EXPLAIN_FILE_THRESHOLD = 5` files must be
+  mutated in the turn. Files are counted through the same aliases as Pi's
+  built-in file tools and existing paths are canonicalized, so relative,
+  `@`-prefixed, home-relative, absolute, and symbolic-link paths to one file
+  count once. A turn that touches fewer files stays silent, because a small
+  adjustment does not need a walkthrough.
 - **Only in the TUI.** `sideroom_ask` returns an explicit UI-not-available error
   in every other mode, so `explain` gates on `ctx.mode === 'tui'`.
 - **Only after a real mutation.** A failed `write`/`edit` does not count.
@@ -31,25 +37,33 @@ be redone. `agent_settled` is the documented point where none of that is left.
 
 The steer names the intent, not the final sentence:
 
-> Use sideroom_ask for one question in the user's language with three options:
-> explain changes and test steps, test steps only, or no explanation. Recommend
-> one.
+> Use sideroom_ask for one question in the user's language with four parallel
+> options: changes only, test steps only, both, or no explanation. Recommend
+> changes only.
 
 The agent writes the question in the user's language, because the extension
-cannot know which language the user speaks. The rest of the questionnaire
-contract — three options, one recommendation, plus the always-on *Out of scope*
-and custom answer — stays owned by `sideroom_ask`.
+cannot know which language the user speaks, and it writes the four labels in one
+grammatical form: four noun phrases, never a verb phrase beside a subordinate
+clause. *Parallel* is the whole instruction the extension gives; the wording is
+the agent's.
+
+The rest of the questionnaire contract — four options, one recommendation, plus
+the always-on *Out of scope* and custom answer — stays owned by `sideroom_ask`.
+Declining is a caller option here rather than *Out of scope*, so the question
+renders six rows.
 
 ## Files
 
 | File | Role |
 | --- | --- |
-| `extensions/explain/index.ts` | Creates the run state and clears it on `session_start`. |
-| `extensions/explain/model.ts` | Run state, the TUI gate, and the offer text. |
+| `extensions/explain/index.ts` | Creates the turn state and clears it on `session_start`. |
+| `extensions/explain/model.ts` | The turn state, the five-file threshold, path keying, the TUI gate, and the offer text. |
 | `extensions/explain/guard.ts` | Event wiring and the single steer. |
+| `extensions/shared/file-path.ts` | Pi-compatible path aliases and canonical file identity. |
 
 ## Tests
 
-`model.test.ts` covers the predicate and caps the complete offer at 160
-characters. `index.test.ts` covers the wiring, delivery options, session reset,
-all silence paths, and re-arming on the next user prompt.
+`model.test.ts` covers the predicate, the threshold, path keying, and caps the
+complete offer at 180 characters. `index.test.ts` covers the wiring, delivery
+options, session reset, all silence paths, and re-arming on the next user
+prompt.

@@ -123,17 +123,16 @@ test('blocks a write that adds a decorative symbol, then degrades', () => {
   }
 });
 
-test('does not re-flag a symbol that already exists in the file', () => {
+test('does not re-flag an existing symbol through Pi path aliases', () => {
   const harness = register();
   try {
     const toolCall = handlerOf(harness, 'tool_call');
     const content = 'const icon = "🔥";\n';
     writeFileSync(join(harness.cwd, 'icon.ts'), content);
-    const decision = toolCall(
-      writeEvent('icon.ts', content),
-      context(harness.cwd, harness.statuses),
-    );
-    assert.equal(decision, undefined);
+    const ctx = context(harness.cwd, harness.statuses);
+
+    assert.equal(toolCall(writeEvent('icon.ts', content), ctx), undefined);
+    assert.equal(toolCall(writeEvent('@icon.ts', content), ctx), undefined);
   } finally {
     rmSync(harness.cwd, { recursive: true, force: true });
   }

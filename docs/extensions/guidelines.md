@@ -13,6 +13,11 @@ system prompt (idempotently — it never appends twice). It points at:
 - The exact language guide under
   `skills/sideroom-guidelines/references/languages/` for the target extension.
 
+The language guides sit on one dense index line, one `extension → path` entry
+per language, rather than one sentence each: the same paths and the same
+requirement, a fraction of the tokens the reminder costs on every turn.
+`prompt.test.ts` caps the reminder's length so the budget cannot drift back up.
+
 The canonical seed, `assets/artifacts/GUIDELINES_TEMPLATE.md`, is never pasted
 into the prompt.
 

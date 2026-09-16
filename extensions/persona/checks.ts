@@ -16,7 +16,7 @@ interface ProhibitionDetector {
 const DETECTORS: readonly ProhibitionDetector[] = [
   {
     prohibitionId: 'decorative-symbols',
-    pattern: /\p{Extended_Pictographic}|\uFE0F|[\u2713\u2714\u2717\u2718]/u,
+    pattern: /\p{Emoji_Presentation}|\uFE0F|[\u2713\u2714\u2717\u2718]/u,
   },
   {
     prohibitionId: 'flattery-and-filler',
