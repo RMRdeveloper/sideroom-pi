@@ -25,6 +25,15 @@ if the effort is too big to hold in one session, say so and stop.
   in the language the user is speaking; keep ids and option values in English.
 - Never ask the user what the codebase can answer. Read the code first; ask
   only what the code cannot settle.
+- Classify before asking. A project fact is read from the code and reused. A
+  minor decision is taken without interrupting. A decision that materially
+  affects architecture, external dependencies, cost, security, operations,
+  persistence, public contracts, or future change difficulty is architectural
+  and must be exposed.
+- Present an architectural decision as the current situation, the alternatives
+  by their practical consequences, and one recommendation with a one-line
+  justification. Never reduce it to technology names. Name a repository
+  inconsistency in the prompt instead of picking one.
 - An *Out of scope* answer closes that thread. Do not re-ask it.
 - Everything a round settles is recorded through `sideroom-domain-modeling`:
   inline glossary entries, the ADR three-gate offer, lazy file creation.
@@ -38,9 +47,11 @@ if the effort is too big to hold in one session, say so and stop.
 1. Read the code around the change. Settle from the codebase everything the
    codebase settles.
 2. Run one `sideroom_ask` round on what remains genuinely open: terms first,
-   then decisions.
+   then the architectural decisions. Minor decisions are yours; do not spend a
+   round on them.
 3. After each round, write resolved terms to `CONTEXT.md` and qualifying
-   decisions to `docs/adr/`.
+   decisions to `docs/adr/`. Offer the ADR for an accepted architectural
+   decision only when all three gates pass.
 4. Repeat until no open term or hard decision remains, or the user cancels.
 5. Close by stating the settled glossary, the ADRs written (if any), and the
    suggested next step: a spec for anything non-trivial, implementation for

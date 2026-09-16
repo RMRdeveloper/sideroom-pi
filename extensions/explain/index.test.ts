@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import registerExplain from './index.ts';
+import { EXPLAIN_FILE_THRESHOLD } from './model.ts';
 
 type EventHandler = (event: never, ctx?: never) => unknown;
 
@@ -15,6 +16,8 @@ interface Harness {
   readonly handlers: Map<string, EventHandler>;
   readonly offers: Offer[];
 }
+
+const CWD = '/work';
 
 function register(): Harness {
   const handlers = new Map<string, EventHandler>();
@@ -44,17 +47,44 @@ function handlerOf(harness: Harness, name: string): EventHandler {
   return handler;
 }
 
-function fileResult(toolName: string, isError = false): never {
-  return { toolName, toolCallId: 't1', input: {}, isError } as never;
+function fileResult(toolName: string, path: string, isError = false): never {
+  return {
+    toolName,
+    toolCallId: `t:${path}`,
+    input: { path },
+    isError,
+  } as never;
+}
+
+function mutateFile(
+  harness: Harness,
+  path: string,
+  toolName = 'write',
+  isError = false,
+): void {
+  handlerOf(harness, 'tool_result')(fileResult(toolName, path, isError), {
+    cwd: CWD,
+  } as never);
+}
+
+function mutateTurn(
+  harness: Harness,
+  count: number,
+  toolName = 'write',
+  isError = false,
+): void {
+  for (let index = 0; index < count; index += 1) {
+    mutateFile(harness, `src/file-${index}.ts`, toolName, isError);
+  }
 }
 
 function settle(harness: Harness, mode = 'tui'): void {
   handlerOf(harness, 'agent_settled')({} as never, { mode } as never);
 }
 
-test('offers the walkthrough after a successful write settles', () => {
+test('offers the walkthrough once the turn reaches the file threshold', () => {
   const harness = register();
-  handlerOf(harness, 'tool_result')(fileResult('write'));
+  mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
   settle(harness);
   assert.equal(harness.offers.length, 1);
   assert.match(harness.offers[0]?.content ?? '', /sideroom_ask/);
@@ -62,40 +92,67 @@ test('offers the walkthrough after a successful write settles', () => {
   assert.equal(harness.offers[0]?.deliverAs, 'steer');
 });
 
+test('stays silent below the file threshold', () => {
+  const harness = register();
+  mutateTurn(harness, EXPLAIN_FILE_THRESHOLD - 1);
+  settle(harness);
+  assert.deepEqual(harness.offers, []);
+});
+
+test('counts a file mutated twice once', () => {
+  const harness = register();
+  for (let index = 0; index < EXPLAIN_FILE_THRESHOLD; index += 1) {
+    mutateFile(harness, 'src/app.ts', 'edit');
+  }
+  settle(harness);
+  assert.deepEqual(harness.offers, []);
+});
+
 test('treats an edit the same as a write', () => {
   const harness = register();
-  handlerOf(harness, 'tool_result')(fileResult('edit'));
+  mutateTurn(harness, EXPLAIN_FILE_THRESHOLD - 1);
+  mutateFile(harness, 'src/edited.ts', 'edit');
   settle(harness);
   assert.equal(harness.offers.length, 1);
 });
 
+test('counts one file once however the model spelled its path', () => {
+  const harness = register();
+  mutateFile(harness, 'src/app.ts');
+  mutateFile(harness, '@src/app.ts');
+  mutateFile(harness, './src/app.ts');
+  mutateFile(harness, '/work/src/app.ts');
+  settle(harness);
+  assert.deepEqual(harness.offers, []);
+});
+
 test('stays silent without a mutation', () => {
   const harness = register();
-  handlerOf(
-    harness,
-    'tool_result',
-  )({ toolName: 'read', toolCallId: 't2', input: {}, isError: false } as never);
+  handlerOf(harness, 'tool_result')(
+    { toolName: 'read', toolCallId: 't1', input: {}, isError: false } as never,
+    { cwd: CWD } as never,
+  );
   settle(harness);
   assert.deepEqual(harness.offers, []);
 });
 
 test('ignores a failed mutation', () => {
   const harness = register();
-  handlerOf(harness, 'tool_result')(fileResult('write', true));
+  mutateTurn(harness, EXPLAIN_FILE_THRESHOLD, 'write', true);
   settle(harness);
   assert.deepEqual(harness.offers, []);
 });
 
 test('stays silent outside the TUI', () => {
   const harness = register();
-  handlerOf(harness, 'tool_result')(fileResult('write'));
+  mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
   settle(harness, 'print');
   assert.deepEqual(harness.offers, []);
 });
 
-test('offers at most once per run and re-arms on the next prompt', () => {
+test('offers at most once per turn and re-arms on the next prompt', () => {
   const harness = register();
-  handlerOf(harness, 'tool_result')(fileResult('write'));
+  mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
 
   settle(harness);
   settle(harness);
@@ -105,14 +162,14 @@ test('offers at most once per run and re-arms on the next prompt', () => {
   settle(harness);
   assert.equal(harness.offers.length, 1);
 
-  handlerOf(harness, 'tool_result')(fileResult('write'));
+  mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
   settle(harness);
   assert.equal(harness.offers.length, 2);
 });
 
-test('clears the run state when a session starts', () => {
+test('clears the turn state when a session starts', () => {
   const harness = register();
-  handlerOf(harness, 'tool_result')(fileResult('write'));
+  mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
   handlerOf(harness, 'session_start')({} as never);
   settle(harness);
   assert.deepEqual(harness.offers, []);
@@ -120,7 +177,7 @@ test('clears the run state when a session starts', () => {
 
 test('ignores a non-user input source when re-arming', () => {
   const harness = register();
-  handlerOf(harness, 'tool_result')(fileResult('write'));
+  mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
   settle(harness);
 
   handlerOf(harness, 'input')({ source: 'extension' } as never);

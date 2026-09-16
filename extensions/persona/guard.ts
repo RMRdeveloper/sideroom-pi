@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import {
   type ExtensionAPI,
   isToolCallEventType,
   type ToolCallEvent,
 } from '@earendil-works/pi-coding-agent';
+import { resolveFileToolPath } from '../shared/file-path.ts';
 import {
   PERSONA_STEER_TYPE,
   type ProhibitionId,
@@ -107,7 +107,11 @@ function extractMutation(
   cwd: string,
 ): ExtractedMutation | undefined {
   if (isToolCallEventType('write', event)) {
-    const previous = readFileIfExists(resolve(cwd, event.input.path));
+    const absolutePath = resolveFileToolPath(cwd, event.input.path);
+    if (absolutePath === undefined) {
+      return undefined;
+    }
+    const previous = readFileIfExists(absolutePath);
     return {
       path: event.input.path,
       addedLines: addedLinesMissingFrom(previous, event.input.content),
@@ -126,15 +130,11 @@ function readFileIfExists(path: string): string | undefined {
   try {
     return readFileSync(path, 'utf8');
   } catch (error) {
-    if (isMissingFile(error)) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
       return undefined;
     }
     throw error;
   }
-}
-
-function isMissingFile(error: unknown): boolean {
-  return error instanceof Error && 'code' in error && error.code === 'ENOENT';
 }
 
 function isDegraded(state: PersonaGuardState, id: ProhibitionId): boolean {

@@ -7,9 +7,14 @@ import {
   EXPLAIN_OFFER,
   EXPLAIN_OFFER_TYPE,
   type ExplainState,
-  resetExplainRun,
+  mutationPathKey,
+  resetExplainTurn,
   shouldOfferExplanation,
 } from './model.ts';
+
+interface FileToolInput {
+  readonly path: string;
+}
 
 export function registerExplainGuard(
   pi: ExtensionAPI,
@@ -19,17 +24,23 @@ export function registerExplainGuard(
     if (event.source !== 'interactive' && event.source !== 'rpc') {
       return;
     }
-    resetExplainRun(state);
+    resetExplainTurn(state);
   });
 
-  pi.on('tool_result', (event) => {
+  pi.on('tool_result', (event, ctx) => {
     if (event.isError) {
       return;
     }
     if (!isEditToolResult(event) && !isWriteToolResult(event)) {
       return;
     }
-    state.mutatedSincePrompt = true;
+    // SAFETY: Pi validates built-in file-tool inputs before emitting tool_result.
+    const input = event.input as unknown as FileToolInput;
+    const pathKey = mutationPathKey(ctx.cwd, input.path);
+    if (pathKey === undefined) {
+      return;
+    }
+    state.mutatedFilesThisTurn.add(pathKey);
   });
 
   // agent_settled is the only point with no retry, compaction, or queued
@@ -38,7 +49,7 @@ export function registerExplainGuard(
     if (!shouldOfferExplanation(state, ctx.mode)) {
       return;
     }
-    state.offeredThisRun = true;
+    state.offeredThisTurn = true;
     pi.sendMessage(
       {
         customType: EXPLAIN_OFFER_TYPE,

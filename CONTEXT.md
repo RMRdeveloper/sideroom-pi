@@ -54,11 +54,35 @@ A Pi session created from a point in an original session. It inherits the board 
 
 _Avoid: child session, parent/child session._
 
+## Turn
+
+The stretch of agent work between two user prompts, from the prompt until the agent settles. The `explain` offer and its mutated-file count belong to one turn and reset when the next user prompt arrives.
+
+_Avoid: run, prompt window._
+
 ## Added line
 
 A line a `write` or `edit` introduces, computed from each `oldText → newText` pair or, for a full write, against the existing file. The rules extension checks only added lines, never the rest of the file.
 
 _Avoid: changed line, new code._
+
+## Project fact
+
+Something the repository already settles consistently. It is discovered from the code and reused, so the user is never asked about it.
+
+_Avoid: established practice, existing pattern._
+
+## Minor decision
+
+A choice with low impact that is reversible without touching architecture, external dependencies, public contracts, or persistence. The agent takes it and does not interrupt the user.
+
+_Avoid: small decision, implementation detail._
+
+## Architectural decision
+
+A choice that materially affects architecture, external dependencies, cost, security, operations, persistence, public contracts, or the difficulty of changing course later. It is exposed to the user through `sideroom_ask`, with the practical consequences of each alternative and one recommendation, before the agent commits to it; an accepted one becomes an ADR when it also clears the three gates of `sideroom-domain-modeling`.
+
+_Avoid: technical decision, design decision._
 
 ## Detected check command
 

@@ -28,7 +28,7 @@ export const TODO_PROMPT_SNIPPET =
 
 export const TODO_PROMPT_GUIDELINES = [
   'Use sideroom_todo to maintain a live work board when implementation has more than one step.',
-  'Use propose to replace the board and update to patch item ids. While any item is pending, exactly one must be in_progress.',
+  'While any item is pending, exactly one must be in_progress.',
   'Complete the current item and start the next item in the same update call.',
   'propose is interactive-TUI-only; update also works in print, JSON, and RPC modes.',
 ];

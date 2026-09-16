@@ -62,9 +62,12 @@ until they ask for another.
 
 A `write` or `edit` whose **added lines** contain a decorative symbol is
 rejected with a reason listing the offending line. Existing content is not
-re-checked, so editing a file that already contains an emoji elsewhere is not
-blocked. A prohibition that fires three times degrades to a steer so the agent
-is never dead-locked.
+re-checked, including when the model uses Pi path aliases for a full rewrite.
+The detector targets default emoji presentation, emoji variation selectors,
+and explicit check or cross marks; semantic copyright, trademark, and
+registration symbols stay valid.
+A prohibition that fires three times degrades to a steer so the agent is never
+dead-locked.
 
 ### What steering means
 

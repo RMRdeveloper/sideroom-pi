@@ -35,6 +35,13 @@ test('appends the reminder once and keeps an existing prompt', () => {
     GUIDELINES_REMINDER,
     /formatter, linter, type checks, and tests/,
   );
+  // The packaged paths depend on where the checkout lives, so only the text
+  // around them counts against the budget the reminder spends every turn.
+  const packagedPathLength = [
+    GUIDELINE_SKILL_PATH,
+    ...LANGUAGE_GUIDES.map((guide) => guide.path),
+  ].reduce((total, path) => total + path.length, 0);
+  assert.equal(GUIDELINES_REMINDER.length - packagedPathLength <= 700, true);
 });
 
 test('ships one complete guide per supported language', async () => {

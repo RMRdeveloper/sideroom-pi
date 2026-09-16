@@ -189,12 +189,12 @@ nothing is detectable, the gate does nothing.
 ### Explain — the walkthrough offer
 
 When an implementation settles, `explain` steers the agent to offer a
-walkthrough through `sideroom_ask`: explain the changes and how to test them,
-only how to test them, or nothing. It fires on `agent_settled`, the point where
+walkthrough through `sideroom_ask`: explain the changes only, how to test them
+only, both, or nothing. It fires on `agent_settled`, the point where
 no retry, compaction, or queued message is left, so the offer never lands on
-work that is about to be redone. Once per prompt, only after a real
-`write`/`edit`, and only in the TUI, because `sideroom_ask` cannot run anywhere
-else. No tool, no widget, no persisted state.
+work that is about to be redone. Once per turn, only when the turn touched at
+least five distinct files, and only in the TUI, because `sideroom_ask` cannot
+run anywhere else. No tool, no widget, no persisted state.
 
 ## Quick path
 
@@ -292,8 +292,10 @@ the diff against the loaded guide and run the relevant project checks.
 - Injection: a short reminder appended in `before_agent_start`, chained after
   the other extensions and idempotent by heading, so it returns after
   compaction.
-- Blocking: decorative symbols in the lines a `write`/`edit` adds. Three fires
-  degrade the prohibition to a steer; five clean mutations reset the counters.
+- Blocking: decorative symbols in the lines a `write`/`edit` adds. Full rewrites
+  resolve Pi path aliases before comparing existing content; semantic copyright,
+  trademark, and registration symbols remain valid. Three fires degrade the
+  prohibition to a steer; five clean mutations reset the counters.
 - Steering: one corrective message per violating assistant message, at most
   three per run.
 - `sideroom_persona` takes no arguments and returns every rule and every
@@ -310,13 +312,14 @@ the diff against the loaded guide and run the relevant project checks.
 
 ### Explain contract
 
-- Trigger: `agent_settled` with at least one successful `write`/`edit` since the
-  last user prompt, in TUI mode.
+- Trigger: `agent_settled` with at least five distinct files mutated since the
+  last user prompt, in TUI mode. File identity follows Pi's path aliases and
+  canonicalizes existing paths.
 - The steer names the intent; the agent writes the question in the user's
-  language with three options and one recommendation. `sideroom_ask` still adds
-  *Out of scope* and the custom answer.
-- At most one offer per user prompt. The flag is set before the steer, so the
-  turn the offer triggers cannot re-trigger it.
+  language with four options, one of them a decline, and one recommendation.
+  `sideroom_ask` still adds *Out of scope* and the custom answer.
+- At most one offer per turn. The flag is set before the steer, so the turn the
+  offer triggers cannot re-trigger it.
 - No green-check requirement: red checks still produce the offer.
 
 ### Grill contract
