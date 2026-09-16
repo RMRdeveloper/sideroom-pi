@@ -1,5 +1,40 @@
 # Changelog
 
+## 8.5.0
+
+### Minor Changes
+
+- 40bcb71: `ask` and `grill` now classify a decision before asking about it. A decision the
+  repository already settles consistently is a project fact, and the agent reuses
+  it without interrupting you. A decision that materially affects architecture,
+  external dependencies, cost, security, operations, persistence, public
+  contracts, or the difficulty of changing course later is an architectural
+  decision: the agent exposes it through `sideroom_ask` with the current
+  situation, the practical consequences of each alternative, and one
+  recommendation, before committing to it. Everything else stays a minor decision
+  the agent takes on its own.
+  
+  No new tool, hook, or state was added. The classification lives in the
+  `sideroom_ask` prompt guidelines and self-contained `sideroom-grill` skill. Ask
+  prompts, labels, and option descriptions stay in the user's language, and an
+  accepted architectural decision still reaches `docs/adr/` only through the
+  existing three-gate offer.
+
+### Patch Changes
+
+- e8f9131: Correct the file-path handling in two mutation guards and the distinct-file
+  count behind the walkthrough offer.
+  
+  A full `write` is compared against the file Pi actually resolves, so rewriting a
+  path as `@icon.ts`, `~/icon.ts`, a file URL, or through a symlink no longer
+  re-flags content that was already in the file. The decorative-symbol detector no
+  longer treats the copyright, trademark, and registration signs as emoji, while a
+  real emoji still blocks the mutation.
+  
+  `explain` counts one physical file once, so reaching the same file through
+  different spellings cannot inflate the five-file threshold and offer a
+  walkthrough for work that does not need one.
+
 ## 8.4.0
 
 ### Minor Changes
