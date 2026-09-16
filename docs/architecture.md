@@ -18,9 +18,10 @@ registration function with an `ExtensionAPI`. The manifest wires this up:
 ```
 
 Helper files inside an extension folder (`.ts` modules) are not extensions;
-only `index.ts` is an entry point.
+only `index.ts` is an entry point. `extensions/shared/` has no entry point and
+holds the file-path rule that guards must share with Pi's built-in file tools.
 
-```
+```text
 extensions/
   ask/            sideroom_ask
   todo/           sideroom_todo
@@ -30,6 +31,7 @@ extensions/
   done/           green-before-finish steer
   persona/        single built-in voice
   explain/        end-of-work walkthrough offer
+  shared/         built-in file-tool path resolution
 assets/artifacts/GUIDELINES_TEMPLATE.md   canonical rule seed
 skills/           packaged agent skills and language guides
 scripts/          repository-only tooling (not shipped)
@@ -60,11 +62,11 @@ Extensions subscribe through `pi.on(event, handler)`. The events Sideroom uses:
 
 | Event | Used by | Purpose |
 | --- | --- | --- |
-| `input` | todo, rules, done, explain | Reset per-run state on a real user prompt (`source: 'interactive'` or `'rpc'`). |
+| `input` | todo, rules, done, explain | Reset per-turn state on a real user prompt (`source: 'interactive'` or `'rpc'`). |
 | `turn_start` | todo, done | Reset per-turn state. |
 | `tool_call` | guidelines, rules, done, persona | Inspect a call before it runs. Return `{ block: true, reason }` to reject it. |
 | `tool_execution_start` | todo | Observe any tool starting; drives the propose nudge. |
-| `tool_result` | modified-files, guidelines, rules, done, explain | Observe results. May append content for `rules` warnings, record reads, or note a successful mutation. |
+| `tool_result` | modified-files, guidelines, rules, done, explain | Observe results. May append content for `rules` warnings, record reads, count a mutated file for `explain`, or note a successful mutation. |
 | `turn_end` | todo, done | Inspect the finished turn; drives watchdog and done steering. |
 | `message_end` | persona | Inspect the finished assistant message and steer on a persona violation. |
 | `agent_settled` | explain | Fired once no retry, compaction, or queued continuation is left. `explain` offers the walkthrough here and nowhere else. |
