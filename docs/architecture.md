@@ -194,6 +194,7 @@ language guide; those files are also part of the published package.
 | `sideroom-guidelines` | The 19-rule contract and per-language guides. |
 | `sideroom-persona` | The single voice contract: Do/Don't table, plain-language bar, and enforcement boundaries. |
 | `sideroom-grill` | Interviews a fuzzy plan in `sideroom_ask` rounds. |
+| `sideroom-architecture` | Surfaces the architectural decisions a change forces so they are asked, not assumed. |
 | `sideroom-domain-modeling` | Resolves language conflicts; writes `CONTEXT.md` and offers ADRs. |
 | `sideroom-domain-scaffold` | Code-first repository scan that builds or completes `CONTEXT.md`. |
 
