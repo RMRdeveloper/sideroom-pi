@@ -23,6 +23,7 @@ Hard choices that passed the ADR gates, kept under `docs/adr/`.
 - [adr/0001-ask-multiple-selection-contract.md](./adr/0001-ask-multiple-selection-contract.md) — multiple-selection questions in `sideroom_ask`.
 - [adr/0002-capped-board-widget.md](./adr/0002-capped-board-widget.md) — row cap, `F9` overlay, and the uncapped injected board.
 - [adr/0003-contribution-and-release-flow.md](./adr/0003-contribution-and-release-flow.md) — `develop` as the integration branch and release-only `main`.
+- [adr/0004-board-block-session-message.md](./adr/0004-board-block-session-message.md) — the board block travels as a session message; supersedes the injection part of 0002.
 
 ## Related top-level documents
 
