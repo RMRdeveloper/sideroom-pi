@@ -50,7 +50,7 @@ export default function registerTodo(pi: ExtensionAPI): void {
     notifyWidgetRefresh(ctx);
   };
 
-  registerSessionRefreshEvents(pi, restoreAndRefresh);
+  registerSessionRefreshEvents(pi, store, restoreAndRefresh);
   registerGuardEvents(pi, store, restore);
   registerBoardContext(pi, store, restoreAndRefresh);
   registerTodoTool(pi, store, notifyWidgetRefresh);

@@ -133,6 +133,46 @@ test('resets the breaker on the next interactive input', () => {
   }
 });
 
+test('blocks a write that introduces any', () => {
+  const { handlers, cwd } = register();
+  try {
+    const toolCall = handlers.get('tool_call');
+    assert.ok(toolCall);
+    const decision = toolCall(
+      writeEvent('c6', 'src/user.ts', 'const id: any = 1;\n'),
+      { cwd } as never,
+    ) as { block?: boolean; reason?: string };
+    assert.equal(decision?.block, true);
+    assert.match(decision?.reason ?? '', /explicit-any/);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('notes a suppressed type error without blocking the write', () => {
+  const { handlers, cwd } = register();
+  try {
+    const toolCall = handlers.get('tool_call');
+    const toolResult = handlers.get('tool_result');
+    assert.ok(toolCall);
+    assert.ok(toolResult);
+
+    const decision = toolCall(
+      writeEvent('c7', 'src/user.ts', '// @ts-ignore\nread();\n'),
+      { cwd } as never,
+    );
+    assert.equal(decision, undefined);
+
+    const enriched = toolResult(writeResultEvent('c7')) as {
+      content: { type: string; text: string }[];
+    };
+    assert.equal(enriched.content.length, 2);
+    assert.match(enriched.content[1]?.text ?? '', /suppressed-type-errors/);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
 test('inspects only edit newText additions', () => {
   const { handlers, cwd } = register();
   try {

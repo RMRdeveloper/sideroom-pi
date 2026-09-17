@@ -19,7 +19,9 @@ registration function with an `ExtensionAPI`. The manifest wires this up:
 
 Helper files inside an extension folder (`.ts` modules) are not extensions;
 only `index.ts` is an entry point. `extensions/shared/` has no entry point and
-holds the file-path rule that guards must share with Pi's built-in file tools.
+holds the file-path rule that guards must share with Pi's built-in file tools,
+plus the prompt-cache contract test that loads every extension. Tests never sit
+directly in `extensions/`, because Pi loads every top-level `.ts` file there.
 
 ```text
 extensions/
@@ -31,7 +33,7 @@ extensions/
   done/           green-before-finish steer
   persona/        single built-in voice
   explain/        end-of-work walkthrough offer
-  shared/         built-in file-tool path resolution
+  shared/         built-in file-tool path resolution, prompt-cache test
 assets/artifacts/GUIDELINES_TEMPLATE.md   canonical rule seed
 skills/           packaged agent skills and language guides
 scripts/          repository-only tooling (not shipped)
@@ -70,12 +72,16 @@ Extensions subscribe through `pi.on(event, handler)`. The events Sideroom uses:
 | `turn_end` | todo, done | Inspect the finished turn; drives watchdog and done steering. |
 | `message_end` | persona | Inspect the finished assistant message and steer on a persona violation. |
 | `agent_settled` | explain | Fired once no retry, compaction, or queued continuation is left. `explain` offers the walkthrough here and nowhere else. |
-| `before_agent_start` | todo, guidelines, persona | Return `{ systemPrompt }` to inject the board block, the guidelines reminder, or the persona reminder. |
+| `before_agent_start` | todo, guidelines, persona | `todo` returns `{ message }` with the board block; `guidelines` and `persona` return `{ systemPrompt }` with their reminder. |
 | `session_start`, `session_tree`, `session_compact` | todo, modified-files, guidelines, persona, explain | Rebuild and redraw state after load, branch navigation, or compaction; `persona` publishes its footer status. |
 
-`before_agent_start` returns `systemPrompt` (not `message`) for injected
-context. The guidelines guard also resets its read state on `session_compact`
-because a summary can drop the loaded guides from context mid-run.
+`before_agent_start` appends a reminder to `systemPrompt` for `guidelines` and
+`persona`, and returns a session message for the board block. The board changes
+while the agent works, and a system prompt that changes invalidates the cached
+prefix of the whole request, so `todo` sends the block as a `custom` message
+and only when it differs from the last one it sent. The guidelines guard also
+resets its read state on `session_compact` because a summary can drop the
+loaded guides from context mid-run.
 
 ## Session persistence
 

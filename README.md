@@ -121,7 +121,7 @@ chat. It never creates a repository task file or a `/todos` command.
 - Widget: at most five rows — open items before resolved ones, the
   `in_progress` row always visible — plus a `…+N more · F9: view all` hint.
   `F9` opens the full board as a read-only overlay, so the widget stays small
-  without hiding work from you; the agent still gets every item in its prompt.
+  without hiding work from you; the agent still gets every item in its context.
 
 ### Edited files — proof, not promises
 

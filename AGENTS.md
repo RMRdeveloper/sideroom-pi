@@ -25,8 +25,8 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   collaborators.
 - `extensions/todo/execute.ts` prepares propose/update results without
   mutating the store.
-- `extensions/todo/session.ts` reconstructs, snapshots, refreshes the widget,
-  and injects the compact board.
+- `extensions/todo/session.ts` reconstructs, snapshots, refreshes the widget, and
+  sends the board block as a session message.
 - `extensions/todo/guards.ts` owns skip-prevention steers.
 - `extensions/todo/model.ts` owns the board schema, normalization, patches, and
   state invariants; `extensions/todo/ui.ts` owns its display-only widget, the
@@ -64,6 +64,11 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   manifest contract that every run asserts. Pure modules carry `*.test.mjs`. It
   needs ffmpeg; it is a maintainer tool, not an extension and not a wrapper
   around Pi.
+- `scripts/cache-report.mjs` prints how many prompt tokens each recorded session
+  re-sent and how much of that followed a work-board update. `scripts/cache-report/parse.mjs`
+  reads Pi's session JSONL, `report.mjs` formats the totals and the per-session
+  rows. Pure modules carry `*.test.mjs`. It reads session files and writes
+  nothing; it is a maintainer tool.
 - `skills/sideroom-guidelines/SKILL.md` owns the Do/Don't table and language map;
   `skills/sideroom-guidelines/references/languages/` owns complete per-language guides.
 - `skills/sideroom-persona/SKILL.md` owns the persona Do/Don't table, the
@@ -78,7 +83,10 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   versions and private vulnerability reporting.
 
 Add a tool by creating `extensions/<name>/index.ts`. Pi discovers
-`extensions/*/index.ts`; helper files in that folder are not extensions.
+`extensions/*/index.ts`; helper files in that folder are not extensions. Test
+files live in a subdirectory, never directly in `extensions/`, because Pi loads
+every top-level `.ts` file there and running a test file at startup would fire
+its `node:test` cases. `pi.extensions` also excludes `extensions/*.test.ts`.
 
 ## Commands
 
@@ -113,9 +121,16 @@ Biome requires braces around every `if` body. Do not disable
   English. TUI chrome stays English.
 - Non-TUI calls fail with an explicit UI-not-available error.
 - The tool must not write Sideroom state into the target repository.
+- No extension may make the system prompt depend on per-turn session state.
+  Per-turn context travels as a session message, so the composed system prompt
+  stays byte-identical while a session runs and the provider's cached prefix
+  survives. `extensions/shared/prompt-cache.test.ts` enforces this.
 - `sideroom_todo` is a display-only work board. Its compact widget shows at
   most five rows, open items first, and `F9` opens the read-only overlay. The
-  cap never reaches the injected system prompt. `propose` replaces the board and is
+  cap never reaches the board block. Send that block on `before_agent_start` as
+  a session message, only when it changed, so the system prompt stays stable for
+  prompt caching; queue it again immediately when automatic compaction retries
+  an interrupted turn. `propose` replaces the board and is
   TUI-only; `update` patches ids in every mode. Persist snapshots with
   `appendEntry`, reconstruct from `getBranch()`, and never take over
   `session_before_compact` or add `/todos`.
@@ -139,5 +154,5 @@ Biome requires braces around every `if` body. Do not disable
   the offer never lands on work that a retry or a compaction is about to redo.
   It has no tool and no persisted state.
 - `sideroom_done` steers, never blocks, and does nothing when no check command
-  is detected. It clears green after any later successful mutation and caps its
-  steering.
+  is detected. It clears green after any later successful mutation, notes once
+  per run when code files changed and no test file did, and caps its steering.
