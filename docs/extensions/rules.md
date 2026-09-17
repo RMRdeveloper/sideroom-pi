@@ -21,13 +21,22 @@ so reordered or reformatted existing lines are not re-flagged.
 | --- | --- | --- |
 | `braced-conditionals` | block | `if`/`else if`/`for`/`while` without a braced body; Python one-line suites. |
 | `explicit-error-handling` | block | Empty catches, `return null/undefined` catches, Python `except: pass`. |
+| `explicit-any` | block | `any` in a type position: `: any`, `as any`, `Array<any>`, `Record<string, any>`, `any[]`, `type Id = any`. |
 | `clear-names` | warn | Declarations, assignments, or parameters named `data`, `info`, `temp`, `tmp`, `result`, `obj`, `val`, `x`. |
 | `comments` | warn | `TODO`/`FIXME`/`XXX`/`HACK`, commented-out code, code-like comments. |
 | `debug-artifacts` | warn | `console.log`/`debug`, `debugger`, `print(`, `var_dump`, `dd`, `dump`, `dbg!`. |
+| `suppressed-type-errors` | warn | A comment whose first token is `@ts-ignore` or `@ts-nocheck`; `@ts-expect-error` is allowed. Quoting them in a string, or mentioning them mid-comment, is not suppression. |
 
 Language is inferred from the path (`languageForPath`). Python replaces the
 braces check with an indented-suite rule and its own error handling; `generic`
-skips structural checks.
+skips structural checks. `explicit-any` and `suppressed-type-errors` apply to
+TypeScript only.
+
+The `any` check recognises type assertions, annotations, generic arguments,
+and type aliases, including aliases split across lines. It does not treat
+value-level commas, assignments, or operators as type syntax, and it runs on
+code with strings and comments already masked: `'any'`, `// any`, `anyValue`,
+`record.any`, `const value = any` and `consume(value, any)` pass.
 
 ## Outcome
 
@@ -58,5 +67,6 @@ A guard must not dead-lock an agent that keeps tripping the same rule:
 
 ## Tests
 
-`model.test.ts` covers diffing and formatting. `index.test.ts` covers blocking,
-warnings, degradation, and reset.
+`model.test.ts` covers diffing and formatting. `checks.test.ts` covers the
+detectors, one case per pattern. `index.test.ts` covers blocking, warnings,
+degradation, and reset.

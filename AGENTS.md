@@ -154,5 +154,5 @@ Biome requires braces around every `if` body. Do not disable
   the offer never lands on work that a retry or a compaction is about to redo.
   It has no tool and no persisted state.
 - `sideroom_done` steers, never blocks, and does nothing when no check command
-  is detected. It clears green after any later successful mutation and caps its
-  steering.
+  is detected. It clears green after any later successful mutation, notes once
+  per run when code files changed and no test file did, and caps its steering.

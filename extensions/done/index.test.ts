@@ -14,7 +14,9 @@ interface Registered {
   readonly cwd: string;
 }
 
-function register(): Registered {
+function register(
+  scripts: Record<string, string> = { check: 'x' },
+): Registered {
   const handlers = new Map<string, EventHandler>();
   const steers: string[] = [];
   const api = {
@@ -26,10 +28,7 @@ function register(): Registered {
     },
   } as unknown as ExtensionAPI;
   const cwd = mkdtempSync(join(tmpdir(), 'sideroom-done-'));
-  writeFileSync(
-    join(cwd, 'package.json'),
-    JSON.stringify({ scripts: { check: 'x' } }),
-  );
+  writeFileSync(join(cwd, 'package.json'), JSON.stringify({ scripts }));
   registerDone(api);
   return { handlers, steers, cwd };
 }
@@ -43,6 +42,55 @@ function mutate(handlers: Map<string, EventHandler>): void {
     input: {},
     content: [],
     isError: false,
+  } as never);
+}
+
+function writePath(
+  handlers: Map<string, EventHandler>,
+  toolCallId: string,
+  path: string,
+): void {
+  const toolCall = handlers.get('tool_call');
+  const toolResult = handlers.get('tool_result');
+  assert.ok(toolCall);
+  assert.ok(toolResult);
+  toolCall(
+    {
+      toolName: 'write',
+      toolCallId,
+      input: { path, content: '' },
+    } as never,
+    {} as never,
+  );
+  toolResult({
+    toolName: 'write',
+    toolCallId,
+    input: {},
+    content: [],
+    isError: false,
+  } as never);
+}
+
+function runCheck(handlers: Map<string, EventHandler>, cwd: string): void {
+  const toolCall = handlers.get('tool_call');
+  const toolResult = handlers.get('tool_result');
+  assert.ok(toolCall);
+  assert.ok(toolResult);
+  toolCall(
+    {
+      toolName: 'bash',
+      toolCallId: 'b1',
+      input: { command: 'npm run test' },
+    } as never,
+    { cwd } as never,
+  );
+  toolResult({
+    toolName: 'bash',
+    toolCallId: 'b1',
+    input: {},
+    content: [],
+    isError: false,
+    details: {},
   } as never);
 }
 
@@ -112,6 +160,51 @@ test('caps steering to avoid an infinite loop', () => {
     turnStart({} as never);
     turnEnd({} as never, { cwd } as never);
     assert.equal(steers.length, 2);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('notes a run that changed code without touching a test', () => {
+  const { handlers, steers, cwd } = register({ test: 'node --test' });
+  try {
+    writePath(handlers, 'w1', 'src/user.ts');
+    runCheck(handlers, cwd);
+    const turnEnd = handlers.get('turn_end');
+    assert.ok(turnEnd);
+    turnEnd({} as never, { cwd } as never);
+    assert.deepEqual(steers, [
+      'This run changed code files and no test file. Add or update the test that covers the change before finishing.',
+    ]);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('stays quiet when the run touched a test', () => {
+  const { handlers, steers, cwd } = register({ test: 'node --test' });
+  try {
+    writePath(handlers, 'w1', 'src/user.ts');
+    writePath(handlers, 'w2', 'src/user.test.ts');
+    runCheck(handlers, cwd);
+    const turnEnd = handlers.get('turn_end');
+    assert.ok(turnEnd);
+    turnEnd({} as never, { cwd } as never);
+    assert.deepEqual(steers, []);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('stays quiet when the run changed only documentation', () => {
+  const { handlers, steers, cwd } = register({ test: 'node --test' });
+  try {
+    writePath(handlers, 'w1', 'README.md');
+    runCheck(handlers, cwd);
+    const turnEnd = handlers.get('turn_end');
+    assert.ok(turnEnd);
+    turnEnd({} as never, { cwd } as never);
+    assert.deepEqual(steers, []);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }

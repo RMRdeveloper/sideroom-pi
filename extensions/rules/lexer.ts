@@ -9,8 +9,18 @@ const LEXICAL_MODE = {
 
 type LexicalMode = (typeof LEXICAL_MODE)[keyof typeof LEXICAL_MODE];
 
-export function maskNonCode(source: string, language: LanguageId): string {
+export interface MaskOptions {
+  /** Keep comment text so a caller can read the directives inside it. */
+  readonly keepComments?: boolean;
+}
+
+export function maskNonCode(
+  source: string,
+  language: LanguageId,
+  options: MaskOptions = {},
+): string {
   const masked = [...source];
+  const keepComments = options.keepComments === true;
   let mode: LexicalMode = LEXICAL_MODE.code;
   let delimiter = '';
 
@@ -22,20 +32,20 @@ export function maskNonCode(source: string, language: LanguageId): string {
         mode = LEXICAL_MODE.code;
         continue;
       }
-      maskCharacter(masked, index);
+      maskComment(masked, index, keepComments);
       continue;
     }
 
     if (mode === LEXICAL_MODE.blockComment) {
       const closesComment = character === '*' && source[index + 1] === '/';
       if (closesComment) {
-        maskCharacter(masked, index);
-        maskCharacter(masked, index + 1);
+        maskComment(masked, index, keepComments);
+        maskComment(masked, index + 1, keepComments);
         index += 1;
         mode = LEXICAL_MODE.code;
         continue;
       }
-      maskCharacter(masked, index);
+      maskComment(masked, index, keepComments);
       continue;
     }
 
@@ -58,7 +68,7 @@ export function maskNonCode(source: string, language: LanguageId): string {
         mode = LEXICAL_MODE.code;
         continue;
       }
-      if (delimiter.length === 1 && character === '\n') {
+      if (delimiter !== '`' && character === '\n') {
         mode = LEXICAL_MODE.code;
         continue;
       }
@@ -68,8 +78,8 @@ export function maskNonCode(source: string, language: LanguageId): string {
 
     const startsLineComment = character === '/' && source[index + 1] === '/';
     if (startsLineComment) {
-      maskCharacter(masked, index);
-      maskCharacter(masked, index + 1);
+      maskComment(masked, index, keepComments);
+      maskComment(masked, index + 1, keepComments);
       index += 1;
       mode = LEXICAL_MODE.lineComment;
       continue;
@@ -77,8 +87,8 @@ export function maskNonCode(source: string, language: LanguageId): string {
 
     const startsBlockComment = character === '/' && source[index + 1] === '*';
     if (startsBlockComment) {
-      maskCharacter(masked, index);
-      maskCharacter(masked, index + 1);
+      maskComment(masked, index, keepComments);
+      maskComment(masked, index + 1, keepComments);
       index += 1;
       mode = LEXICAL_MODE.blockComment;
       continue;
@@ -87,7 +97,7 @@ export function maskNonCode(source: string, language: LanguageId): string {
     const startsHashComment =
       character === '#' && supportsHashComments(language);
     if (startsHashComment) {
-      maskCharacter(masked, index);
+      maskComment(masked, index, keepComments);
       mode = LEXICAL_MODE.lineComment;
       continue;
     }
@@ -133,4 +143,15 @@ function maskCharacter(masked: string[], index: number): void {
   if (shouldMask) {
     masked[index] = ' ';
   }
+}
+
+function maskComment(
+  masked: string[],
+  index: number,
+  keepComments: boolean,
+): void {
+  if (keepComments) {
+    return;
+  }
+  maskCharacter(masked, index);
 }

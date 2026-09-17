@@ -4,6 +4,7 @@ import {
   RULE_SEVERITY,
   type RuleId,
   supportsBracedConditionals,
+  supportsExplicitAny,
 } from './catalog.ts';
 import { maskNonCode } from './lexer.ts';
 import type { AddedLine, RuleViolation } from './model.ts';
@@ -38,6 +39,29 @@ const DEBUG_PATTERNS: readonly RegExp[] = [
   /\bdbg!\s*\(/,
 ];
 
+// Keep these patterns on syntax that can only introduce a type. Value-level
+// commas, assignments, and operators may legally surround an identifier named
+// `any`, so they are deliberately absent.
+const EXPLICIT_ANY_PATTERNS: readonly RegExp[] = [
+  /\bas\s+any\b/,
+  /\b(?:keyof|satisfies)\s+any\b/,
+  /\bany\s*\[\s*\]/,
+  /\b[$\w]+<[^<>\n]*\bany\b[^<>\n]*>(?!\s*[$\w])/,
+  /\binterface\s+[$\w]+(?:\s*<[^;{\n]*>)?\s*\{[^}\n]*:\s*[^;}\n]*\bany\b/,
+  /\b(?:const|let|var)\s+[$\w]+\s*:\s*(?:(?:=>)|[^;=\n])*\bany\b/,
+  /(?:^|[(,])\s*(?:\.\.\.)?[$\w]+\??\s*:\s*(?:(?:=>)|[^;=\n])*\bany\b/,
+  /\)\s*:\s*(?:(?:=>)|[^;={\n])*\bany\b/,
+  /^\s*(?:(?:public|private|protected|readonly|static|declare|abstract)\s+)*[$\w]+[?!]?\s*:\s*(?:(?:=>)|[^;,=\n])*\bany\b[^;=\n]*(?:;|=)/,
+];
+
+// A suppression is a comment whose first token is the directive; prose that
+// mentions the directive, or a string that quotes it, is not one.
+const SUPPRESSED_TYPE_ERRORS =
+  /(?:^|\s)(?:\/\/|\/\*)\s*@ts-(?:ignore|nocheck)\b/;
+
+const TYPE_ALIAS = /\btype\s+[$\w]+(?:\s*<[^;=]*>)?\s*=/g;
+const ANY_TOKEN = /\bany\b/g;
+
 const FUNCTION_PARAMS: readonly RegExp[] = [
   /\bfunction\s+\w*\s*\(([^()]*)\)/g,
   /\bdef\s+\w+\s*\(([^()]*)\)/g,
@@ -54,9 +78,16 @@ export function evaluateAddedLines(
   const code = maskNonCode(joined, language);
   const codeLines = code.split('\n');
   const usesBracedConditionals = supportsBracedConditionals(language);
+  const usesExplicitAny = supportsExplicitAny(language);
+  const commentLines = usesExplicitAny
+    ? maskNonCode(joined, language, { keepComments: true }).split('\n')
+    : [];
 
   if (usesBracedConditionals) {
     collectBracedConditionals(code, lines, violations);
+  }
+  if (usesExplicitAny) {
+    collectTypeAliasAny(code, lines, violations);
   }
 
   for (let index = 0; index < lines.length; index += 1) {
@@ -70,6 +101,13 @@ export function evaluateAddedLines(
     };
     if (language === LANGUAGE.python) {
       collectPythonSuite(codeLine, violations);
+    }
+    if (usesExplicitAny) {
+      collectExplicitAny(codeLine, violations);
+      collectSuppressedTypeErrors(
+        { line: added.line, text: commentLines[index] ?? '' },
+        violations,
+      );
     }
     collectClearNames(codeLine, violations);
     collectComments(added, violations);
@@ -272,6 +310,123 @@ function collectDebugArtifacts(
       ),
     );
   }
+}
+
+function collectExplicitAny(
+  codeLine: AddedLine,
+  violations: RuleViolation[],
+): void {
+  const typeCode = codeLine.text
+    .replaceAll(/\btypeof\s+any\b/g, (match) => ' '.repeat(match.length))
+    .replaceAll(/^\s*(?:import|export)\s*\{[^}]*\}/g, (match) =>
+      ' '.repeat(match.length),
+    );
+  if (EXPLICIT_ANY_PATTERNS.some((pattern) => pattern.test(typeCode))) {
+    violations.push(
+      violation(
+        'explicit-any',
+        "[explicit-any] Replace 'any' with the type the value actually has; use 'unknown' only when it must be narrowed first.",
+        codeLine.line,
+      ),
+    );
+  }
+}
+
+function collectTypeAliasAny(
+  code: string,
+  lines: readonly AddedLine[],
+  violations: RuleViolation[],
+): void {
+  const aliases = code.matchAll(
+    new RegExp(TYPE_ALIAS.source, TYPE_ALIAS.flags),
+  );
+  for (const alias of aliases) {
+    const bodyOffset = (alias.index ?? 0) + alias[0].length;
+    const endOffset = typeAliasEndOffset(code, bodyOffset);
+    const body = code.slice(bodyOffset, endOffset);
+    for (const anyMatch of body.matchAll(
+      new RegExp(ANY_TOKEN.source, ANY_TOKEN.flags),
+    )) {
+      const anyOffset = bodyOffset + (anyMatch.index ?? 0);
+      if (isValueLevelAnyInType(code, anyOffset)) {
+        continue;
+      }
+      violations.push(
+        violation(
+          'explicit-any',
+          "[explicit-any] Replace 'any' with the type the value actually has; use 'unknown' only when it must be narrowed first.",
+          lineForOffset(code, lines, anyOffset),
+        ),
+      );
+    }
+  }
+}
+
+function typeAliasEndOffset(code: string, bodyOffset: number): number {
+  let braceDepth = 0;
+  let bracketDepth = 0;
+  let parenthesisDepth = 0;
+  for (let index = bodyOffset; index < code.length; index += 1) {
+    const character = code[index];
+    if (character === '{') {
+      braceDepth += 1;
+      continue;
+    }
+    if (character === '}') {
+      braceDepth -= 1;
+      continue;
+    }
+    if (character === '[') {
+      bracketDepth += 1;
+      continue;
+    }
+    if (character === ']') {
+      bracketDepth -= 1;
+      continue;
+    }
+    if (character === '(') {
+      parenthesisDepth += 1;
+      continue;
+    }
+    if (character === ')') {
+      parenthesisDepth -= 1;
+      continue;
+    }
+    if (
+      character === ';' &&
+      braceDepth === 0 &&
+      bracketDepth === 0 &&
+      parenthesisDepth === 0
+    ) {
+      return index;
+    }
+  }
+  return code.length;
+}
+
+function isValueLevelAnyInType(code: string, anyOffset: number): boolean {
+  const prefix = code.slice(0, anyOffset);
+  if (/\btypeof\s*$/.test(prefix) || /\.\s*$/.test(prefix)) {
+    return true;
+  }
+  const suffix = code.slice(anyOffset + 'any'.length);
+  return /^\s*\??\s*(?::|\()/.test(suffix);
+}
+
+function collectSuppressedTypeErrors(
+  commentLine: AddedLine,
+  violations: RuleViolation[],
+): void {
+  if (!SUPPRESSED_TYPE_ERRORS.test(commentLine.text)) {
+    return;
+  }
+  violations.push(
+    violation(
+      'suppressed-type-errors',
+      "[suppressed-type-errors] Replace '@ts-ignore' or '@ts-nocheck' with '@ts-expect-error' and an explanation, or fix the type.",
+      commentLine.line,
+    ),
+  );
 }
 
 function closingParenthesisOffset(
