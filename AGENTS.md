@@ -37,6 +37,12 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   `extensions/modified-files/ui.ts` owns the compact and extended displays.
 - `extensions/guidelines/index.ts` appends a short write/edit reminder.
 - `extensions/guidelines/prompt.ts` owns the reminder text and idempotent append.
+- `extensions/monorepo-skills/index.ts` composes trusted child-folder skill
+  discovery; `extensions/monorepo-skills/scan.ts` owns the bounded,
+  ignore-aware walk and Pi-compatible location rules;
+  `extensions/monorepo-skills/flags.ts` owns the CLI disable check; and
+  `extensions/monorepo-skills/prompt.ts` owns the static location-preference
+  note.
 - `extensions/rules/index.ts` composes the guidelines rule gate;
   `extensions/rules/catalog.ts` owns rule severities and language detection;
   `extensions/rules/model.ts` owns added-line diffing and result formatting;
@@ -125,6 +131,10 @@ Biome requires braces around every `if` body. Do not disable
   Per-turn context travels as a session message, so the composed system prompt
   stays byte-identical while a session runs and the provider's cached prefix
   survives. `extensions/shared/prompt-cache.test.ts` enforces this.
+- `monorepo-skills` contributes trusted `.pi/skills` and `.agents/skills` from
+  child folders through `resources_discover`, at most three levels below Pi's
+  working directory. It respects ignore files and `--no-skills`, leaves name
+  collisions to Pi, writes no state, and adds no tool or command.
 - `sideroom_todo` is a display-only work board. Its compact widget shows at
   most five rows, open items first, and `F9` opens the read-only overlay. The
   cap never reaches the board block. Send that block on `before_agent_start` as
