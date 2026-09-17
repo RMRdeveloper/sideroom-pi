@@ -2,8 +2,9 @@
 
 Sideroom Pi is a global [Pi package](https://pi.dev/docs/latest/packages) that
 adds a side room to a parent agent: questions, a live work board, an edited-file
-view, and quality gates. Nothing it produces lives in the target repository —
-all state is held in the active Pi session branch.
+view, quality gates, and monorepo child-folder skill discovery. Nothing it
+produces lives in the target repository — all state is held in the active Pi
+session branch.
 
 ## Package layout
 
@@ -29,6 +30,7 @@ extensions/
   todo/           sideroom_todo
   modified-files/ edited-file tracking
   guidelines/     pre-edit read gate
+  monorepo-skills/ trusted child-folder skill discovery
   rules/          added-line rule checks
   done/           green-before-finish steer
   persona/        single built-in voice
@@ -57,6 +59,8 @@ Each tool follows the same split so pure logic can be tested without Pi:
 `selection.ts` for the multiple-selection reducer. `rules` and `done` are pure
 guards without a tool. `persona` persists no profile state, so it ships
 `catalog.ts`, `checks.ts`, and `guard.ts` instead of `session.ts` or `ui.ts`.
+`monorepo-skills` has no tool or state: `scan.ts` owns discovery, `flags.ts`
+owns the CLI disable check, and `prompt.ts` owns its static prompt note.
 
 ## Lifecycle events
 
@@ -72,11 +76,13 @@ Extensions subscribe through `pi.on(event, handler)`. The events Sideroom uses:
 | `turn_end` | todo, done | Inspect the finished turn; drives watchdog and done steering. |
 | `message_end` | persona | Inspect the finished assistant message and steer on a persona violation. |
 | `agent_settled` | explain | Fired once no retry, compaction, or queued continuation is left. `explain` offers the walkthrough here and nowhere else. |
-| `before_agent_start` | todo, guidelines, persona | `todo` returns `{ message }` with the board block; `guidelines` and `persona` return `{ systemPrompt }` with their reminder. |
+| `resources_discover` | monorepo-skills | Returns trusted child-folder skill paths before Pi rebuilds the system prompt. |
+| `before_agent_start` | todo, guidelines, monorepo-skills, persona | `todo` returns `{ message }` with the board block; the others return `{ systemPrompt }` with static reminders. |
 | `session_start`, `session_tree`, `session_compact` | todo, modified-files, guidelines, persona, explain | Rebuild and redraw state after load, branch navigation, or compaction; `persona` publishes its footer status. |
 
 `before_agent_start` appends a reminder to `systemPrompt` for `guidelines` and
-`persona`, and returns a session message for the board block. The board changes
+`persona`, plus a location-preference note when `monorepo-skills` found child
+skills, and returns a session message for the board block. The board changes
 while the agent works, and a system prompt that changes invalidates the cached
 prefix of the whole request, so `todo` sends the block as a `custom` message
 and only when it differs from the last one it sent. The guidelines guard also
@@ -152,8 +158,8 @@ not retrigger a nudge or watchdog, and they cap how often they fire per run.
 
 `ask` and `todo propose` need a terminal. They check `ctx.mode === 'tui'` and
 otherwise return the explicit error `Error: UI not available (running in
-non-interactive mode)`. `todo update`, `guidelines`, `rules`, `done`, and
-`persona` work in every mode. Persona blocking and steering stay active where
+non-interactive mode)`. `todo update`, `guidelines`, `monorepo-skills`,
+`rules`, `done`, and `persona` work in every mode. Persona blocking and steering stay active where
 there is no UI, and only the footer status is skipped.
 
 `explain` also runs in every mode, but it only sends its offer in the TUI: it is

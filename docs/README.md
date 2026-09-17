@@ -11,6 +11,7 @@ Maintainable documentation for the Sideroom Pi package. Start here.
 | [extensions/todo.md](./extensions/todo.md) | `sideroom_todo` work board, capped widget, `F9` overlay, persistence, and skip prevention. |
 | [extensions/modified-files.md](./extensions/modified-files.md) | Session edited-file tracking, compact widget, and `F8` overlay. |
 | [extensions/guidelines.md](./extensions/guidelines.md) | Pre-edit read gate and the packaged coding skill. |
+| [extensions/monorepo-skills.md](./extensions/monorepo-skills.md) | Trusted discovery of child-folder `.pi/skills` and `.agents/skills`. |
 | [extensions/rules.md](./extensions/rules.md) | Added-line rule checks, blocking, warnings, and the circuit breaker. |
 | [extensions/persona.md](./extensions/persona.md) | The single built-in voice, its prohibitions, injection, and enforcement. |
 | [extensions/explain.md](./extensions/explain.md) | The end-of-work walkthrough offer, its trigger, and its limits. |
@@ -24,6 +25,7 @@ Hard choices that passed the ADR gates, kept under `docs/adr/`.
 - [adr/0002-capped-board-widget.md](./adr/0002-capped-board-widget.md) — row cap, `F9` overlay, and the uncapped injected board.
 - [adr/0003-contribution-and-release-flow.md](./adr/0003-contribution-and-release-flow.md) — `develop` as the integration branch and release-only `main`.
 - [adr/0004-board-block-session-message.md](./adr/0004-board-block-session-message.md) — the board block travels as a session message; supersedes the injection part of 0002.
+- [adr/0005-monorepo-skills.md](./adr/0005-monorepo-skills.md) — trusted, bounded discovery of skills in monorepo child folders.
 
 ## Related top-level documents
 

@@ -95,3 +95,15 @@ _Avoid: technical decision, design decision._
 The single project command that the done extension watches to decide whether the session is green, chosen from package manager scripts and known ecosystem defaults. It is detected from the working directory, not configured.
 
 _Avoid: test command, build command._
+
+## Monorepo child folder
+
+A descendant of Pi's working directory that carries its own `.pi/skills` or `.agents/skills`. It remains part of the same Pi project; it is not a separate trusted project.
+
+_Avoid: nested project, subproject._
+
+## Monorepo skill
+
+A skill stored in a monorepo child folder and added to the session by the `monorepo-skills` extension. Pi's normal project-skill discovery does not walk down to find it.
+
+_Avoid: child skill, nested skill, workspace skill._
