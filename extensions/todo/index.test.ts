@@ -86,9 +86,12 @@ test('registers a sequential tool that snapshots and injects the live board', as
   const injected = beforeAgentStart(
     { systemPrompt: 'base prompt' } as never,
     ctx,
-  ) as { systemPrompt?: string };
-  assert.match(injected.systemPrompt ?? '', /sideroom_todo \(live board/);
-  assert.match(injected.systemPrompt ?? '', /base prompt/);
+  ) as {
+    message?: { customType?: string; content?: string; display?: boolean };
+  };
+  assert.equal(injected.message?.customType, 'sideroom-todo-board');
+  assert.match(injected.message?.content ?? '', /sideroom_todo \(live board/);
+  assert.equal(injected.message?.display, false);
 
   const input = handlers.get('input');
   const turnStart = handlers.get('turn_start');

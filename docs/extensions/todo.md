@@ -70,8 +70,9 @@ server — or normalizes the schema — register `TodoParamsSchema` in
 
 ## Board block
 
-Before every turn, `before_agent_start` injects the compact board through
-`systemPrompt`:
+Before every turn, `before_agent_start` sends the compact board as a session
+message (`customType: 'sideroom-todo-board'`, `display: false`) and only when it
+differs from the last block it sent:
 
 ```text
 sideroom_todo (live board; do not recap in prose)
@@ -86,7 +87,15 @@ the same update. propose replaces the list; update patches by id.
 ```
 
 Marks: `>` in progress, `-` pending, `✓` completed, `~` cancelled.
-`formatBoardBlock()` is shared by the injected block and the widget.
+`formatBoardBlock()` is shared by the board block and the widget.
+
+Sending the block as a message keeps the system prompt byte-identical while the
+agent works, which is what prompt caching needs: a system prompt that changes
+invalidates the cached prefix of the whole request. An unchanged board sends
+nothing. `session_start` and `session_tree` forget the last sent block because
+a restore can drop it from the model's context. `session_compact` does the same;
+when automatic compaction retries the interrupted turn, it also queues the
+current block immediately so the retry cannot run without the board.
 
 ## Widget
 
@@ -98,8 +107,8 @@ by status, and a dim `…+N more · F9: view all` line when rows are hidden.
   items (`completed` and `cancelled`) are hidden before them.
 - Visible rows keep their board order, and the single `in_progress` item always
   gets a row even when it falls outside the first five.
-- The cap is display-only: `formatBoardBlock()` still injects every item into
-  the system prompt.
+- The cap is display-only: `formatBoardBlock()` still sends every item to the
+  agent.
 
 `F9` opens a read-only overlay with 12 visible rows, `↑`/`↓` and `PgUp`/`PgDn`
 scrolling, and `Esc`/`F9` to close. It mutates nothing; `propose` and `update`
@@ -153,7 +162,7 @@ and are tagged so their own continuation does not retrigger them.
 | `extensions/todo/index.ts` | Registers the tool and composes collaborators. |
 | `extensions/todo/model.ts` | Schemas, parsing, normalization, invariants, board formatting, nudge/watchdog decisions. |
 | `extensions/todo/execute.ts` | Builds propose/update results without mutating the store. |
-| `extensions/todo/session.ts` | Snapshot reconstruction, widget refresh, prompt injection, refresh event. |
+| `extensions/todo/session.ts` | Snapshot reconstruction, widget refresh, board-block message, refresh event. |
 | `extensions/todo/guards.ts` | Nudge and watchdog steers. |
 | `extensions/todo/ui.ts` | Read-only widget, row cap, hidden-row hint, and `F9` overlay. |
 
@@ -161,7 +170,8 @@ and are tagged so their own continuation does not retrigger them.
 
 `model.test.ts` covers limits, normalization, patches, duplicates, unknown ids,
 and invariants. `execute.test.ts` covers TUI vs. non-TUI. `session.test.ts`
-covers snapshot reconstruction, including the canonical empty list.
+covers snapshot reconstruction, including the canonical empty list, and the
+board-block message on change and after a restore.
 `ui.test.ts` covers the row cap, the hidden-row hint, and the overlay.
 `index.test.ts` covers persistence, injection, refresh, shortcut registration,
 and guard behavior.

@@ -1,6 +1,7 @@
 # 0002. Capped work-board widget with an `F9` overlay
 
 - **Status:** Accepted
+- **Superseded in part by:** [0004](0004-board-block-session-message.md) — the board block now travels as a session message, not through `systemPrompt`.
 - **Date:** 2026-09-11
 
 ## Context

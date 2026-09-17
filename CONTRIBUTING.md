@@ -74,6 +74,7 @@ headless runs fail fast by design.
 | `npm test` | `node --test` over `extensions/**/*.test.ts` and `scripts/**/*.test.mjs`. |
 | `npm run check` | The gate: types, braces check, Biome check, tests. Run it before every PR. |
 | `npm run preview` | Rebuilds `media/preview.png` and `media/preview.mp4`. Needs ffmpeg; maintainer tool. |
+| `npm run cache:report` | Reads this project's Pi session files and prints prompt-cache totals. Maintainer tool. |
 | `npm run changeset` | Creates a changeset (see [Changesets](#changesets)). |
 | `npm run changeset:status` | Shows which packages and bumps the pending changesets produce. |
 
