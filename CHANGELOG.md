@@ -1,5 +1,30 @@
 # Changelog
 
+## 8.6.0
+
+### Minor Changes
+
+- bc77550: `sideroom_todo` now sends its board block as a session message on
+  `before_agent_start`, and only when the block changed since the previous turn,
+  instead of appending it to the system prompt. You see the same board and the
+  agent reads the same items; `session_start`, `session_tree`, and
+  `session_compact` re-send the block after a restore.
+  
+  A system prompt that changed on every board update invalidated the cached prefix
+  of the whole request. In ten recorded sessions of this repository, turns opened
+  after a board update re-sent 82% of the context on average, 129,842 tokens,
+  against 5,450 tokens when the board did not change.
+- 61120fb: `sideroom_rules` now blocks `any` in a type position and flags `@ts-ignore` and
+  `@ts-nocheck`. Replace `any` with the type the value actually has; `unknown` is
+  the way out when the value must be narrowed first. The check reads code with
+  strings and comments masked, so `'any'`, `// any`, `anyValue` and `record.any`
+  pass, and the project's own type check still has the last word on whether the
+  replacement compiles.
+  
+  `sideroom_done` also notes a run that changed code files without touching a test
+  file. It fires once per run, only when the project has a test setup, and never
+  blocks; the check gate keeps priority while the checks are red.
+
 ## 8.5.0
 
 ### Minor Changes
