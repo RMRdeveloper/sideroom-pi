@@ -157,6 +157,30 @@ function shellOperatorAt(
   return undefined;
 }
 
+export function hasTestSetup(cwd: string): boolean {
+  if (hasPackageTestScript(cwd)) {
+    return true;
+  }
+  if (
+    existsSync(join(cwd, 'pyproject.toml')) ||
+    existsSync(join(cwd, 'setup.py'))
+  ) {
+    return true;
+  }
+  if (existsSync(join(cwd, 'go.mod'))) {
+    return true;
+  }
+  return existsSync(join(cwd, 'Cargo.toml'));
+}
+
+function hasPackageTestScript(cwd: string): boolean {
+  const packagePath = join(cwd, 'package.json');
+  if (!existsSync(packagePath)) {
+    return false;
+  }
+  return typeof readScripts(packagePath).test === 'string';
+}
+
 function detectPackageCommand(cwd: string): CheckCommand | undefined {
   const packagePath = join(cwd, 'package.json');
   if (!existsSync(packagePath)) {

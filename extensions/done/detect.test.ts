@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { commandMatches, detectCheckCommand } from './detect.ts';
+import { commandMatches, detectCheckCommand, hasTestSetup } from './detect.ts';
 
 function withDir(run: (dir: string) => void): void {
   const dir = mkdtempSync(join(tmpdir(), 'sideroom-done-'));
@@ -67,6 +67,35 @@ test('detects pytest, go, cargo, and make check', () => {
 test('returns undefined when nothing is detectable', () => {
   withDir((dir) => {
     assert.equal(detectCheckCommand(dir), undefined);
+  });
+});
+
+test('detects a test setup separately from the check command', () => {
+  withDir((dir) => {
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({ scripts: { check: 'x' } }),
+    );
+    assert.equal(hasTestSetup(dir), false);
+  });
+  withDir((dir) => {
+    writeFileSync(
+      join(dir, 'package.json'),
+      JSON.stringify({ scripts: { test: 'x' } }),
+    );
+    assert.equal(hasTestSetup(dir), true);
+  });
+  withDir((dir) => {
+    writeFileSync(join(dir, 'pyproject.toml'), '');
+    assert.equal(hasTestSetup(dir), true);
+  });
+  withDir((dir) => {
+    writeFileSync(join(dir, 'Cargo.toml'), '');
+    assert.equal(hasTestSetup(dir), true);
+  });
+  withDir((dir) => {
+    writeFileSync(join(dir, 'Makefile'), 'check:\n\tnpm test\n');
+    assert.equal(hasTestSetup(dir), false);
   });
 });
 

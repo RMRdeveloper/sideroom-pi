@@ -42,6 +42,12 @@ A work-board item whose status is `in_progress` or `pending`, as opposed to a _r
 
 _Avoid: active item, unfinished item._
 
+## Board block
+
+The `sideroom_todo` text the agent reads: a header, one row per item, and the board instructions. It travels as a session message on `before_agent_start`, sent only when it differs from the previous block and re-sent after a restore. An automatic compaction retry queues it immediately so the retry keeps the current board.
+
+_Avoid: system prompt block, injected prompt._
+
 ## Edited-file history
 
 The session-backed list of paths from successful Pi `write` and `edit` results. It records agent editing activity, not the repository working tree or Git diff.

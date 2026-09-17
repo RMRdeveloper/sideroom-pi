@@ -13,11 +13,13 @@ import {
 import { renderTodoWidget } from './ui.ts';
 
 export const SNAPSHOT_TYPE = 'sideroom-todo';
+export const BOARD_MESSAGE_TYPE = 'sideroom-todo-board';
 export const WIDGET_KEY = 'sideroom-todo';
 export const TODO_WIDGET_REFRESH_EVENT = 'sideroom:todo-widget-refreshed';
 
 export interface TodoStore {
   items: readonly TodoItem[];
+  lastSentBlock?: string;
 }
 
 export type BoardLifecycle = (ctx: ExtensionContext) => void;
@@ -89,11 +91,29 @@ export function commitBoard(
 
 export function registerSessionRefreshEvents(
   pi: ExtensionAPI,
+  store: TodoStore,
   restoreAndRefresh: BoardLifecycle,
 ): void {
-  pi.on('session_start', (_event, ctx) => restoreAndRefresh(ctx));
-  pi.on('session_tree', (_event, ctx) => restoreAndRefresh(ctx));
-  pi.on('session_compact', (_event, ctx) => restoreAndRefresh(ctx));
+  // A restore can drop the sent block from the model's context, so an unchanged
+  // board still has to be announced again.
+  const restoreSession = (ctx: ExtensionContext) => {
+    restoreAndRefresh(ctx);
+    forgetSentBoardBlock(store);
+  };
+  pi.on('session_start', (_event, ctx) => restoreSession(ctx));
+  pi.on('session_tree', (_event, ctx) => restoreSession(ctx));
+  pi.on('session_compact', (event, ctx) => {
+    restoreSession(ctx);
+    if (!event.willRetry) {
+      return;
+    }
+    const block = pendingBoardBlock(store);
+    if (block === undefined) {
+      return;
+    }
+    store.lastSentBlock = block;
+    pi.sendMessage(boardMessage(block), { deliverAs: 'steer' });
+  });
 }
 
 export function registerBoardContext(
@@ -101,15 +121,44 @@ export function registerBoardContext(
   store: TodoStore,
   restoreAndRefresh: BoardLifecycle,
 ): void {
-  pi.on('before_agent_start', (event, ctx) => {
+  pi.on('before_agent_start', (_event, ctx) => {
     restoreAndRefresh(ctx);
-    if (store.items.length === 0) {
+    const block = pendingBoardBlock(store);
+    if (block === undefined) {
       return;
     }
-    return {
-      systemPrompt: `${event.systemPrompt}\n\n${formatBoardBlock(store.items)}`,
-    };
+    store.lastSentBlock = block;
+    return { message: boardMessage(block) };
   });
+}
+
+// The block rides a session message instead of the system prompt: a volatile
+// system prompt invalidates the cached prefix of the whole request.
+function pendingBoardBlock(store: TodoStore): string | undefined {
+  if (store.items.length === 0) {
+    return undefined;
+  }
+  const block = formatBoardBlock(store.items);
+  if (block === store.lastSentBlock) {
+    return undefined;
+  }
+  return block;
+}
+
+function forgetSentBoardBlock(store: TodoStore): void {
+  store.lastSentBlock = undefined;
+}
+
+function boardMessage(block: string): {
+  customType: typeof BOARD_MESSAGE_TYPE;
+  content: string;
+  display: false;
+} {
+  return {
+    customType: BOARD_MESSAGE_TYPE,
+    content: block,
+    display: false,
+  };
 }
 
 function findSnapshotItems(

@@ -18,19 +18,23 @@ export type LanguageId = (typeof LANGUAGE)[keyof typeof LANGUAGE];
 
 export type RuleId =
   | 'braced-conditionals'
+  | 'explicit-any'
   | 'explicit-error-handling'
   | 'clear-names'
   | 'comments'
-  | 'debug-artifacts';
+  | 'debug-artifacts'
+  | 'suppressed-type-errors';
 
 export type RuleSeverity = (typeof SEVERITY)[keyof typeof SEVERITY];
 
 export const RULE_SEVERITY: Readonly<Record<RuleId, RuleSeverity>> = {
   'braced-conditionals': SEVERITY.block,
+  'explicit-any': SEVERITY.block,
   'explicit-error-handling': SEVERITY.block,
   'clear-names': SEVERITY.warn,
   comments: SEVERITY.warn,
   'debug-artifacts': SEVERITY.warn,
+  'suppressed-type-errors': SEVERITY.warn,
 };
 
 export function languageForPath(path: string): LanguageId {
@@ -68,4 +72,8 @@ export function languageForPath(path: string): LanguageId {
 
 export function supportsBracedConditionals(language: LanguageId): boolean {
   return language !== LANGUAGE.python && language !== LANGUAGE.generic;
+}
+
+export function supportsExplicitAny(language: LanguageId): boolean {
+  return language === LANGUAGE.typescript;
 }

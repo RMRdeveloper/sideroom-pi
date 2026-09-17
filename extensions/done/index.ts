@@ -2,14 +2,23 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from '@earendil-works/pi-coding-agent';
-import { type CheckCommand, detectCheckCommand } from './detect.ts';
-import { type ResolveCommand, registerDoneGuard } from './guard.ts';
+import {
+  type CheckCommand,
+  detectCheckCommand,
+  hasTestSetup,
+} from './detect.ts';
+import {
+  type ResolveCommand,
+  type ResolveTestSetup,
+  registerDoneGuard,
+} from './guard.ts';
 import { createDoneState, resetDoneRun } from './model.ts';
 
 // Pi loads extensions/*/index.ts through export default.
 export default function registerDone(pi: ExtensionAPI): void {
   const state = createDoneState();
   const cache = new Map<string, CheckCommand | undefined>();
+  const testCache = new Map<string, boolean>();
   const resolveCommand: ResolveCommand = (
     ctx: Pick<ExtensionContext, 'cwd'>,
   ) => {
@@ -20,8 +29,19 @@ export default function registerDone(pi: ExtensionAPI): void {
     cache.set(ctx.cwd, command);
     return command;
   };
+  const resolveTestSetup: ResolveTestSetup = (
+    ctx: Pick<ExtensionContext, 'cwd'>,
+  ) => {
+    const cached = testCache.get(ctx.cwd);
+    if (cached !== undefined) {
+      return cached;
+    }
+    const hasTests = hasTestSetup(ctx.cwd);
+    testCache.set(ctx.cwd, hasTests);
+    return hasTests;
+  };
 
-  registerDoneGuard(pi, state, resolveCommand);
+  registerDoneGuard(pi, state, resolveCommand, resolveTestSetup);
 
   pi.on('input', (event) => {
     if (event.source === 'interactive' || event.source === 'rpc') {

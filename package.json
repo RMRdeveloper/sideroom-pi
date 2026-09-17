@@ -1,6 +1,6 @@
 {
   "name": "@rmrdeveloper/sideroom-pi",
-  "version": "8.4.0",
+  "version": "8.5.0",
   "description": "Pi coding-agent package that asks clarifying questions, shows a live todo board, enforces coding guidelines, and will not call it done while your checks are red.",
   "type": "module",
   "files": [
@@ -22,6 +22,7 @@
     "format": "biome format --write extensions scripts package.json biome.json commitlint.config.mjs .changeset/config.json",
     "format:check": "biome format extensions scripts package.json biome.json commitlint.config.mjs .changeset/config.json",
     "preview": "node scripts/render-preview.mjs",
+    "cache:report": "node scripts/cache-report.mjs",
     "check:if-blocks": "node scripts/check-if-blocks.mjs",
     "check": "npm run types && npm run check:if-blocks && biome check extensions scripts package.json biome.json commitlint.config.mjs .changeset/config.json && npm test"
   },
@@ -69,7 +70,8 @@
   },
   "pi": {
     "extensions": [
-      "./extensions"
+      "./extensions",
+      "!extensions/*.test.ts"
     ],
     "skills": [
       "./skills"
