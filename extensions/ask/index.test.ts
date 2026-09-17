@@ -38,9 +38,24 @@ test('registers sideroom_ask as a sequential parent-agent tool', () => {
   assert.match(guidelines, /project fact/);
   assert.match(guidelines, /minor decision/);
   assert.match(guidelines, /architectural decision/);
+  assert.match(guidelines, /never assume it/);
+  assert.match(guidelines, /sideroom-architecture skill/);
   assert.match(guidelines, /practical consequences/);
   assert.match(guidelines, /one-line justification/);
   assert.equal(guidelines.length <= 1400, true);
+});
+
+test('keeps the architecture decision contract self-contained', () => {
+  const skillPath = join(
+    dirname(fileURLToPath(import.meta.url)),
+    '../../skills/sideroom-architecture/SKILL.md',
+  );
+  const skill = readFileSync(skillPath, 'utf8');
+
+  assert.match(skill, /Assume nothing architectural/);
+  assert.match(skill, /do not march the whole\s+catalog/);
+  assert.match(skill, /Quantify or decline/);
+  assert.match(skill, /Out of scope/);
 });
 
 test('keeps the grill decision classification self-contained', () => {
