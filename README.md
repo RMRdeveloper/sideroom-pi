@@ -52,6 +52,7 @@ Sideroom answers each one with a small, opinionated surface:
 | Invisible work | `sideroom_todo` — a live board above the editor, always one step in focus |
 | Repo pollution | Session-branch state — the board and history die with the session, never with a commit |
 | Style drift | A pre-edit gate + the on-demand `sideroom-guidelines` skill |
+| Invisible monorepo skills | `monorepo-skills` — trusted child folders join Pi's available skill list |
 | Vague plans | `sideroom-grill` — an interview that settles the words before the work |
 | Unapplied guidelines | `sideroom_rules` — mechanical checks that block or flag the lines you add |
 | Unclear answers | `sideroom_persona` — one voice: direct, plain, and free of jargon it invented |
@@ -86,6 +87,10 @@ wall of tool calls, it:
   blocked. The guides cover guard clauses, braced conditionals, fail-fast
   errors, focused units, and all 19 canonical rules without dumping them into
   the system prompt.
+- **Finds the skills below the working directory.** In a trusted monorepo, Pi
+  normally ignores project skills stored under child folders. Sideroom scans
+  three levels down, adds their `.pi/skills` and `.agents/skills`, and leaves
+  duplicate-name warnings to Pi.
 - **Cannot sneak sloppy lines past the gate.** Each write and edit is checked
   against the mechanical rules on the added lines only: braceless
   conditionals and swallowed errors block the mutation; vague names, stale
@@ -153,6 +158,19 @@ language guide under `skills/sideroom-guidelines/references/languages/`.
 Each guide mirrors all 19 rules in the canonical seed with idiomatic examples.
 The seed, `assets/artifacts/GUIDELINES_TEMPLATE.md`, is never pasted into the
 system prompt.
+
+### Monorepo skills — child skills are still project skills
+
+Pi discovers `.pi/skills` only from its working directory and
+`.agents/skills` from that directory and its ancestors. `monorepo-skills`
+closes the downward gap: in a trusted project it scans at most three child
+levels, respects `.gitignore`, `.ignore`, and `.fdignore`, and contributes the
+same skill locations without writing project configuration. Skill bodies stay
+on demand; only names, descriptions, and locations enter the system prompt.
+
+Duplicate names keep Pi's precedence and diagnostics. Root and global skills
+load before extension paths, so use `pi config -l` to disable one that shadows
+a needed child-folder skill.
 
 ### Rules — enforcement, not advice
 
@@ -272,6 +290,19 @@ languages use the shared table. Do not route around
 the gate through Bash or another file-mutation path. Before finishing, review
 the diff against the loaded guide and run the relevant project checks.
 
+### Monorepo-skills contract
+
+- Trigger: `resources_discover` after project trust resolves, in every mode.
+- Scope: `.pi/skills` and `.agents/skills` in child folders at most three
+  levels below Pi's working directory.
+- Traversal: ignore-aware, no directory symlinks, deterministic child-folder
+  order, `.pi/skills` before `.agents/skills` inside one folder.
+- Safety: untrusted projects and CLI `--no-skills`/`-ns` contribute no paths.
+- Collisions: Pi keeps the first name and reports skipped paths. Child-folder
+  skills cannot override root or user skills added earlier.
+- Prompt: one static, idempotent note prefers the skill whose location matches
+  the folder being edited.
+
 ### Rules contract
 
 - Trigger: every `write`/`edit` call, in every mode.
@@ -338,7 +369,9 @@ skills. If a third-party skill still wins, remove it from routing by adding
 `disable-model-invocation: true` to its frontmatter, or exclude its path with
 `-path` in `settings.skills`. A literal name collision keeps the first skill
 found: project `.pi/skills`, then project `.agents/skills`, then
-`~/.pi/agent/skills`, then `~/.agents/skills`, then packages.
+`~/.pi/agent/skills`, then `~/.agents/skills`, then packages. Child-folder
+paths contributed by `monorepo-skills` come later and cannot override any of
+them.
 
 ## Documentation
 

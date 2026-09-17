@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import type {
   ExtensionAPI,
@@ -9,6 +12,7 @@ import registerDone from '../done/index.ts';
 import registerExplain from '../explain/index.ts';
 import registerGuidelines from '../guidelines/index.ts';
 import registerModifiedFiles from '../modified-files/index.ts';
+import registerMonorepoSkills from '../monorepo-skills/index.ts';
 import registerPersona from '../persona/index.ts';
 import registerRules from '../rules/index.ts';
 import registerTodo from '../todo/index.ts';
@@ -16,9 +20,9 @@ import type { TodoItem, TodoParams } from '../todo/model.ts';
 
 const BASE_SYSTEM_PROMPT = 'base system prompt';
 
-// The only extensions allowed to touch the system prompt. Every other
-// extension must carry per-turn context as a session message, so the cached
-// prefix stays byte-identical while the session runs.
+// The extensions that always touch a plain system prompt. Monorepo skills adds
+// a static note only after resource discovery finds child-folder skills; the
+// cache contract for that conditional path is tested below.
 const SYSTEM_PROMPT_MUTATORS = ['guidelines', 'persona'];
 
 const EXTENSIONS: readonly ExtensionEntry[] = [
@@ -27,6 +31,7 @@ const EXTENSIONS: readonly ExtensionEntry[] = [
   ['explain', registerExplain],
   ['guidelines', registerGuidelines],
   ['modified-files', registerModifiedFiles],
+  ['monorepo-skills', registerMonorepoSkills],
   ['persona', registerPersona],
   ['rules', registerRules],
   ['todo', registerTodo],
@@ -37,7 +42,7 @@ const initialItems: readonly TodoItem[] = [
   { id: 'tests', content: 'Cover login', status: 'pending' },
 ];
 
-test('only the static reminders touch the system prompt', () => {
+test('only the always-on reminders touch a plain system prompt', () => {
   const producers: string[] = [];
   for (const entry of EXTENSIONS) {
     const harness = createHarness([entry]);
@@ -47,6 +52,32 @@ test('only the static reminders touch the system prompt', () => {
   }
 
   assert.deepEqual(producers, SYSTEM_PROMPT_MUTATORS);
+});
+
+test('monorepo skill discovery keeps the prompt byte-identical across turns', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'sideroom-prompt-cache-'));
+  try {
+    const skillDirectory = join(cwd, 'api/.pi/skills/api-guide');
+    mkdirSync(skillDirectory, { recursive: true });
+    writeFileSync(join(skillDirectory, 'SKILL.md'), 'body');
+
+    const harness = createHarness(
+      [['monorepo-skills', registerMonorepoSkills]],
+      cwd,
+    );
+    const discover = harness.handlers.get('resources_discover')?.[0];
+    assert.ok(discover);
+    discover({ cwd, reason: 'startup' } as never, harness.ctx);
+
+    const firstTurn = composeSystemPrompt(harness);
+    const secondTurn = composeSystemPrompt(harness);
+    assert.match(firstTurn.systemPrompt, /Sideroom monorepo skills/);
+    assert.equal(secondTurn.systemPrompt, firstTurn.systemPrompt);
+    assert.deepEqual(firstTurn.messages, []);
+    assert.deepEqual(secondTurn.messages, []);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
 });
 
 test('a board change leaves the composed system prompt byte-identical', async () => {
@@ -125,7 +156,10 @@ function boardMessage(composed: ComposedPrompt): string {
   return composed.messages[0]?.content ?? '';
 }
 
-function createHarness(entries: readonly ExtensionEntry[]): Harness {
+function createHarness(
+  entries: readonly ExtensionEntry[],
+  cwd = '/repo',
+): Harness {
   const handlers = new Map<string, EventHandler[]>();
   const tools = new Map<string, RegisteredTool>();
   const snapshots: unknown[] = [];
@@ -147,9 +181,10 @@ function createHarness(entries: readonly ExtensionEntry[]): Harness {
     events: { emit() {}, on() {} },
   } as unknown as ExtensionAPI;
   const ctx = {
-    cwd: '/repo',
+    cwd,
     mode: 'tui',
     hasUI: false,
+    isProjectTrusted: () => true,
     sessionManager: {
       getBranch: () => snapshots.map(boardSnapshotEntry) as never,
     },
