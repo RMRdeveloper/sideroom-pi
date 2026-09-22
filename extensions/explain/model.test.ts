@@ -3,13 +3,16 @@ import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import {
+  applyOfferDecision,
   createExplainState,
+  decideOffer,
+  EXPLAIN_DECISION,
   EXPLAIN_FILE_THRESHOLD,
   EXPLAIN_OFFER,
   type ExplainState,
   mutationPathKey,
+  recordMutation,
   resetExplainTurn,
-  shouldOfferExplanation,
 } from './model.ts';
 
 function mutatedPaths(cwd: string, count: number): readonly string[] {
@@ -20,43 +23,62 @@ function mutatedPaths(cwd: string, count: number): readonly string[] {
 
 function mutate(state: ExplainState, cwd: string, count: number): void {
   for (const pathKey of mutatedPaths(cwd, count)) {
-    state.mutatedFilesThisTurn.add(pathKey);
+    recordMutation(state, pathKey);
   }
 }
 
-test('offers in the TUI once the turn reaches the file threshold', () => {
+function settle(state: ExplainState, mode = 'tui'): void {
+  applyOfferDecision(state, decideOffer(state, mode));
+}
+
+test('defers the first settle and offers at the next one', () => {
   const state = createExplainState();
-  assert.equal(shouldOfferExplanation(state, 'tui'), false);
+  mutate(state, '/work', EXPLAIN_FILE_THRESHOLD);
+  assert.equal(decideOffer(state, 'tui'), EXPLAIN_DECISION.defer);
+  settle(state);
+  assert.equal(decideOffer(state, 'tui'), EXPLAIN_DECISION.send);
+  settle(state);
+  assert.equal(state.offeredThisTurn, true);
+  assert.equal(decideOffer(state, 'tui'), EXPLAIN_DECISION.none);
+});
 
-  mutate(state, '/work', EXPLAIN_FILE_THRESHOLD - 1);
-  assert.equal(shouldOfferExplanation(state, 'tui'), false);
+test('offers after a review turn that crosses the threshold', () => {
+  const state = createExplainState();
+  mutate(state, '/work', EXPLAIN_FILE_THRESHOLD - 3);
+  assert.equal(decideOffer(state, 'tui'), EXPLAIN_DECISION.defer);
+  settle(state);
 
-  const thresholdPath = mutationPathKey('/work', 'src/last.ts');
-  assert.ok(thresholdPath);
-  state.mutatedFilesThisTurn.add(thresholdPath);
-  assert.equal(shouldOfferExplanation(state, 'tui'), true);
-
-  state.offeredThisTurn = true;
-  assert.equal(shouldOfferExplanation(state, 'tui'), false);
+  for (const path of ['src/late-a.ts', 'src/late-b.ts', 'src/late-c.ts']) {
+    const pathKey = mutationPathKey('/work', path);
+    assert.ok(pathKey);
+    recordMutation(state, pathKey);
+  }
+  assert.equal(decideOffer(state, 'tui'), EXPLAIN_DECISION.send);
+  settle(state);
 });
 
 test('stays silent outside the TUI, where sideroom_ask cannot run', () => {
   const state = createExplainState();
   mutate(state, '/work', EXPLAIN_FILE_THRESHOLD);
   for (const mode of ['rpc', 'json', 'print']) {
-    assert.equal(shouldOfferExplanation(state, mode), false, mode);
+    assert.equal(decideOffer(state, mode), EXPLAIN_DECISION.none, mode);
+    settle(state, mode);
   }
 });
 
 test('re-arms on the next user prompt', () => {
   const state = createExplainState();
   mutate(state, '/work', EXPLAIN_FILE_THRESHOLD);
-  state.offeredThisTurn = true;
+  settle(state);
+  settle(state);
+  assert.equal(state.offeredThisTurn, true);
 
   resetExplainTurn(state);
   assert.equal(state.mutatedFilesThisTurn.size, 0);
+  assert.equal(state.mutatedSinceSettle, false);
+  assert.equal(state.pendingOffer, false);
   assert.equal(state.offeredThisTurn, false);
-  assert.equal(shouldOfferExplanation(state, 'tui'), false);
+  assert.equal(decideOffer(state, 'tui'), EXPLAIN_DECISION.none);
 });
 
 test('keys one file once however the model spelled its path', () => {

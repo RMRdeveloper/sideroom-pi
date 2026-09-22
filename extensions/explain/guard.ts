@@ -4,12 +4,15 @@ import {
   isWriteToolResult,
 } from '@earendil-works/pi-coding-agent';
 import {
+  applyOfferDecision,
+  decideOffer,
+  EXPLAIN_DECISION,
   EXPLAIN_OFFER,
   EXPLAIN_OFFER_TYPE,
   type ExplainState,
   mutationPathKey,
+  recordMutation,
   resetExplainTurn,
-  shouldOfferExplanation,
 } from './model.ts';
 
 interface FileToolInput {
@@ -40,16 +43,17 @@ export function registerExplainGuard(
     if (pathKey === undefined) {
       return;
     }
-    state.mutatedFilesThisTurn.add(pathKey);
+    recordMutation(state, pathKey);
   });
 
   // agent_settled is the only point with no retry, compaction, or queued
   // continuation left, so the walkthrough is never offered over reworked work.
   pi.on('agent_settled', (_event, ctx) => {
-    if (!shouldOfferExplanation(state, ctx.mode)) {
+    const decision = decideOffer(state, ctx.mode);
+    applyOfferDecision(state, decision);
+    if (decision !== EXPLAIN_DECISION.send) {
       return;
     }
-    state.offeredThisTurn = true;
     pi.sendMessage(
       {
         customType: EXPLAIN_OFFER_TYPE,
