@@ -17,6 +17,10 @@ interface RegisteredTool {
 interface Harness {
   readonly handlers: Map<string, EventHandler>;
   readonly steers: string[];
+  readonly steerOptions: (
+    | { triggerTurn?: boolean; deliverAs?: string }
+    | undefined
+  )[];
   readonly statuses: (string | undefined)[];
   readonly tool: RegisteredTool | undefined;
   readonly cwd: string;
@@ -25,6 +29,10 @@ interface Harness {
 function register(): Harness {
   const handlers = new Map<string, EventHandler>();
   const steers: string[] = [];
+  const steerOptions: (
+    | { triggerTurn?: boolean; deliverAs?: string }
+    | undefined
+  )[] = [];
   const statuses: (string | undefined)[] = [];
   let tool: RegisteredTool | undefined;
   const api = {
@@ -34,14 +42,19 @@ function register(): Harness {
     registerTool(definition: RegisteredTool) {
       tool = definition;
     },
-    sendMessage(message: { content: string }) {
+    sendMessage(
+      message: { content: string },
+      options?: { triggerTurn?: boolean; deliverAs?: string },
+    ) {
       steers.push(message.content);
+      steerOptions.push(options);
     },
   } as unknown as ExtensionAPI;
   registerPersona(api);
   return {
     handlers,
     steers,
+    steerOptions,
     statuses,
     tool,
     cwd: mkdtempSync(join(tmpdir(), 'sideroom-persona-')),
@@ -143,18 +156,49 @@ test('steers at most three times per run and resets on the next prompt', () => {
   try {
     const messageEnd = handlerOf(harness, 'message_end');
     const event = () => assistantEvent('Great question! Here it is.');
+    const ctx = context(harness.cwd, harness.statuses);
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      messageEnd(event());
+      messageEnd(event(), ctx);
     }
     assert.equal(harness.steers.length, 3);
+    for (const options of harness.steerOptions) {
+      assert.equal(options?.triggerTurn, true);
+      assert.equal(options?.deliverAs, 'steer');
+    }
 
     handlerOf(harness, 'before_agent_start')(
       { systemPrompt: 'base' } as never,
       context(harness.cwd, harness.statuses),
     );
-    messageEnd(event());
+    messageEnd(event(), ctx);
     assert.equal(harness.steers.length, 4);
+  } finally {
+    rmSync(harness.cwd, { recursive: true, force: true });
+  }
+});
+
+test('counts blocks and steers for the current run', () => {
+  const harness = register();
+  try {
+    const toolCall = handlerOf(harness, 'tool_call');
+    const messageEnd = handlerOf(harness, 'message_end');
+    const ctx = context(harness.cwd, harness.statuses);
+
+    toolCall(writeEvent('src/icon.ts', 'const icon = "\u{1F525}";\n'), ctx);
+    assert.equal(harness.statuses.at(-1), 'persona: direct · 1 block');
+
+    messageEnd(assistantEvent('Great question! Here it is.'), ctx);
+    assert.equal(
+      harness.statuses.at(-1),
+      'persona: direct · 1 block · 1 steer',
+    );
+
+    handlerOf(harness, 'before_agent_start')(
+      { systemPrompt: 'base' } as never,
+      ctx,
+    );
+    assert.equal(harness.statuses.at(-1), 'persona: direct');
   } finally {
     rmSync(harness.cwd, { recursive: true, force: true });
   }

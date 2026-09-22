@@ -11,6 +11,7 @@ import registerAsk from '../ask/index.ts';
 import registerDone from '../done/index.ts';
 import registerExplain from '../explain/index.ts';
 import registerGuidelines from '../guidelines/index.ts';
+import registerJev from '../jev/index.ts';
 import registerModifiedFiles from '../modified-files/index.ts';
 import registerMonorepoSkills from '../monorepo-skills/index.ts';
 import registerPersona from '../persona/index.ts';
@@ -30,6 +31,7 @@ const EXTENSIONS: readonly ExtensionEntry[] = [
   ['done', registerDone],
   ['explain', registerExplain],
   ['guidelines', registerGuidelines],
+  ['jev', registerJev],
   ['modified-files', registerModifiedFiles],
   ['monorepo-skills', registerMonorepoSkills],
   ['persona', registerPersona],

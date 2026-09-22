@@ -5,11 +5,23 @@ import {
   resetGuidelineReadState,
 } from './guard.ts';
 import { appendGuidelinesReminder } from './prompt.ts';
+import {
+  createReviewState,
+  registerReviewGuard,
+  resetReviewTurn,
+} from './review.ts';
 
 // Pi loads extensions/*/index.ts through export default.
 export default function registerGuidelines(pi: ExtensionAPI): void {
   const readState = createGuidelineReadState();
   registerGuidelineGuard(pi, readState);
+
+  const reviewState = createReviewState();
+  registerReviewGuard(pi, reviewState);
+  pi.on('session_start', () => {
+    resetGuidelineReadState(readState);
+    resetReviewTurn(reviewState);
+  });
 
   pi.on('before_agent_start', (event) => {
     resetGuidelineReadState(readState);

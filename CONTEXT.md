@@ -107,3 +107,39 @@ _Avoid: nested project, subproject._
 A skill stored in a monorepo child folder and added to the session by the `monorepo-skills` extension. Pi's normal project-skill discovery does not walk down to find it.
 
 _Avoid: child skill, nested skill, workspace skill._
+
+## Steer
+
+A private, hidden message a guard sends to correct the agent's behavior, carrying `display: false` and `triggerTurn: true` so it starts the turn that applies it. It never blocks a mutation on its own.
+
+_Avoid: reminder, warning, system message._
+
+## Review steer
+
+The `guidelines` steer sent at most once per turn when the settle follows a successful mutation, asking the agent to re-check every changed file against the loaded language guide and run the project checks. It is separate from the work-board nudge and watchdog.
+
+_Avoid: review reminder, quality gate message._
+
+## Walkthrough offer
+
+The `explain` steer that asks the agent to offer a walkthrough through `sideroom_ask` after a substantial settle. It waits one settle behind the review steer so the review always runs first.
+
+_Avoid: summary offer, explanation prompt._
+
+## Jev finding
+
+One guide rule Jev scored at or above the cutoff on a changed file, appended to the tool result as a note. A finding never blocks the mutation.
+
+_Avoid: Jev error, violation, Jev warning._
+
+## Voice rule
+
+One of the persona's six rules for user-facing prose, from `plain-language` to `user-language`. A voice rule is corrected with a steer; it does not block a mutation.
+
+_Avoid: style rule, tone rule._
+
+## Prohibition
+
+One of the persona's four hard restrictions. An artifact prohibition blocks a `write`/`edit` that adds the forbidden content, degrading to a steer after repeated fires; a prose prohibition steers only.
+
+_Avoid: ban, hard rule._

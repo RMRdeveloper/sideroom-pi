@@ -15,8 +15,7 @@ export const GUIDELINES_REMINDER = `${GUIDELINES_REMINDER_HEADING}
 Before the first write or edit in each agent run, use the read tool without offset or limit to load these files in full:
 - ${GUIDELINE_SKILL_PATH}
 - for the extension of the file you will change, one of: ${LANGUAGE_GUIDE_INDEX}
-A required read counts only when it succeeds without truncation. Until all required reads succeed, do not call write or edit and do not mutate files through bash or another tool; the extension blocks those mutations.
-After changing files, review the code against the loaded guide and run the relevant formatter, linter, type checks, and tests.`;
+A required read counts only when it succeeds without truncation. Until all required reads succeed, do not call write or edit and do not mutate files through bash or another tool; the extension blocks those mutations.`;
 
 export function appendGuidelinesReminder(systemPrompt: string): string {
   if (systemPrompt.includes(GUIDELINES_REMINDER_HEADING)) {

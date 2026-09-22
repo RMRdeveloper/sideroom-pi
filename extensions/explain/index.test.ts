@@ -82,9 +82,12 @@ function settle(harness: Harness, mode = 'tui'): void {
   handlerOf(harness, 'agent_settled')({} as never, { mode } as never);
 }
 
-test('offers the walkthrough once the turn reaches the file threshold', () => {
+test('defers one settle, then offers at the file threshold', () => {
   const harness = register();
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
+  settle(harness);
+  assert.equal(harness.offers.length, 0);
+
   settle(harness);
   assert.equal(harness.offers.length, 1);
   assert.match(harness.offers[0]?.content ?? '', /sideroom_ask/);
@@ -92,11 +95,26 @@ test('offers the walkthrough once the turn reaches the file threshold', () => {
   assert.equal(harness.offers[0]?.deliverAs, 'steer');
 });
 
+test('offers after a review turn that crosses the threshold', () => {
+  const harness = register();
+  mutateFile(harness, 'src/a.ts');
+  mutateFile(harness, 'src/b.ts');
+  settle(harness);
+  assert.equal(harness.offers.length, 0);
+
+  mutateFile(harness, 'src/c.ts');
+  mutateFile(harness, 'src/d.ts');
+  mutateFile(harness, 'src/e.ts');
+  settle(harness);
+  assert.equal(harness.offers.length, 1);
+});
+
 test('stays silent below the file threshold', () => {
   const harness = register();
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD - 1);
   settle(harness);
-  assert.deepEqual(harness.offers, []);
+  settle(harness);
+  assert.equal(harness.offers.length, 0);
 });
 
 test('counts a file mutated twice once', () => {
@@ -105,13 +123,15 @@ test('counts a file mutated twice once', () => {
     mutateFile(harness, 'src/app.ts', 'edit');
   }
   settle(harness);
-  assert.deepEqual(harness.offers, []);
+  settle(harness);
+  assert.equal(harness.offers.length, 0);
 });
 
 test('treats an edit the same as a write', () => {
   const harness = register();
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD - 1);
   mutateFile(harness, 'src/edited.ts', 'edit');
+  settle(harness);
   settle(harness);
   assert.equal(harness.offers.length, 1);
 });
@@ -123,7 +143,8 @@ test('counts one file once however the model spelled its path', () => {
   mutateFile(harness, './src/app.ts');
   mutateFile(harness, '/work/src/app.ts');
   settle(harness);
-  assert.deepEqual(harness.offers, []);
+  settle(harness);
+  assert.equal(harness.offers.length, 0);
 });
 
 test('stays silent without a mutation', () => {
@@ -133,26 +154,33 @@ test('stays silent without a mutation', () => {
     { cwd: CWD } as never,
   );
   settle(harness);
-  assert.deepEqual(harness.offers, []);
+  settle(harness);
+  assert.equal(harness.offers.length, 0);
 });
 
 test('ignores a failed mutation', () => {
   const harness = register();
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD, 'write', true);
   settle(harness);
-  assert.deepEqual(harness.offers, []);
+  settle(harness);
+  assert.equal(harness.offers.length, 0);
 });
 
 test('stays silent outside the TUI', () => {
   const harness = register();
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
   settle(harness, 'print');
-  assert.deepEqual(harness.offers, []);
+  settle(harness, 'print');
+  assert.equal(harness.offers.length, 0);
 });
 
 test('offers at most once per turn and re-arms on the next prompt', () => {
   const harness = register();
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
+
+  settle(harness);
+  settle(harness);
+  assert.equal(harness.offers.length, 1);
 
   settle(harness);
   settle(harness);
@@ -164,6 +192,7 @@ test('offers at most once per turn and re-arms on the next prompt', () => {
 
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
   settle(harness);
+  settle(harness);
   assert.equal(harness.offers.length, 2);
 });
 
@@ -172,15 +201,18 @@ test('clears the turn state when a session starts', () => {
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
   handlerOf(harness, 'session_start')({} as never);
   settle(harness);
-  assert.deepEqual(harness.offers, []);
+  settle(harness);
+  assert.equal(harness.offers.length, 0);
 });
 
 test('ignores a non-user input source when re-arming', () => {
   const harness = register();
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
   settle(harness);
+  settle(harness);
 
   handlerOf(harness, 'input')({ source: 'extension' } as never);
+  settle(harness);
   settle(harness);
   assert.equal(harness.offers.length, 1);
 });

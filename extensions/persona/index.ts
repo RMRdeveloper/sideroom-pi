@@ -11,7 +11,7 @@ import {
   registerPersonaGuard,
   resetPersonaRun,
 } from './guard.ts';
-import { PERSONA_STATUS_LABEL } from './model.ts';
+import { personaStatusLabel } from './model.ts';
 import { appendPersonaReminder } from './prompt.ts';
 
 export const PERSONA_DESCRIPTION =
@@ -22,7 +22,16 @@ export const PERSONA_PROMPT_SNIPPET = 'Read the active Sideroom persona.';
 // Pi loads extensions/*/index.ts through export default.
 export default function registerPersona(pi: ExtensionAPI): void {
   const state = createPersonaGuardState();
-  registerPersonaGuard(pi, state);
+  const publishStatus = (ctx: ExtensionContext): void => {
+    if (!ctx.hasUI) {
+      return;
+    }
+    ctx.ui.setStatus(
+      PERSONA_STATUS_KEY,
+      personaStatusLabel(state.blocksThisRun, state.steersThisRun),
+    );
+  };
+  registerPersonaGuard(pi, state, publishStatus);
 
   pi.on('session_start', (_event, ctx) => publishStatus(ctx));
 
@@ -67,11 +76,4 @@ export default function registerPersona(pi: ExtensionAPI): void {
       );
     },
   });
-}
-
-function publishStatus(ctx: ExtensionContext): void {
-  if (!ctx.hasUI) {
-    return;
-  }
-  ctx.ui.setStatus(PERSONA_STATUS_KEY, PERSONA_STATUS_LABEL);
 }

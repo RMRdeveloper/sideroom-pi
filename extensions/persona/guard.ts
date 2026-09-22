@@ -1,10 +1,11 @@
-import { readFileSync } from 'node:fs';
 import {
   type ExtensionAPI,
+  type ExtensionContext,
   isToolCallEventType,
   type ToolCallEvent,
 } from '@earendil-works/pi-coding-agent';
 import { resolveFileToolPath } from '../shared/file-path.ts';
+import { readFileIfExists } from '../shared/read-file.ts';
 import {
   PERSONA_STEER_TYPE,
   type ProhibitionId,
@@ -38,29 +39,41 @@ export interface PersonaGuardState {
   readonly fires: Map<ProhibitionId, number>;
   cleanMutations: number;
   steersThisRun: number;
+  blocksThisRun: number;
 }
 
 export function createPersonaGuardState(): PersonaGuardState {
-  return { fires: new Map(), cleanMutations: 0, steersThisRun: 0 };
+  return {
+    fires: new Map(),
+    cleanMutations: 0,
+    steersThisRun: 0,
+    blocksThisRun: 0,
+  };
 }
 
 export function resetPersonaRun(state: PersonaGuardState): void {
   state.steersThisRun = 0;
+  state.blocksThisRun = 0;
 }
 
 export function registerPersonaGuard(
   pi: ExtensionAPI,
   state: PersonaGuardState,
+  report: (ctx: ExtensionContext) => void,
 ): void {
   pi.on('tool_call', (event, ctx) => {
     const mutation = extractMutation(event, ctx.cwd);
     if (mutation === undefined) {
       return undefined;
     }
-    return applyArtifactOutcome(pi, state, mutation);
+    const blockDecision = applyArtifactOutcome(pi, state, mutation);
+    if (blockDecision !== undefined) {
+      report(ctx);
+    }
+    return blockDecision;
   });
 
-  pi.on('message_end', (event) => {
+  pi.on('message_end', (event, ctx) => {
     if (event.message.role !== 'assistant') {
       return undefined;
     }
@@ -73,6 +86,7 @@ export function registerPersonaGuard(
     }
 
     sendPersonaSteer(pi, state, formatSteer(violations));
+    report(ctx);
     return undefined;
   });
 }
@@ -92,6 +106,7 @@ function applyArtifactOutcome(
     (violation) => !isDegraded(state, violation.prohibition.id),
   );
   if (blocking.length > 0) {
+    state.blocksThisRun += 1;
     for (const violation of blocking) {
       incrementFires(state, violation.prohibition.id);
     }
@@ -126,17 +141,6 @@ function extractMutation(
   return undefined;
 }
 
-function readFileIfExists(path: string): string | undefined {
-  try {
-    return readFileSync(path, 'utf8');
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-      return undefined;
-    }
-    throw error;
-  }
-}
-
 function isDegraded(state: PersonaGuardState, id: ProhibitionId): boolean {
   return (state.fires.get(id) ?? 0) >= BLOCK_DEGRADE_AFTER;
 }
@@ -156,7 +160,7 @@ function sendPersonaSteer(
   state.steersThisRun += 1;
   pi.sendMessage(
     { customType: PERSONA_STEER_TYPE, content, display: false },
-    { deliverAs: 'steer' },
+    { triggerTurn: true, deliverAs: 'steer' },
   );
 }
 
