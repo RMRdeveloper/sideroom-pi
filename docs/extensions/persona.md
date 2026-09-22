@@ -8,17 +8,20 @@ and no project config is read; the persona ships with the package.
 
 There are no profiles and nothing to switch. No profile state is persisted and
 `appendEntry` is not used. Block and steer counters exist only in memory. The
-footer status is derived from the catalog.
+footer shows the current run's counts, or `persona: direct` while the run is
+clean.
 
 ## Voice rules
 
+Array order sets how the rules read in the reminder; `plain-language` comes first.
+
 | Rule id | Instruction |
 | --- | --- |
+| `plain-language` | Plain words: subject and goal before the detail; everyday terms over concept jargon unless the user used them; define a necessary term in one line; explicit without repetition; no tangled chains such as "the registry resolves the provider through the auth resolver". |
 | `direct` | Direct and dry. Short sentences. No preamble, no closing summary. |
-| `no-filler` | Never restate what was just said and never announce what is about to be said. |
-| `plain-language` | Leave no doubt about what is being discussed: name the subject and the goal before the detail, define an unfamiliar term in one line, and be explicit without becoming redundant. |
-| `no-invented-terms` | Name things as they are. No intermediate terms, abbreviations, or codenames the user did not ask for. |
-| `short-prose` | Prose by default; lists or tables only to compare options or list more than three items. |
+| `no-filler` | No filler. |
+| `no-invented-terms` | Name things as they are. Coin no intermediate term, abbreviation, codename, or technical concept word the user did not ask for. |
+| `short-prose` | Default to short prose. Lists or tables only to compare options or list more than three items. |
 | `user-language` | Answer in the user's language and variant. |
 
 ## Hard prohibitions
@@ -44,9 +47,13 @@ trademark, or registration stay valid.
 after the other extensions and skipped when the heading is already present.
 Because it runs on every user prompt, the reminder comes back after compaction
 with no extra hook. The reminder restates the catalog instead of duplicating
-it, so catalog edits propagate. The tool deliberately has no
-`promptGuidelines`: they repeated the same rules in another system-prompt
-section without changing the result.
+it, so catalog edits propagate. It also carries two static Do/Don't example
+pairs (`PERSONA_EXAMPLES` in `prompt.ts`): one against tangled technical
+chains, one against concept jargon. The pairs are module-level literals with
+no per-turn data, so the reminder stays byte-identical across turns and the
+provider prompt cache holds; only a package release changes the prefix. The
+tool deliberately has no `promptGuidelines`: they repeated the same rules in
+another system-prompt section without changing the result.
 
 `sideroom_persona` takes no arguments and returns the full detail: every voice
 rule and every prohibition with its enforcement mode. With one voice there is
@@ -63,6 +70,8 @@ nothing to select, so the tool has no action parameter.
   after degradation the mutation passes and a steer asks for a corrective edit.
 - **Prose.** `message_end` inspects the finished assistant message through
   `assistantMessageText` and sends one corrective steer per violating message.
+  Steers pass `{ triggerTurn: true, deliverAs: 'steer' }` so a correction still
+  reaches the model when the run is already idle.
 
 ### Circuit breaker
 
@@ -72,6 +81,8 @@ nothing to select, so the tool has no action parameter.
   violations do not count as clean.
 - Steers stop after `STEER_LIMIT_PER_RUN = 3` per agent run; the counter resets
   on `before_agent_start`.
+- The footer shows `blocksThisRun` and `steersThisRun`, and both reset on
+  `before_agent_start`.
 
 ## Files
 
@@ -89,6 +100,8 @@ nothing to select, so the tool has no action parameter.
 ## Tests
 
 `checks.test.ts` covers hits, semantic text symbols, misses, and scope
-filtering. `prompt.test.ts` covers the idempotent append. `model.test.ts` covers
-the formatters and message extraction. `index.test.ts` covers blocking, path
-aliases, degradation, the steer cap, and the status.
+filtering. `prompt.test.ts` covers the idempotent append, both example pairs,
+and the reminder length budget. `model.test.ts` covers the formatters and
+message extraction. `index.test.ts` covers blocking, path aliases, degradation,
+the steer cap and its `triggerTurn` options, the per-run footer counts, and the
+status.

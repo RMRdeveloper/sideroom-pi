@@ -11,6 +11,7 @@ import {
 } from './catalog.ts';
 import {
   appendPersonaReminder,
+  PERSONA_EXAMPLES,
   PERSONA_REMINDER,
   PERSONA_REMINDER_HEADING,
 } from './prompt.ts';
@@ -36,7 +37,30 @@ test('restates the catalog instead of duplicating it', () => {
   }
   assert.equal(PERSONA_REMINDER.includes(PERSONA_TOOL_NAME), true);
   assert.equal(PERSONA_REMINDER.includes(PERSONA_SKILL_PATH), true);
-  assert.equal(PERSONA_REMINDER.length - PERSONA_SKILL_PATH.length < 975, true);
+  // Static examples plus the catalog restatement. The budget guards against
+  // unbounded growth; prompt caching cares about byte-stability, not length.
+  assert.equal(
+    PERSONA_REMINDER.length - PERSONA_SKILL_PATH.length < 1500,
+    true,
+  );
+});
+
+test("ships both static Do/Don't example pairs with no per-turn data", () => {
+  assert.equal(PERSONA_EXAMPLES.length, 2);
+  assert.match(PERSONA_REMINDER, /Examples:\n/);
+  for (const example of PERSONA_EXAMPLES) {
+    assert.match(example, /^Do: /);
+    assert.match(example, /Don't: /);
+    assert.equal(PERSONA_REMINDER.includes(example), true, example);
+  }
+  assert.match(
+    PERSONA_EXAMPLES[0],
+    /auth resolver pipeline/,
+    'tangled chain pair',
+  );
+  assert.match(PERSONA_EXAMPLES[1], /lifecycle hook/, 'concept jargon pair');
+  // Reminder must not pick up session-specific values.
+  assert.doesNotMatch(PERSONA_REMINDER, /\d{4}-\d{2}-\d{2}/);
 });
 
 test('ships a skill that fits one read and stays in sync', () => {
@@ -49,9 +73,12 @@ test('ships a skill that fits one read and stays in sync', () => {
   for (const prohibition of PROHIBITIONS) {
     assert.equal(skill.includes(prohibition.id), true, prohibition.id);
   }
-  assert.match(skill, /Plain means no doubt, not more words/);
+  assert.match(skill, /Plain means everyday words, not more words/);
   assert.match(skill, /fires three times degrades to a steer/);
-  assert.match(skill, /three steers are sent per agent run/);
+  assert.match(skill, /three steers are sent per\s+agent run/);
+  assert.match(skill, /triggerTurn: true/);
+  assert.match(skill, /auth resolver pipeline/);
+  assert.match(skill, /lifecycle hook/);
 });
 
 test('keeps the packaged skill path inside the repository', () => {
