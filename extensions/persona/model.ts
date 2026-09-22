@@ -20,7 +20,23 @@ export interface PersonaToolDetails {
   readonly prohibitions: readonly string[];
 }
 
-export const PERSONA_STATUS_LABEL = `persona: direct, ${String(PROHIBITIONS.length)} prohibitions`;
+export function personaStatusLabel(blocks: number, steers: number): string {
+  const counts = [
+    countLabel(blocks, 'block'),
+    countLabel(steers, 'steer'),
+  ].filter((count) => count.length > 0);
+  if (counts.length === 0) {
+    return 'persona: direct';
+  }
+  return `persona: direct · ${counts.join(' · ')}`;
+}
+
+function countLabel(count: number, noun: string): string {
+  if (count === 0) {
+    return '';
+  }
+  return `${String(count)} ${noun}${count === 1 ? '' : 's'}`;
+}
 
 export function personaToolDetails(): PersonaToolDetails {
   return {
@@ -82,7 +98,7 @@ export function formatSteer(
       (violation) =>
         `- ${violation.prohibition.rule} Found: "${violation.excerpt}"`,
     ),
-    'Rewrite it plainly: name the subject and goal before details, without ambiguity or repetition.',
+    'Rewrite in plain words: subject and goal first, everyday terms, no concept jargon the user did not use.',
   ].join('\n');
 }
 

@@ -91,6 +91,8 @@ function resetTurnState(runState: TodoRunState): void {
   runState.turnMutated = false;
   runState.turnCalledTodo = false;
   runState.updateWatchdogThisTurn = false;
+  // A steer only silences the turn that sent it; later turns may steer again.
+  runState.steerFromUs = false;
 }
 
 function sendSteer(

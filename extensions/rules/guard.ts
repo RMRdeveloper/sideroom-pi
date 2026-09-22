@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   type ExtensionAPI,
@@ -7,6 +6,7 @@ import {
   isWriteToolResult,
   type ToolCallEvent,
 } from '@earendil-works/pi-coding-agent';
+import { readFileIfExists } from '../shared/read-file.ts';
 import { languageForPath, type RuleId, SEVERITY } from './catalog.ts';
 import { evaluateAddedLines } from './checks.ts';
 import {
@@ -162,21 +162,6 @@ function extractEdit(
     lines.push(...addedLines(edit.oldText, edit.newText));
   }
   return { path, language: languageForPath(path), lines };
-}
-
-function readFileIfExists(path: string): string | undefined {
-  try {
-    return readFileSync(path, 'utf8');
-  } catch (error) {
-    if (isMissingFile(error)) {
-      return undefined;
-    }
-    throw error;
-  }
-}
-
-function isMissingFile(error: unknown): boolean {
-  return error instanceof Error && 'code' in error && error.code === 'ENOENT';
 }
 
 function isDegraded(state: RulesState, ruleId: RuleId): boolean {

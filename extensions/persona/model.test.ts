@@ -8,7 +8,7 @@ import {
   formatBlockReason,
   formatPersonaDetail,
   formatSteer,
-  PERSONA_STATUS_LABEL,
+  personaStatusLabel,
   personaToolDetails,
 } from './model.ts';
 
@@ -35,8 +35,16 @@ test('reports the tool details as catalog ids', () => {
     details.prohibitions,
     PROHIBITIONS.map((prohibition) => prohibition.id),
   );
-  assert.match(PERSONA_STATUS_LABEL, /^persona: direct/);
-  assert.match(PERSONA_STATUS_LABEL, /4 prohibitions/);
+});
+
+test('labels the footer with the current run counts', () => {
+  assert.equal(personaStatusLabel(0, 0), 'persona: direct');
+  assert.equal(personaStatusLabel(1, 0), 'persona: direct · 1 block');
+  assert.equal(
+    personaStatusLabel(2, 1),
+    'persona: direct · 2 blocks · 1 steer',
+  );
+  assert.equal(personaStatusLabel(0, 3), 'persona: direct · 3 steers');
 });
 
 test('formats the artifact block and its degraded steer', () => {
@@ -59,7 +67,9 @@ test('formats a steer that asks for a rewrite', () => {
   );
   assert.match(steer, /sideroom_persona/);
   assert.match(steer, /Great question!/);
-  assert.match(steer, /Rewrite it plainly/);
+  assert.match(steer, /Rewrite in plain words/);
+  assert.match(steer, /everyday terms/);
+  assert.match(steer, /no concept jargon/);
 });
 
 test('reads only text blocks out of a message', () => {

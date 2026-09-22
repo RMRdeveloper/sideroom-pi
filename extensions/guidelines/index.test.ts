@@ -17,7 +17,7 @@ test('injects the guidelines reminder once per system prompt', () => {
   const handlers = new Map<string, EventHandler>();
   const api = {
     on(name: string, handler: EventHandler) {
-      handlers.set(name, handler);
+      chain(handlers, name, handler);
     },
   } as unknown as ExtensionAPI;
 
@@ -47,7 +47,7 @@ test('requires completed reads before a later tool round can mutate', () => {
   const api = {
     getActiveTools: () => activeTools,
     on(name: string, handler: EventHandler) {
-      handlers.set(name, handler);
+      chain(handlers, name, handler);
     },
   } as unknown as ExtensionAPI;
 
@@ -167,7 +167,7 @@ test('resolves relative and dotted guide paths against the session cwd', () => {
   const api = {
     getActiveTools: () => ['read', 'edit', 'write'],
     on(name: string, handler: EventHandler) {
-      handlers.set(name, handler);
+      chain(handlers, name, handler);
     },
   } as unknown as ExtensionAPI;
 
@@ -217,7 +217,7 @@ test('resolves symlinked guide paths to the catalog location', {
   const api = {
     getActiveTools: () => ['read', 'edit', 'write'],
     on(name: string, handler: EventHandler) {
-      handlers.set(name, handler);
+      chain(handlers, name, handler);
     },
   } as unknown as ExtensionAPI;
 
@@ -273,7 +273,7 @@ test('resets the gate after compaction so stale reads cannot authorize mutations
   const api = {
     getActiveTools: () => ['read', 'edit', 'write'],
     on(name: string, handler: EventHandler) {
-      handlers.set(name, handler);
+      chain(handlers, name, handler);
     },
   } as unknown as ExtensionAPI;
 
@@ -337,3 +337,21 @@ test('maps every catalog extension to its language guide', () => {
 
 type EventHandler = (event: never, ctx?: never) => unknown;
 type GuardResult = { block?: boolean; reason?: string } | undefined;
+
+// Pi chains handlers registered for the same event; the review guard and the
+// read gate both subscribe to tool_result, so tests must compose them.
+function chain(
+  handlers: Map<string, EventHandler>,
+  name: string,
+  handler: EventHandler,
+): void {
+  const existing = handlers.get(name);
+  if (existing === undefined) {
+    handlers.set(name, handler);
+    return;
+  }
+  handlers.set(name, ((event: never, ctx: never) => {
+    const earlierOutcome = existing(event, ctx);
+    return handler(event, ctx) ?? earlierOutcome;
+  }) as EventHandler);
+}

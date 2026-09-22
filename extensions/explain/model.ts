@@ -11,17 +11,35 @@ const TUI_MODE = 'tui';
 export const EXPLAIN_OFFER =
   "Use sideroom_ask for one question in the user's language with four parallel options: changes only, test steps only, both, or no explanation. Recommend changes only.";
 
+export const EXPLAIN_DECISION = {
+  send: 'send',
+  defer: 'defer',
+  none: 'none',
+} as const;
+
+export type ExplainDecision =
+  (typeof EXPLAIN_DECISION)[keyof typeof EXPLAIN_DECISION];
+
 export interface ExplainState {
   mutatedFilesThisTurn: Set<string>;
+  mutatedSinceSettle: boolean;
+  pendingOffer: boolean;
   offeredThisTurn: boolean;
 }
 
 export function createExplainState(): ExplainState {
-  return { mutatedFilesThisTurn: new Set(), offeredThisTurn: false };
+  return {
+    mutatedFilesThisTurn: new Set(),
+    mutatedSinceSettle: false,
+    pendingOffer: false,
+    offeredThisTurn: false,
+  };
 }
 
 export function resetExplainTurn(state: ExplainState): void {
   state.mutatedFilesThisTurn.clear();
+  state.mutatedSinceSettle = false;
+  state.pendingOffer = false;
   state.offeredThisTurn = false;
 }
 
@@ -31,14 +49,45 @@ export function mutationPathKey(cwd: string, path: string): string | undefined {
   return resolveFileToolPath(cwd, path);
 }
 
-// sideroom_ask rejects every mode but the TUI, so the offer is gated the same way.
-export function shouldOfferExplanation(
+export function recordMutation(state: ExplainState, pathKey: string): void {
+  state.mutatedFilesThisTurn.add(pathKey);
+  state.mutatedSinceSettle = true;
+}
+
+// The guidelines review steers at the first settle after a mutation, and
+// agent_settled runs both deferred steers in extension load order. Explain
+// holds its own steer back one settle so the review always runs first.
+export function decideOffer(
   state: ExplainState,
   mode: string,
-): boolean {
-  return (
+): ExplainDecision {
+  const thresholdReached =
     mode === TUI_MODE &&
-    state.mutatedFilesThisTurn.size >= EXPLAIN_FILE_THRESHOLD &&
-    !state.offeredThisTurn
-  );
+    !state.offeredThisTurn &&
+    state.mutatedFilesThisTurn.size >= EXPLAIN_FILE_THRESHOLD;
+  if (state.pendingOffer && thresholdReached) {
+    return EXPLAIN_DECISION.send;
+  }
+  if (
+    thresholdReached ||
+    (mode === TUI_MODE && state.mutatedSinceSettle && !state.offeredThisTurn)
+  ) {
+    return EXPLAIN_DECISION.defer;
+  }
+  return EXPLAIN_DECISION.none;
+}
+
+export function applyOfferDecision(
+  state: ExplainState,
+  decision: ExplainDecision,
+): void {
+  if (decision === EXPLAIN_DECISION.send) {
+    state.offeredThisTurn = true;
+    state.pendingOffer = false;
+  } else if (decision === EXPLAIN_DECISION.defer) {
+    state.pendingOffer = true;
+  } else {
+    state.pendingOffer = false;
+  }
+  state.mutatedSinceSettle = false;
 }

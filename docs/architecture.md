@@ -20,22 +20,24 @@ registration function with an `ExtensionAPI`. The manifest wires this up:
 
 Helper files inside an extension folder (`.ts` modules) are not extensions;
 only `index.ts` is an entry point. `extensions/shared/` has no entry point and
-holds the file-path rule that guards must share with Pi's built-in file tools,
-plus the prompt-cache contract test that loads every extension. Tests never sit
-directly in `extensions/`, because Pi loads every top-level `.ts` file there.
+holds the file-path rule and the missing-file read that guards share with Pi's
+built-in file tools, plus the prompt-cache contract test that loads every
+extension. Tests never sit directly in `extensions/`, because Pi loads every
+top-level `.ts` file there.
 
 ```text
 extensions/
   ask/            sideroom_ask
   todo/           sideroom_todo
   modified-files/ edited-file tracking
-  guidelines/     pre-edit read gate
+  guidelines/     pre-edit read gate and review steer
   monorepo-skills/ trusted child-folder skill discovery
   rules/          added-line rule checks
   done/           green-before-finish steer
   persona/        single built-in voice
+  jev/            optional Jev semantic review
   explain/        end-of-work walkthrough offer
-  shared/         built-in file-tool path resolution, prompt-cache test
+  shared/         built-in file-tool path resolution and reads, prompt-cache test
 assets/artifacts/GUIDELINES_TEMPLATE.md   canonical rule seed
 skills/           packaged agent skills and language guides
 scripts/          repository-only tooling (not shipped)
@@ -61,6 +63,10 @@ guards without a tool. `persona` persists no profile state, so it ships
 `catalog.ts`, `checks.ts`, and `guard.ts` instead of `session.ts` or `ui.ts`.
 `monorepo-skills` has no tool or state: `scan.ts` owns discovery, `flags.ts`
 owns the CLI disable check, and `prompt.ts` owns its static prompt note.
+`guidelines` pairs `guard.ts` (the read gate) with `review.ts` (the one-shot
+review steer). `jev` has no tool and no persisted state: `client.ts` owns the
+single HTTP call, `key.ts` the owner-only key file, and `ui.ts` the masked `F10`
+screen.
 
 ## Lifecycle events
 
@@ -68,17 +74,17 @@ Extensions subscribe through `pi.on(event, handler)`. The events Sideroom uses:
 
 | Event | Used by | Purpose |
 | --- | --- | --- |
-| `input` | todo, rules, done, explain | Reset per-turn state on a real user prompt (`source: 'interactive'` or `'rpc'`). |
+| `input` | todo, rules, done, explain, guidelines, jev | Reset per-turn state on a real user prompt (`source: 'interactive'` or `'rpc'`). `guidelines` clears its review-turn flags here; `jev` clears its per-turn dedup set; a steer or `session_start` does not re-arm. |
 | `turn_start` | todo, done | Reset per-turn state. |
-| `tool_call` | guidelines, rules, done, persona | Inspect a call before it runs. Return `{ block: true, reason }` to reject it. |
+| `tool_call` | guidelines, rules, done, persona, jev | Inspect a call before it runs. Return `{ block: true, reason }` to reject it. `jev` records the added lines here, because a `write` erases the previous content. |
 | `tool_execution_start` | todo | Observe any tool starting; drives the propose nudge. |
-| `tool_result` | modified-files, guidelines, rules, done, explain | Observe results. May append content for `rules` warnings, record reads, count a mutated file for `explain`, or note a successful mutation. |
+| `tool_result` | modified-files, guidelines, rules, done, explain, jev | Observe results. May append content for `rules` warnings, record reads, arm the `guidelines` review steer, count a mutated file for `explain`, note a successful mutation, or ask `jev` for a semantic review. |
 | `turn_end` | todo, done | Inspect the finished turn; drives watchdog and done steering. |
 | `message_end` | persona | Inspect the finished assistant message and steer on a persona violation. |
-| `agent_settled` | explain | Fired once no retry, compaction, or queued continuation is left. `explain` offers the walkthrough here and nowhere else. |
+| `agent_settled` | explain, guidelines | Fired once no retry, compaction, or queued continuation is left. `guidelines` sends its one-shot review steer here, at most once per turn; `explain` holds its offer back to the next settle so the review always runs first. |
 | `resources_discover` | monorepo-skills | Returns trusted child-folder skill paths before Pi rebuilds the system prompt. |
 | `before_agent_start` | todo, guidelines, monorepo-skills, persona | `todo` returns `{ message }` with the board block; the others return `{ systemPrompt }` with static reminders. |
-| `session_start`, `session_tree`, `session_compact` | todo, modified-files, guidelines, persona, explain | Rebuild and redraw state after load, branch navigation, or compaction; `persona` publishes its footer status. |
+| `session_start`, `session_tree`, `session_compact` | todo, modified-files, guidelines, persona, explain, jev | Rebuild and redraw state after load, branch navigation, or compaction; `persona` publishes its footer status; `jev` resets its session call count and republishes its status; `guidelines` clears its read state and its review-steer flags on `session_start`. |
 
 `before_agent_start` appends a reminder to `systemPrompt` for `guidelines` and
 `persona`, plus a location-preference note when `monorepo-skills` found child
@@ -116,7 +122,9 @@ state files into the target project.
 | todo steer types | `sideroom-todo-nudge`, `sideroom-todo-watchdog` |
 | done steer type | `sideroom-done-gate` |
 | persona steer type and status key | `sideroom-persona-steer`, `sideroom-persona` |
+| jev status key | `sideroom-jev` |
 | explain offer type | `sideroom-explain-offer` |
+| guidelines review steer type | `sideroom-guidelines-review` |
 
 ## Widgets and ordering
 
@@ -151,16 +159,22 @@ pi.sendMessage(
 );
 ```
 
-Guards tag their own messages (`steerFromUs`) so the resulting continuation does
-not retrigger a nudge or watchdog, and they cap how often they fire per run.
+Guards tag their own messages (`steerFromUs`) so the turn the steer triggers does
+not retrigger a nudge or watchdog, and the watchdog fires at most once per turn:
+`steerFromUs` resets on `turn_start` with the other per-turn counters, so a run
+that skips several updates is corrected more than once. `guidelines` and
+`explain` gate their single steer with a flag set before the message is sent
+(`steeredThisTurn`, `offeredThisTurn`) and cleared by interactive input.
 
 ## Interactivity
 
 `ask` and `todo propose` need a terminal. They check `ctx.mode === 'tui'` and
 otherwise return the explicit error `Error: UI not available (running in
 non-interactive mode)`. `todo update`, `guidelines`, `monorepo-skills`,
-`rules`, `done`, and `persona` work in every mode. Persona blocking and steering stay active where
-there is no UI, and only the footer status is skipped.
+`rules`, `done`, `persona`, and `jev` work in every mode. Persona blocking and
+steering stay active where there is no UI, and only the footer status is
+skipped; `jev` reviews in every mode, and only its `F10` key screen needs the
+terminal.
 
 `explain` also runs in every mode, but it only sends its offer in the TUI: it is
 wrapped around `sideroom_ask`, which rejects every other mode.

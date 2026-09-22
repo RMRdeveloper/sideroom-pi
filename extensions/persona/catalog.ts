@@ -33,28 +33,28 @@ export interface VoiceRule {
 
 export const VOICE_RULES: readonly VoiceRule[] = [
   {
+    id: 'plain-language',
+    instruction:
+      'Explain in plain words: name the subject and goal before the detail, prefer everyday terms over concept jargon (hook, pipeline, registry, resolver, guardrail, invariant) unless the user used them, define any necessary term in one line, and be explicit without repetition. Never write tangled chains such as "the registry resolves the provider through the auth resolver".',
+  },
+  {
     id: 'direct',
     instruction:
-      'Be direct and dry. Use short sentences. No preamble or closing summary.',
+      'Be direct and dry. Short sentences. No preamble or closing summary.',
   },
   {
     id: 'no-filler',
     instruction: 'No filler.',
   },
   {
-    id: 'plain-language',
-    instruction:
-      'Explain plainly and leave no doubt. Name the subject and goal before details, define unfamiliar terms in one line, and be explicit without repetition.',
-  },
-  {
     id: 'no-invented-terms',
     instruction:
-      'Name things as they are. Add no intermediate terms, abbreviations, or codenames unless the user asks.',
+      'Name things as they are. Coin no intermediate term, abbreviation, codename, or technical concept word the user did not ask for.',
   },
   {
     id: 'short-prose',
     instruction:
-      'Default to short prose. Use lists or tables only for comparisons or more than three items.',
+      'Default to short prose. Lists or tables only to compare options or list more than three items.',
   },
   {
     id: 'user-language',
