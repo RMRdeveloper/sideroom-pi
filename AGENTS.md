@@ -35,14 +35,30 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   session restoration, and the `F8` view.
 - `extensions/modified-files/session.ts` owns snapshots and widget refreshes;
   `extensions/modified-files/ui.ts` owns the compact and extended displays.
-- `extensions/guidelines/index.ts` appends a short write/edit reminder.
+- `extensions/guidelines/index.ts` composes the reminder, the read gate, and
+  the review steer; it appends a short write/edit reminder and resets both read
+  and review state on `session_start`.
 - `extensions/guidelines/prompt.ts` owns the reminder text and idempotent append.
+- `extensions/guidelines/review.ts` owns the end-of-turn review steer: arms on a
+  successful `write`/`edit`, fires once on `agent_settled`, and resets on
+  interactive `input` and `session_start`.
 - `extensions/monorepo-skills/index.ts` composes trusted child-folder skill
   discovery; `extensions/monorepo-skills/scan.ts` owns the bounded,
   ignore-aware walk and Pi-compatible location rules;
   `extensions/monorepo-skills/flags.ts` owns the CLI disable check; and
   `extensions/monorepo-skills/prompt.ts` owns the static location-preference
   note.
+- `extensions/jev/index.ts` composes the optional Jev review: it resolves the
+  key, and registers the guard, the `F10` capture screen, and the footer
+  status. The guard counts the calls made in the active session; the footer and
+  the capture screen show that count.
+- `extensions/jev/client.ts` owns the single call to the Jev endpoint, the
+  status-to-failure map, and the injectable transport; `extensions/jev/model.ts`
+  owns the wire shapes, the six questions, the cutoff, and the note text;
+  `extensions/jev/key.ts` owns environment-first key resolution and the
+  owner-only config file; `extensions/jev/guard.ts` owns the events, dedup, the
+  circuit breaker, the session call count, and the fail-open paths;
+  `extensions/jev/ui.ts` owns the masked capture screen and the footer labels.
 - `extensions/rules/index.ts` composes the guidelines rule gate;
   `extensions/rules/catalog.ts` owns rule severities and language detection;
   `extensions/rules/model.ts` owns added-line diffing and result formatting;
@@ -52,15 +68,16 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
 - `extensions/done/index.ts` composes the finish gate; `extensions/done/detect.ts`
   owns per-ecosystem check-command detection; `extensions/done/guard.ts` owns
   run state and steering.
-- `extensions/persona/index.ts` composes the single built-in voice and its
-  status; `extensions/persona/catalog.ts` owns the voice rules and hard
+- `extensions/persona/index.ts` composes the single built-in voice and the
+  footer's per-run counts; `extensions/persona/catalog.ts` owns the voice rules and hard
   prohibitions, `extensions/persona/checks.ts` owns the detectors,
   `extensions/persona/guard.ts` owns artifact blocking and the prose steer.
 - `extensions/explain/index.ts` composes the end-of-work walkthrough offer;
-  `extensions/explain/model.ts` owns its turn state, file threshold, and
-  trigger, `extensions/explain/guard.ts` owns the event wiring.
+  `extensions/explain/model.ts` owns its turn state, file threshold, deferral
+  decision, and trigger, `extensions/explain/guard.ts` owns the event wiring.
 - `extensions/shared/file-path.ts` owns file-tool path resolution shared by
-  guards that must match Pi's built-in `write` and `edit` semantics.
+  guards that must match Pi's built-in `write` and `edit` semantics;
+  `extensions/shared/read-file.ts` owns the missing-file read those guards share.
 - `scripts/render-preview.mjs` is the entry that renders `media/preview.png`
   and `media/preview.mp4`, the gallery's `pi.image` and `pi.video`.
   `scripts/preview/` holds the pipeline: `ansi.mjs` turns SGR and OSC 8 into
@@ -148,20 +165,35 @@ Biome requires braces around every `if` body. Do not disable
   current session. Its compact widget shows at most five paths and must
   reapply after `sideroom:todo-widget-refreshed` so it remains below the board.
 - `guidelines` injects a short reminder and blocks `write`/`edit` until exact
-  full-file reads load the packaged skill body and one complete language guide. Do not add a slash
-  command or a writer subagent.
+  full-file reads load the packaged skill body and one complete language guide. After any successful
+  mutation it sends one hidden review steer on `agent_settled`, at most once per
+  turn, asking the agent to re-check the changed files against the loaded guide
+  and run the project checks. Do not add a slash command or a writer subagent.
 - `sideroom_rules` checks only lines added by a `write`/`edit`, blocks braceless
   conditionals and swallowed errors, notes softer violations on the result, and
   degrades a repeatedly firing block. It writes no files and reads no project
   config; the catalog ships with the package.
+- `jev` is an optional semantic review that adds no dependency beyond `fetch`.
+  It asks one decision model about the six guide rules no mechanical check can
+  decide (3, 4, 7, 8, 9, 10) on the file a `write`/`edit` just changed, and
+  appends a note to the tool result. It never blocks, never reaches the system
+  prompt, sends only the file and the added lines, skips a body over 60k
+  characters instead of truncating it, stops calling on quota or a rejected key,
+  and does nothing at all without a key. The key comes from `TYPESAFE_API_KEY`
+  or from `getAgentDir()/sideroom.json` at mode `0600`, captured through `F10`
+  and never written to the session. The call count is per session, resets on
+  `session_start`, and is never persisted.
 - `sideroom_persona` is a single built-in voice: no profiles, no switching, no
   persisted profile state. A `write`/`edit` whose added lines contain a decorative symbol
   is blocked and degrades after repeated fires; the other prohibitions are
-  steered, capped per run.
+  steered, capped per run. The footer shows the run's block and steer counts and
+  drops back to `persona: direct` on the next `before_agent_start`.
 - `explain` offers a walkthrough through `sideroom_ask` at most once per turn,
   only after successful `write`/`edit` results touched at least five distinct
   files, and only in the TUI. It fires on `agent_settled`, never `agent_end`, so
   the offer never lands on work that a retry or a compaction is about to redo.
+  It holds the steer back one settle, because the guidelines review steers on
+  the same event and the two would otherwise race in extension load order.
   It has no tool and no persisted state.
 - `sideroom_done` steers, never blocks, and does nothing when no check command
   is detected. It clears green after any later successful mutation, notes once

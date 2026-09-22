@@ -51,10 +51,11 @@ Sideroom answers each one with a small, opinionated surface:
 | Silent guessing | `sideroom_ask` — questions with an opinion, one batch at a time |
 | Invisible work | `sideroom_todo` — a live board above the editor, always one step in focus |
 | Repo pollution | Session-branch state — the board and history die with the session, never with a commit |
-| Style drift | A pre-edit gate + the on-demand `sideroom-guidelines` skill |
+| Style drift | A pre-edit gate + the on-demand `sideroom-guidelines` skill + an end-of-turn review steer |
 | Invisible monorepo skills | `monorepo-skills` — trusted child folders join Pi's available skill list |
 | Vague plans | `sideroom-grill` — an interview that settles the words before the work |
 | Unapplied guidelines | `sideroom_rules` — mechanical checks that block or flag the lines you add |
+| Unchecked judgment rules | `jev` — asks a decision model about the six rules no check can decide |
 | Unclear answers | `sideroom_persona` — one voice: direct, plain, and free of jargon it invented |
 | Premature completion | `sideroom_done` — steers back to the project's check command before finishing |
 | Work left unexplained | `explain` — offers a walkthrough and how to test it once the work settles |
@@ -157,7 +158,10 @@ full read of the packaged skill and, for supported targets, the one complete
 language guide under `skills/sideroom-guidelines/references/languages/`.
 Each guide mirrors all 19 rules in the canonical seed with idiomatic examples.
 The seed, `assets/artifacts/GUIDELINES_TEMPLATE.md`, is never pasted into the
-system prompt.
+system prompt. After any successful mutation, one hidden review steer fires when
+the turn settles and asks the agent to re-check every changed file against the
+loaded guide and run the relevant formatter, linter, type checks, and tests —
+so the contract is applied, not just read.
 
 ### Monorepo skills — child skills are still project skills
 
@@ -182,6 +186,24 @@ identifiers, stale comments, commented-out code, and debug artifacts are
 appended as notes to the tool result. A per-rule circuit breaker degrades a
 repeatedly firing block to a note so the agent never dead-locks. No files
 written, no config read: the catalog ships with the package.
+
+### Jev — judgment where no check reaches
+
+Reading the guide covers the mechanical rules. `jev` covers the other kind: one
+optional call to TypeSafe's Jev decision model about the six guide rules a
+single file can answer (guard clauses, fail fast, command/query separation,
+null handling, immutability, validate once) on the file a `write` or `edit` just
+changed. The answer arrives as a probability, and a note is appended to the tool
+result when it clears the cutoff.
+
+It never blocks and never enters the system prompt. The state is the file and
+the added lines and nothing else — no conversation, no session, no neighbours.
+The footer counts the calls the session made, and `F10` shows the same count
+beside the key source. Without a key nothing is called, and when Jev runs out of
+quota, rejects the key,
+or stops answering, the extension goes quiet without touching the turn. The key
+lives in `TYPESAFE_API_KEY` or in your agent directory, and `F10` captures it
+without ever writing it to the session.
 
 ### Persona — one voice, not a costume
 
@@ -210,9 +232,11 @@ When an implementation settles, `explain` steers the agent to offer a
 walkthrough through `sideroom_ask`: explain the changes only, how to test them
 only, both, or nothing. It fires on `agent_settled`, the point where
 no retry, compaction, or queued message is left, so the offer never lands on
-work that is about to be redone. Once per turn, only when the turn touched at
-least five distinct files, and only in the TUI, because `sideroom_ask` cannot
-run anywhere else. No tool, no widget, no persisted state.
+work that is about to be redone. It waits one settle so the guidelines review
+runs first; both fire on `agent_settled`, and Pi would otherwise order them by
+extension load. Once per turn, only when the turn touched at least five distinct
+files, and only in the TUI, because `sideroom_ask` cannot run anywhere else. No
+tool, no widget, no persisted state.
 
 ## Quick path
 
@@ -287,8 +311,12 @@ also fully read the packaged guide matching the target path. Reads with
 `offset` or `limit`, failed reads, and same-named files elsewhere do not count.
 The extension blocks the mutation until the required reads succeed; unsupported
 languages use the shared table. Do not route around
-the gate through Bash or another file-mutation path. Before finishing, review
-the diff against the loaded guide and run the relevant project checks.
+the gate through Bash or another file-mutation path. After any successful
+`write`/`edit`, one hidden review steer fires on `agent_settled` (at most once
+per turn) asking the agent to re-check every changed file against the loaded
+guide and run the relevant project checks. Interactive input clears the steer
+flags; `before_agent_start` does not, so a steer continuation never re-triggers
+itself.
 
 ### Monorepo-skills contract
 
@@ -315,11 +343,30 @@ the diff against the loaded guide and run the relevant project checks.
 - A rule that blocks three times in a run degrades to a warning until five
   clean checks or a new interactive prompt reset it.
 
+### Jev contract
+
+- Off without a key: no request, and behavior identical to a package without
+  this extension.
+- Warn only. A finding is text appended to the tool result; nothing blocks and
+  nothing reaches the system prompt.
+- One request per successful `write`/`edit`, with six `noul` questions on one
+  shared state of the file body and the added lines.
+- A body over 60k characters is skipped rather than truncated. An answer at or
+  above `0.8` probability becomes a note.
+- Quota (`402`) and a rejected key (`401`, `403`) stop the calls immediately;
+  network errors, `429` and `5xx` stop after three consecutive failures. A
+  success rearms the breaker, and `F10` rearms it by hand.
+- Every request increments a session call counter, shown in the footer and on
+  `F10`; it resets on `session_start` and is never persisted.
+- The key comes from `TYPESAFE_API_KEY` or from
+  `getAgentDir()/sideroom.json` at mode `0600`, and never enters the session.
+
 ### Persona contract
 
 - One built-in voice. No profiles, no switching, and no persisted profile
-  state; runtime guard counters stay in memory. The footer status is derived
-  from the catalog.
+  state; runtime guard counters stay in memory. The footer shows the run's block
+  and steer counts (`persona: direct · 2 blocks · 1 steer`) and drops back to
+  `persona: direct` on the next run.
 - Injection: a short reminder appended in `before_agent_start`, chained after
   the other extensions and idempotent by heading, so it returns after
   compaction.
@@ -346,6 +393,9 @@ the diff against the loaded guide and run the relevant project checks.
 - Trigger: `agent_settled` with at least five distinct files mutated since the
   last user prompt, in TUI mode. File identity follows Pi's path aliases and
   canonicalizes existing paths.
+- One settle of delay: the guidelines review steers on the same event, and Pi
+  runs both deferred steers in extension load order, so `explain` offers at the
+  next settle.
 - The steer names the intent; the agent writes the question in the user's
   language with four options, one of them a decline, and one recommendation.
   `sideroom_ask` still adds *Out of scope* and the custom answer.

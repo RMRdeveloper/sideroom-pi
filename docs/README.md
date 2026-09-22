@@ -10,9 +10,10 @@ Maintainable documentation for the Sideroom Pi package. Start here.
 | [extensions/ask.md](./extensions/ask.md) | `sideroom_ask` questionnaire contract and TUI. |
 | [extensions/todo.md](./extensions/todo.md) | `sideroom_todo` work board, capped widget, `F9` overlay, persistence, and skip prevention. |
 | [extensions/modified-files.md](./extensions/modified-files.md) | Session edited-file tracking, compact widget, and `F8` overlay. |
-| [extensions/guidelines.md](./extensions/guidelines.md) | Pre-edit read gate and the packaged coding skill. |
+| [extensions/guidelines.md](./extensions/guidelines.md) | Pre-edit read gate, the packaged coding skill, and the end-of-turn review steer. |
 | [extensions/monorepo-skills.md](./extensions/monorepo-skills.md) | Trusted discovery of child-folder `.pi/skills` and `.agents/skills`. |
 | [extensions/rules.md](./extensions/rules.md) | Added-line rule checks, blocking, warnings, and the circuit breaker. |
+| [extensions/jev.md](./extensions/jev.md) | The optional Jev review: the six judgment rules, the minimal state, the fail-open policy, and the `F10` key screen. |
 | [extensions/persona.md](./extensions/persona.md) | The single built-in voice, its prohibitions, injection, and enforcement. |
 | [extensions/explain.md](./extensions/explain.md) | The end-of-work walkthrough offer, its trigger, and its limits. |
 | [extensions/done.md](./extensions/done.md) | Check-command detection and the green-before-finish steer. |
