@@ -31,10 +31,9 @@ test('appends the reminder once and keeps an existing prompt', () => {
     assert.equal(GUIDELINES_REMINDER.includes(guide.path), true);
   }
 
-  assert.match(
-    GUIDELINES_REMINDER,
-    /formatter, linter, type checks, and tests/,
-  );
+  // The review steer owns the post-mutation instruction; repeating it here
+  // would spend the same sentence on every turn.
+  assert.doesNotMatch(GUIDELINES_REMINDER, /formatter, linter/);
   // The packaged paths depend on where the checkout lives, so only the text
   // around them counts against the budget the reminder spends every turn.
   const packagedPathLength = [

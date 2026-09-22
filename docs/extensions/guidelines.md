@@ -48,16 +48,46 @@ into the prompt.
 Each guide mirrors all 19 rules from the seed with idiomatic examples. The
 catalog lives in `extensions/guidelines/catalog.ts`.
 
+## Review steer
+
+Reading the guide is not enough; the agent still has to apply it. After a run
+in which any `write`/`edit` succeeded, `review.ts` sends one hidden steer on
+`agent_settled` asking the agent to re-check every changed file against the
+loaded language guide and run the relevant formatter, linter, type checks, and
+tests. If the guide has drifted out of context, the steer tells the agent to
+re-read it in full first.
+
+- Fires at most once per turn: `steeredThisTurn` is set before the message is
+  sent, so the continuation the steer starts cannot re-trigger it.
+- Only successful mutations count; a failed `write`/`edit` does not arm it.
+- Review state resets on `input` (`source: 'interactive'` or `'rpc'`) and on
+  `session_start`. It deliberately does *not* reset on `before_agent_start`
+  (that would re-arm every steer continuation into an infinite loop) or on
+  `session_compact` (compaction may interrupt a run mid-edit; the review still
+  applies once the run settles).
+- The steer travels as a hidden session message (`display: false`,
+  `customType: 'sideroom-guidelines-review'`) with `triggerTurn: true` and
+  `deliverAs: 'steer'`, matching how `todo`, `done`, and `explain` steer. It
+  does not go through `input` or `before_agent_start`, so it neither resets its
+  own state nor appends another reminder.
+- `explain` defers behind it: both fire on `agent_settled`, and Pi runs their
+  deferred steers in extension load order, so `explain` holds its offer back one
+  settle and sends it after the review has run.
+
 ## Files
 
 | File | Role |
 | --- | --- |
-| `extensions/guidelines/index.ts` | Registers the guard and the reminder injection/reset events. |
+| `extensions/guidelines/index.ts` | Registers the guard, the reminder injection/reset events, and the review guard. |
 | `extensions/guidelines/guard.ts` | Tracks reads, canonicalizes paths, and blocks mutations. |
 | `extensions/guidelines/catalog.ts` | Package-rooted skill and language-guide paths. |
 | `extensions/guidelines/prompt.ts` | Builds and idempotently appends the reminder. |
+| `extensions/guidelines/review.ts` | Arms the review steer on successful mutations and fires it once per turn. |
 
 ## Tests
 
 `index.test.ts` covers blocking, accepted reads, truncation, compaction reset,
 and the inactive-read-tool case. `prompt.test.ts` covers idempotent appending.
+`review.test.ts` covers the one-shot arm/fire cycle, the failed-mutation case,
+interactive vs. extension input resets, `session_start` clearing, and
+independence from `before_agent_start`.
