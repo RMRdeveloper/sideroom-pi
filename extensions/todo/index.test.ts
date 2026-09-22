@@ -118,6 +118,80 @@ test('registers a sequential tool that snapshots and injects the live board', as
   ]);
 });
 
+test('resets the steer guard each turn so a nudge cannot silence the run', async () => {
+  const registered: { tool?: RegisteredTool } = {};
+  const handlers = new Map<string, EventHandler>();
+  const snapshots: unknown[] = [];
+  const steers: string[] = [];
+  const api = {
+    registerTool(tool: RegisteredTool) {
+      registered.tool = tool;
+    },
+    registerShortcut() {},
+    on(name: string, handler: EventHandler) {
+      handlers.set(name, handler);
+    },
+    appendEntry(_customType: string, data: unknown) {
+      snapshots.push(data);
+    },
+    sendMessage(message: unknown) {
+      steers.push((message as { customType?: string }).customType ?? '');
+    },
+    events: { emit() {} },
+  } as unknown as ExtensionAPI;
+  const ctx = {
+    mode: 'tui',
+    sessionManager: {
+      getBranch: () =>
+        snapshots.map((snapshot) => customEntry(snapshot)) as never,
+    },
+    ui: { setWidget() {} },
+  } as unknown as ExtensionContext;
+
+  registerTodo(api);
+  const tool = registered.tool;
+  assert.ok(tool);
+  const input = handlers.get('input');
+  const turnStart = handlers.get('turn_start');
+  const toolStart = handlers.get('tool_execution_start');
+  const turnEnd = handlers.get('turn_end');
+  assert.ok(input);
+  assert.ok(turnStart);
+  assert.ok(toolStart);
+  assert.ok(turnEnd);
+
+  input({ source: 'interactive' } as never, ctx);
+  turnStart({} as never, ctx);
+  toolStart({ toolName: 'write' } as never, ctx);
+  assert.deepEqual(steers, ['sideroom-todo-nudge']);
+
+  turnStart({} as never, ctx);
+  toolStart({ toolName: 'sideroom_todo' } as never, ctx);
+  await tool.execute(
+    'call-1',
+    propose(initialItems),
+    undefined,
+    undefined,
+    ctx,
+  );
+  turnEnd({} as never, ctx);
+  assert.deepEqual(steers, ['sideroom-todo-nudge']);
+
+  turnStart({} as never, ctx);
+  toolStart({ toolName: 'write' } as never, ctx);
+  turnEnd({} as never, ctx);
+  assert.deepEqual(steers, ['sideroom-todo-nudge', 'sideroom-todo-watchdog']);
+
+  turnStart({} as never, ctx);
+  toolStart({ toolName: 'write' } as never, ctx);
+  turnEnd({} as never, ctx);
+  assert.deepEqual(steers, [
+    'sideroom-todo-nudge',
+    'sideroom-todo-watchdog',
+    'sideroom-todo-watchdog',
+  ]);
+});
+
 test('nudges only once when mutating an empty board', () => {
   const handlers = new Map<string, EventHandler>();
   const steers: unknown[] = [];

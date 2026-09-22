@@ -150,8 +150,9 @@ Guards steer but never block mutations.
 - **Update watchdog:** if a turn mutated files but never called `sideroom_todo`,
   send one steer to `update`. At most once per turn.
 
-Both use `sendMessage({ display: false }, { triggerTurn: true, deliverAs: 'steer' })`
-and are tagged so their own continuation does not retrigger them.
+Both use `sendMessage({ display: false }, { triggerTurn: true, deliverAs: 'steer' })`.
+A sent steer silences only the rest of its own turn: `steerFromUs` resets on
+`turn_start` with the per-turn counters, so a later turn can steer again.
 `proposeNudgedThisRun` resets only on an `input` with `source: 'interactive'` or
 `'rpc'`, never on `agent_start`/`before_agent_start`.
 
