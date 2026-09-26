@@ -5,6 +5,9 @@ node_modules/
 dist/
 *.tsbuildinfo
 
+# Astro generated types
+site/.astro/
+
 # Logs
 *.log
 npm-debug.log*
@@ -20,6 +23,7 @@ coverage/
 # OS
 .DS_Store
 Thumbs.db
+*:Zone.Identifier
 
 # Editors
 .vscode/*
