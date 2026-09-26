@@ -140,9 +140,13 @@ project are labelled `external`. A new session starts clean.
 
 An on-demand skill for fuzzy plans. It interviews you in `sideroom_ask`
 rounds — reading the codebase first so it never asks what the code already
-says — until you share one understanding. Resolved terms land in
-`CONTEXT.md` the moment they resolve; hard decisions land as ADRs under
-`docs/adr/`. Everything else stays in the conversation, ready to become a
+says — until you share one understanding. Its recommendations favor choices
+that are easy to maintain and meet known growth needs over the cheapest initial
+build. It names the upfront cost; if a missing fact could change the choice,
+it asks for that fact before recommending a solution. Resolved terms land in
+`CONTEXT.md` the moment they resolve. Only hard-to-reverse, surprising choices
+with a real trade-off qualify for a record under `docs/adr/`; the user is asked
+first. Everything else stays in the conversation, ready to become a
 spec or an implementation. Vocabulary sharpening during the rounds follows
 the companion `sideroom-domain-modeling` skill, which also runs on its own
 whenever the words — not the plan — are the problem. And when there is no

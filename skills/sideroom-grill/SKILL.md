@@ -34,6 +34,14 @@ if the effort is too big to hold in one session, say so and stop.
   by their practical consequences, and one recommendation with a one-line
   justification. Never reduce it to technology names. Name a repository
   inconsistency in the prompt instead of picking one.
+- Recommend for sustainable quality: prefer maintainability and room to grow
+  for known needs over the cheapest initial build. Explain the upfront cost and
+  future change cost; do not mistake speculative maximum capacity for quality.
+  Apply this to minor decisions too, without asking the user about them.
+- If a missing fact or figure could change the recommendation, ask for it in
+  a preliminary round before recommending a solution. That round still needs
+  a defensible recommended option, such as gathering the missing evidence;
+  never invent a number or mark an unsupported solution as recommended.
 - An *Out of scope* answer closes that thread. Do not re-ask it.
 - Everything a round settles is recorded through `sideroom-domain-modeling`:
   inline glossary entries, the ADR three-gate offer, lazy file creation.
@@ -47,8 +55,8 @@ if the effort is too big to hold in one session, say so and stop.
 1. Read the code around the change. Settle from the codebase everything the
    codebase settles.
 2. Run one `sideroom_ask` round on what remains genuinely open: terms first,
-   then the architectural decisions. Minor decisions are yours; do not spend a
-   round on them.
+   then missing facts that could change a recommendation, then the architectural
+   decisions. Minor decisions are yours; do not spend a round on them.
 3. After each round, write resolved terms to `CONTEXT.md` and qualifying
    decisions to `docs/adr/`. Offer the ADR for an accepted architectural
    decision only when all three gates pass.
