@@ -20,10 +20,11 @@ registration function with an `ExtensionAPI`. The manifest wires this up:
 
 Helper files inside an extension folder (`.ts` modules) are not extensions;
 only `index.ts` is an entry point. `extensions/shared/` has no entry point and
-holds the file-path rule and the missing-file read that guards share with Pi's
-built-in file tools, plus the prompt-cache contract test that loads every
-extension. Tests never sit directly in `extensions/`, because Pi loads every
-top-level `.ts` file there.
+holds the file-tool path rules and the missing-file read that guards share with
+Pi's built-in file tools, the end-of-run steer rules the review and the offer
+share, the `sideroom:review-note` event Jev emits for the review, plus the
+prompt-cache contract test that loads every extension. Tests never sit directly
+in `extensions/`, because Pi loads every top-level `.ts` file there.
 
 ```text
 extensions/
@@ -37,7 +38,7 @@ extensions/
   persona/        single built-in voice
   jev/            optional Jev semantic review
   explain/        end-of-work walkthrough offer
-  shared/         built-in file-tool path resolution and reads, prompt-cache test
+  shared/         file-tool paths, end-of-run steer rules, the review-note event, prompt-cache test
 assets/artifacts/GUIDELINES_TEMPLATE.md   canonical rule seed
 skills/           packaged agent skills and language guides
 scripts/          repository-only tooling (not shipped)
@@ -74,17 +75,17 @@ Extensions subscribe through `pi.on(event, handler)`. The events Sideroom uses:
 
 | Event | Used by | Purpose |
 | --- | --- | --- |
-| `input` | todo, rules, done, explain, guidelines, jev | Reset per-turn state on a real user prompt (`source: 'interactive'` or `'rpc'`). `guidelines` clears its review-turn flags here; `jev` clears its per-turn dedup set; a steer or `session_start` does not re-arm. |
+| `input` | todo, rules, done, explain, guidelines, jev | Reset per-turn state on a real user prompt (`source: 'interactive'` or `'rpc'`). `guidelines`, `explain`, and `jev` reset only when the prompt arrives while the agent is idle, so a message typed during a run does not re-arm them; `jev` clears its per-turn dedup set and its rate-limit pause; a steer or `session_start` does not re-arm. |
 | `turn_start` | todo, done | Reset per-turn state. |
-| `tool_call` | guidelines, rules, done, persona, jev | Inspect a call before it runs. Return `{ block: true, reason }` to reject it. `jev` records the added lines here, because a `write` erases the previous content. |
+| `tool_call` | guidelines, rules, done, persona, jev | Inspect a call before it runs. Return `{ block: true, reason }` to reject it. `jev` records the added lines here, because a `write` erases the previous content, and only for project files in a supported language whose change added lines. |
 | `tool_execution_start` | todo | Observe any tool starting; drives the propose nudge. |
-| `tool_result` | modified-files, guidelines, rules, done, explain, jev | Observe results. May append content for `rules` warnings, record reads, arm the `guidelines` review steer, count a mutated file for `explain`, note a successful mutation, or ask `jev` for a semantic review. |
-| `turn_end` | todo, done | Inspect the finished turn; drives watchdog and done steering. |
+| `tool_result` | modified-files, guidelines, rules, done, explain, jev | Observe results. May append content for `rules` warnings, record reads, arm the `guidelines` review steer, count a mutated file for `explain`, note a successful mutation, or ask `jev` for a semantic review, whose findings go to the `guidelines` review on `sideroom:review-note` instead of the tool result. |
+| `turn_end` | todo, done, jev | Inspect the finished turn; drives watchdog and done steering. `jev` drops calls another extension blocked, which never reach `tool_result`. |
 | `message_end` | persona | Inspect the finished assistant message and steer on a persona violation. |
-| `agent_settled` | explain, guidelines | Fired once no retry, compaction, or queued continuation is left. `guidelines` sends its one-shot review steer here, at most once per turn; `explain` holds its offer back to the next settle so the review always runs first. |
+| `agent_before_settle` | explain, guidelines | The last point where a run can continue, after retries and compaction recovery. `guidelines` appends its one-shot review steer here, at most once per turn, carrying any `jev` notes gathered so far, plus one follow-up per turn for notes that arrive after it fired; `explain` holds its offer back to the next boundary so the review always runs first. Both return a hidden `custom_message` entry with `continue: true`, keep earlier handlers' entries, and skip aborted or errored runs and runs with a pending user message. `agent_settled` is notification-only, so no steer is sent there. |
 | `resources_discover` | monorepo-skills | Returns trusted child-folder skill paths before Pi rebuilds the system prompt. |
 | `before_agent_start` | todo, guidelines, monorepo-skills, persona | `todo` returns `{ message }` with the board block; the others return `{ systemPrompt }` with static reminders. |
-| `session_start`, `session_tree`, `session_compact` | todo, modified-files, guidelines, persona, explain, jev | Rebuild and redraw state after load, branch navigation, or compaction; `persona` publishes its footer status; `jev` resets its session call count and republishes its status; `guidelines` clears its read state and its review-steer flags on `session_start`. |
+| `session_start`, `session_tree`, `session_compact` | todo, modified-files, guidelines, persona, explain, jev | Rebuild and redraw state after load, branch navigation, or compaction; `persona` publishes its footer status; `jev` resets its session call count, drops recorded calls and its dedup set, and republishes its status; `guidelines` clears its read state and its review-steer flags on `session_start`. |
 
 `before_agent_start` appends a reminder to `systemPrompt` for `guidelines` and
 `persona`, plus a location-preference note when `monorepo-skills` found child
@@ -143,9 +144,18 @@ session state.
 pi.events.emit('sideroom:todo-widget-refreshed', ctx);
 ```
 
-`modified-files` subscribes and reapplies its widget in response. This is the
-only cross-extension coupling; it lives in `extensions/todo/session.ts` as
-`TODO_WIDGET_REFRESH_EVENT` and is imported by `modified-files/index.ts`.
+`modified-files` subscribes and reapplies its widget in response; that channel
+lives in `extensions/todo/session.ts` as `TODO_WIDGET_REFRESH_EVENT`.
+
+`jev` emits a note on a second channel after a request returns a finding:
+
+```ts
+pi.events.emit('sideroom:review-note', { text });
+```
+
+`guidelines` subscribes and carries the turn's notes in its review steer. That
+channel lives in `extensions/shared/review-note.ts`, which owns the event name
+and the payload check. These two are the only cross-extension couplings.
 
 ## Steering the agent
 
@@ -162,9 +172,19 @@ pi.sendMessage(
 Guards tag their own messages (`steerFromUs`) so the turn the steer triggers does
 not retrigger a nudge or watchdog, and the watchdog fires at most once per turn:
 `steerFromUs` resets on `turn_start` with the other per-turn counters, so a run
-that skips several updates is corrected more than once. `guidelines` and
-`explain` gate their single steer with a flag set before the message is sent
-(`steeredThisTurn`, `offeredThisTurn`) and cleared by interactive input.
+that skips several updates is corrected more than once.
+
+A steer sent at the end of the run does not go through `sendMessage`. It is a
+hidden `custom_message` entry appended on `agent_before_settle` with
+`continue: true`, so Pi continues the same run instead of opening a second one
+after the user already saw the agent stop. `extensions/shared/settle.ts` holds
+the rules both end-of-run steers share: the boundary accepts a steer only for a
+completed run with no user message pending, the entries earlier handlers
+proposed are kept, and turn state resets only on input that arrives while the
+agent is idle. `guidelines` gates its review with `steeredThisTurn` and gives
+notes that arrive after it fired one follow-up per turn; `explain` gates its
+offer with `offeredThisTurn` and holds it back one boundary so the review always
+runs first.
 
 ## Interactivity
 

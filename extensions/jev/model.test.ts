@@ -7,6 +7,7 @@ import {
   buildRequestBody,
   findingKey,
   formatFindings,
+  isReviewablePath,
   JEV_MODEL,
   JEV_RULES,
   MAX_STATE_CHARACTERS,
@@ -106,9 +107,26 @@ test('parses a well-formed envelope and refuses anything else', () => {
   );
 });
 
-test('skips a file that does not fit the state budget', () => {
-  assert.equal(stateFitsBudget('x'.repeat(MAX_STATE_CHARACTERS)), true);
-  assert.equal(stateFitsBudget('x'.repeat(MAX_STATE_CHARACTERS + 1)), false);
+test('measures the whole serialized state against the budget', () => {
+  const half = 'x'.repeat(MAX_STATE_CHARACTERS / 2);
+  const edited = buildFileState('src/a.ts', half, 'edit', []);
+  assert.equal(stateFitsBudget(edited), true);
+
+  const created = buildFileState(
+    'src/a.ts',
+    half,
+    'write',
+    addedLinesForWrite(undefined, half),
+  );
+  assert.equal(stateFitsBudget(created), false);
+});
+
+test('reviews only files in a supported language', () => {
+  assert.equal(isReviewablePath('src/a.ts'), true);
+  assert.equal(isReviewablePath('cmd/main.go'), true);
+  assert.equal(isReviewablePath('README.md'), false);
+  assert.equal(isReviewablePath('package-lock.json'), false);
+  assert.equal(isReviewablePath('config.yaml'), false);
 });
 
 test('formats a note that names the rule and the probability', () => {
