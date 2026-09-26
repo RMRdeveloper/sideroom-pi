@@ -58,7 +58,8 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   the capture screen show that count.
 - `extensions/jev/client.ts` owns the single call to the Jev endpoint, the
   status-to-failure map, and the injectable transport; `extensions/jev/model.ts`
-  owns the wire shapes, the six questions, the cutoff, and the note text;
+  owns the wire shapes, evidence-based questions, byte budget, cutoff, and note text;
+  `extensions/jev/context.ts` owns bounded, ignore-aware related-source selection;
   `extensions/jev/key.ts` owns environment-first key resolution and the
   owner-only config file; `extensions/jev/guard.ts` owns the events, the
   filters, dedup, the circuit breaker, the rate-limit pause, the session call
@@ -181,20 +182,22 @@ Biome requires braces around every `if` body. Do not disable
   conditionals and swallowed errors, notes softer violations on the result, and
   degrades a repeatedly firing block. It writes no files and reads no project
   config; the catalog ships with the package.
-- `jev` is an optional semantic review that adds no dependency beyond `fetch`.
-  It asks one decision model about the six guide rules no mechanical check can
-  decide (3, 4, 7, 8, 9, 10) on the file a `write`/`edit` just changed, and
-  emits each finding on `sideroom:review-note` for the guidelines review to
-  carry in its end-of-run steer, never on the tool result. It never blocks,
-  never reaches the system prompt, and asks only about project files in a
-  supported language whose change added lines. It sends only the
-  project-relative path, the body, and the added lines, skips a serialized
-  state over 60k characters instead of truncating it, follows the run's abort
-  signal, pauses on `429` until the next idle prompt, stops calling on quota or
-  a rejected key, and does nothing at all without a key. The key comes from `TYPESAFE_API_KEY`
-  or from `getAgentDir()/sideroom.json` at mode `0600`, captured through `F10`
-  and never written to the session. The call count is per session, resets on
-  `session_start`, and is never persisted.
+- `jev` is an optional semantic review using `fetch` and the existing `ignore`
+  dependency. It asks one decision model about guide rules 3, 4, 7–11, 17, and
+  19 when supported by visible evidence, and emits each finding on
+  `sideroom:review-note` for the guidelines review to carry in its end-of-run
+  steer, never on the tool result. It never blocks or reaches the system prompt,
+  and asks only about project files in a supported language whose change added
+  lines. It sends the changed file, its added lines and up to four directly
+  related, non-ignored source files with relative paths; hidden, symlinked,
+  sensitive-named and out-of-project paths are excluded. It uses conservative
+  32,000-byte state-plus-question and 64,000-byte request limits, keeps files
+  whole, and omits questions without the evidence they require. It follows the
+  run's abort signal, pauses on `429` until the next idle prompt, stops calling
+  on quota or a rejected key, and does nothing at all without a key. The key
+  comes from `TYPESAFE_API_KEY` or from `getAgentDir()/sideroom.json` at mode
+  `0600`, captured through `F10` and never written to the session. The call
+  count is per session, resets on `session_start`, and is never persisted.
 - `sideroom_persona` is a single built-in voice: no profiles, no switching, no
   persisted profile state. A `write`/`edit` whose added lines contain a decorative symbol
   is blocked and degrades after repeated fires; the other prohibitions are

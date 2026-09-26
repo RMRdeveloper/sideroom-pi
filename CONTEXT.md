@@ -132,6 +132,12 @@ The `explain` steer that asks the agent to offer a walkthrough through `sideroom
 
 _Avoid: summary offer, explanation prompt._
 
+## Related source
+
+The up to four complete source files Jev receives next to the changed file: first the files it imports, then the direct consumers found by source reference. Discovery stays inside the working directory and skips ignored, hidden, symlinked, sensitive-named and dependency paths, so a neighbour that was skipped is never evidence that no relation exists.
+
+_Avoid: context files, neighbours, extra files._
+
 ## Jev finding
 
 One guide rule Jev scored at or above the cutoff on a changed project file. A finding never blocks the mutation: Jev emits it as a review note for the guidelines review to carry at the settle boundary, instead of writing it to the tool result.

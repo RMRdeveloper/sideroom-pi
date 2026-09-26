@@ -55,8 +55,8 @@ Sideroom answers each one with a small, opinionated surface:
 | Invisible monorepo skills | `monorepo-skills` — trusted child folders join Pi's available skill list |
 | Vague plans | `sideroom-grill` — an interview that settles the words before the work |
 | Unapplied guidelines | `sideroom_rules` — mechanical checks that block or flag the lines you add |
-| Unchecked judgment rules | `jev` — asks a decision model about the six rules no check can decide |
-| Unclear answers | `sideroom_persona` — one voice: direct, plain, and free of jargon it invented |
+| Unchecked judgment rules | `jev` — asks a decision model about guide rules with visible evidence |
+| Unclear answers | `sideroom_persona` — one voice: direct, plain, and free of unnecessary technical words |
 | Premature completion | `sideroom_done` — steers back to the project's check command before finishing |
 | Work left unexplained | `explain` — offers a walkthrough and how to test it once the work settles |
 
@@ -140,9 +140,13 @@ project are labelled `external`. A new session starts clean.
 
 An on-demand skill for fuzzy plans. It interviews you in `sideroom_ask`
 rounds — reading the codebase first so it never asks what the code already
-says — until you share one understanding. Resolved terms land in
-`CONTEXT.md` the moment they resolve; hard decisions land as ADRs under
-`docs/adr/`. Everything else stays in the conversation, ready to become a
+says — until you share one understanding. Its recommendations favor choices
+that are easy to maintain and meet known growth needs over the cheapest initial
+build. It names the upfront cost; if a missing fact could change the choice,
+it asks for that fact before recommending a solution. Resolved terms land in
+`CONTEXT.md` the moment they resolve. Only hard-to-reverse, surprising choices
+with a real trade-off qualify for a record under `docs/adr/`; the user is asked
+first. Everything else stays in the conversation, ready to become a
 spec or an implementation. Vocabulary sharpening during the rounds follows
 the companion `sideroom-domain-modeling` skill, which also runs on its own
 whenever the words — not the plan — are the problem. And when there is no
@@ -189,17 +193,18 @@ written, no config read: the catalog ships with the package.
 
 ### Jev — judgment where no check reaches
 
-Reading the guide covers the mechanical rules. `jev` covers the other kind: one
-optional call to TypeSafe's Jev decision model about the six guide rules a
-single file can answer (guard clauses, fail fast, command/query separation,
-null handling, immutability, validate once) on the file a `write` or `edit` just
-changed. The answer arrives as a probability, and when it clears the cutoff the
-note travels with the guidelines review at the end of the run instead of
-interrupting each edit. READMEs, JSON, lockfiles, deletion-only edits, and files
-outside the project are never sent.
+Reading the guide covers the mechanical rules. `jev` makes one optional call
+to TypeSafe's decision model about the changed file and, when available, up to
+four directly related source files. It checks guard clauses, fail fast,
+command/query separation, null handling, immutability, repeated validation,
+responsibility, dependency direction, and comments only when the supplied
+files support the question. An answer above the cutoff travels with the
+end-of-run guidelines review instead of interrupting each edit. READMEs, JSON,
+lockfiles, deletion-only edits, and files outside the project are never sent.
 
-It never blocks and never enters the system prompt. The state is the file and
-the added lines and nothing else — no conversation, no session, no neighbours.
+It never blocks and never enters the system prompt. No conversation or session
+content leaves the machine. Related source excludes ignored, hidden, sensitive-
+named and symlinked paths; a normal source file can still contain a secret.
 The footer counts the calls the session made, and `F10` shows the same count
 beside the key source. Without a key nothing is called, and when Jev runs out of
 quota, rejects the key,
@@ -214,12 +219,12 @@ without ever writing it to the session.
 `sideroom_persona` is the agent's voice, and there is exactly one of it. A
 short reminder rides the system prompt on every turn, so it survives
 compaction; the full guide lives in the on-demand `sideroom-persona` skill.
-The voice is direct and dry, free of filler, and plain enough to leave no
-doubt about what is being discussed — while calling things by the names the
-user already uses. Emojis and decorative symbols in the lines a `write`/`edit`
-adds block the mutation; flattering openers, hedging, automatic apologies, and
-AI meta-commentary are answered with a capped steer. No profiles to switch and
-no profile selection to store.
+The voice is direct and dry, free of filler. It uses everyday words even when
+you use technical terms. It keeps a technical term only when needed to
+understand or act, and explains it the first time. Emojis and decorative
+symbols in the lines a `write`/`edit` adds block the mutation; flattering
+openers, hedging, automatic apologies, and AI meta-commentary are answered
+with a capped steer. No profiles to switch and no profile selection to store.
 
 ### Done — done means green
 
@@ -359,10 +364,12 @@ itself.
   arrive after the review fired; nothing blocks and nothing reaches the system
   prompt.
 - One request per successful `write`/`edit` of a project file in a supported
-  language that added lines, with six `noul` questions on one shared state of
-  the project-relative path, the file body, and the added lines.
-- A serialized state over 60k characters is skipped rather than truncated. An
-  answer at or above `0.8` probability becomes a note.
+  language that added lines, with applicable `noul` questions on the complete
+  changed file and up to four directly related source files.
+- The official 32k-token state-plus-longest-question and 64k-token request
+  limits are observed conservatively using 32,000 and 64,000 UTF-8 bytes.
+  Oversized neighbours are omitted whole; if the changed file cannot fit,
+  the call is skipped. An answer at or above `0.8` becomes a note.
 - The request follows the run's abort signal; a cancelled request is not a
   failure.
 - Quota (`402`) and a rejected key (`401`, `403`) stop the calls immediately. A

@@ -15,26 +15,32 @@ mechanical check can decide.
   guidelines review carries it in its end-of-run steer. A note that arrives
   after the review fired gets one follow-up steer per turn. Nothing blocks, and
   nothing reaches the system prompt, so the cached prefix survives.
-- **One request per successful mutation worth asking about**, carrying six
-  `noul` questions and one shared state. Latency is flat in question count, and
-  the file leaves the machine once. No request is made for a file outside a
-  supported language (`.md`, `.json`, `.yaml`, lockfiles), for an edit that adds
-  no lines, or for a file outside the working directory.
-- **State is the file and the change, nothing else.** `file` holds the path
-  relative to the working directory, resolved the way Pi's file tools resolve
-  it, the language and the body; `change` holds the kind and the added lines.
-  An absolute or `@`-prefixed path the model wrote never leaves the machine.
-  The conversation, the session transcript, the board, other files, git history
-  and environment values never travel.
+- **One request per successful mutation worth asking about**, carrying only the
+  applicable `noul` questions and one shared state. No request is made for a
+  file outside a supported language (`.md`, `.json`, `.yaml`, lockfiles), for an
+  edit that adds no lines, or for a file outside the working directory.
+- **State is the changed file, its added lines, and bounded related source.**
+  `file` holds the project-relative path, language and complete body; `change`
+  holds the kind and added lines. `context` holds up to four complete directly
+  related source files, with their relative paths and relation (`imported` or
+  `consumer`), plus a `partial` flag when discovery or selection was incomplete.
+  Imports take priority over consumers. Files outside the working directory,
+  ignored files, hidden paths, symlinks, dependency/build folders and
+  sensitive-named paths are excluded. These path checks do not detect a secret
+  embedded in an otherwise ordinary source file. The conversation, session,
+  board, documentation, configuration, git history and environment never travel.
 - **Trigger.** `tool_call` records the added lines, because after a `write` the
   previous content is already gone. `tool_result` reads the resulting body from
   disk and asks. A call another extension blocks never reaches `tool_result`,
   so recorded calls are dropped on `turn_end` and on `session_start`.
-- **Budget.** A serialized state over 60k characters is skipped, never
-  truncated: half a file reads as a distorted picture and Jev answers it with
-  the same confidence. The whole state is measured, because a new file travels
-  twice, as the body and as its added lines. The API allows 64k tokens for the
-  request and 32k for the state plus the longest question.
+- **Budget.** The official Jev 1.13 limits are 32k tokens for state plus the
+  longest question and 64k tokens for the entire request. Without a service
+  tokenizer, Sideroom conservatively bounds their JSON UTF-8 size to 32,000
+  and 64,000 bytes, respectively. A complete changed file that does not fit
+  skips review; related files that do not fit are omitted whole. The scan stops
+  after 1,024 source files or ten folder levels and never includes more than
+  four neighbours. Incomplete discovery sets `context.partial` rather than
+  pretending the missing evidence is absent.
 - **Escape cuts the request.** Pi waits for every `tool_result` handler before
   the result reaches the model, so the request follows the run's abort signal
   as well as the three-second timeout. A request is not started once the run is
@@ -55,28 +61,26 @@ mechanical check can decide.
   and other `4xx`/`5xx` stop after three consecutive failures. A successful call
   rearms the breaker, and the F10 screen rearms it by hand. A request that hangs
   is cut after three seconds.
-- **Injection has nowhere to go.** TypeSafe states that the state is not treated
-  as hostile, and the body was written by the agent. Because the review can only
-  add a note to a steer, the worst an injected instruction achieves is one
-  wrong note.
+- **Findings cannot block.** The changed file and its neighbours are untrusted
+  input; misleading code or comments may still cause a wrong review note. Jev
+  can only emit notes for the guidelines review, never mutate code or block a
+  write.
 
-## The six rules
+## The questions
 
-The mechanical engine decides seven local things on added lines: braces, `any`,
-swallowed errors, vague names, stale comments, commented-out code and suppressed
-type errors. These six are the guide rules a single file can still answer.
+The six original questions remain: `guard-clauses` (3), `fail-fast` (4),
+`command-query` (7), `null-handling` (8), `immutability` (9), and `validate-once`
+(10). Rule 10 now requires visible evidence of the same check at the input
+boundary and in the added lines, rather than guessing what another file did.
 
-| Question id | Guide rule | Why a single file answers it |
-| --- | --- | --- |
-| `guard-clauses` | 3 | Nesting is visible in the body |
-| `fail-fast` | 4 | A fallback that hides a broken dependency sits in the function |
-| `command-query` | 7 | Doing and returning are both in the signature and the body |
-| `null-handling` | 8 | The convention is local to the file |
-| `immutability` | 9 | Mutating a parameter is visible at the mutation |
-| `validate-once` | 10 | A repeated check is visible where it repeats |
-
-Rules 11, 12, 15, 16, 17 and 18 stay out: they need the module's neighbours, and
-sending only the file would make Jev guess.
+Three questions are added: `single-responsibility` (11) looks for unrelated
+work performed inside the changed unit, not merely coordinated by it;
+`dependency-direction` (17) runs only when an imported source file is actually
+included; and `comments` (19) runs only when added text contains a comment
+marker. Every question checks the added lines against the supplied body, not
+unchanged code as a new violation. The mechanical rules still cover their
+existing local cases. Rules requiring requirements or more distant files stay
+in the language guide for the agent's review.
 
 ## The key
 
@@ -104,7 +108,8 @@ sending only the file would make Jev guess.
 | --- | --- |
 | `extensions/jev/index.ts` | Composition: resolves the key, wires the guard, the shortcut and the footer. |
 | `extensions/jev/client.ts` | The single HTTP call, status classification, and the injectable transport. |
-| `extensions/jev/model.ts` | Wire shapes, the six questions, the cutoff, the note text. Pure. |
+| `extensions/jev/model.ts` | Wire shapes, the applicable questions, the byte budget, the cutoff, the note text. Pure. |
+| `extensions/jev/context.ts` | Bounded ignore-aware source discovery and complete-file selection. |
 | `extensions/jev/key.ts` | Environment-first key resolution and the owner-only config file. |
 | `extensions/jev/guard.ts` | Events, filters, dedup, the circuit breaker, the rate-limit pause and the fail-open paths. |
 | `extensions/jev/ui.ts` | The masked capture screen and the footer labels. |
@@ -113,8 +118,10 @@ sending only the file would make Jev guess.
 
 ## Tests
 
-`model.test.ts` covers the request shape, the state allowlist, the cutoff,
-parsing, the serialized-state budget and the language filter. `client.test.ts`
+`model.test.ts` covers the request shape, evidence-based questions, the cutoff,
+parsing, the request budget and the language filter. `context.test.ts` checks
+imported files, consumers, language references, exclusions and budget skips.
+`client.test.ts`
 covers the status-to-failure map including `429`, the fail-open paths, a user
 cancel, and the outgoing request following the run's abort signal, with `fetch`
 stubbed. `key.test.ts` covers precedence, the owner-only modes and a missing or

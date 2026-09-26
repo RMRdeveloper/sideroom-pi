@@ -10,26 +10,34 @@ import {
   isReviewablePath,
   JEV_MODEL,
   JEV_RULES,
-  MAX_STATE_CHARACTERS,
+  MAX_STATE_BYTES,
   parseEnvelope,
   readFindings,
   stateFitsBudget,
   VIOLATION_PROBABILITY,
 } from './model.ts';
 
-test('asks one noul per single-file rule in a single request', () => {
+test('asks only rules supported by the supplied evidence in one request', () => {
   const state = buildFileState('src/example.ts', 'const a = 1;\n', 'edit', []);
   const body = buildRequestBody(state);
 
   assert.equal(body.model, JEV_MODEL);
-  assert.equal(Object.keys(body.questions).length, JEV_RULES.length);
-  assert.equal(JEV_RULES.length, 6);
-  for (const rule of JEV_RULES) {
-    const question = body.questions[rule.id];
-    assert.equal(question?.type, 'noul', rule.id);
-    assert.equal((question?.criteria.true.length ?? 0) > 0, true, rule.id);
-    assert.equal((question?.criteria.false.length ?? 0) > 0, true, rule.id);
+  assert.equal(JEV_RULES.length, 9);
+  assert.equal(body.questions['dependency-direction'], undefined);
+  assert.equal(body.questions.comments, undefined);
+  for (const question of Object.values(body.questions)) {
+    assert.equal(question.type, 'noul');
+    assert.ok(question.criteria.true.length > 0);
+    assert.ok(question.criteria.false.length > 0);
   }
+});
+
+test('command-query question distinguishes local accumulation from visible side effects', () => {
+  const question = buildRequestBody(buildFileState('src/a.ts', '', 'edit', []))
+    .questions['command-query'];
+  assert.match(question?.instructions ?? '', /local collections/);
+  assert.match(question?.criteria.true ?? '', /caller-visible state/);
+  assert.match(question?.criteria.false ?? '', /read-only file access/);
 });
 
 test('carries only the file and the change, never the conversation', () => {
@@ -40,7 +48,8 @@ test('carries only the file and the change, never the conversation', () => {
     addedLinesForWrite(undefined, 'const a = 1;\n'),
   );
 
-  assert.deepEqual(Object.keys(state).sort(), ['change', 'file']);
+  assert.deepEqual(Object.keys(state).sort(), ['change', 'context', 'file']);
+  assert.deepEqual(state.context, { files: [], partial: false });
   assert.deepEqual(Object.keys(state.file).sort(), [
     'body',
     'language',
@@ -107,8 +116,8 @@ test('parses a well-formed envelope and refuses anything else', () => {
   );
 });
 
-test('measures the whole serialized state against the budget', () => {
-  const half = 'x'.repeat(MAX_STATE_CHARACTERS / 2);
+test('uses a conservative byte bound for state and questions', () => {
+  const half = 'x'.repeat(MAX_STATE_BYTES / 2);
   const edited = buildFileState('src/a.ts', half, 'edit', []);
   assert.equal(stateFitsBudget(edited), true);
 
@@ -127,6 +136,42 @@ test('reviews only files in a supported language', () => {
   assert.equal(isReviewablePath('README.md'), false);
   assert.equal(isReviewablePath('package-lock.json'), false);
   assert.equal(isReviewablePath('config.yaml'), false);
+});
+
+test('does not accept an answer to a question that was not asked', () => {
+  assert.deepEqual(
+    readFindings(
+      { model: undefined, answers: { 'dependency-direction': { noul: 1 } } },
+      new Set(['guard-clauses']),
+    ),
+    [],
+  );
+});
+
+test('includes related rules only when there is evidence', () => {
+  const state = buildFileState(
+    'src/domain/order.ts',
+    'import { save } from "../infra/store";\n',
+    'edit',
+    [{ line: 1, text: 'import { save } from "../infra/store";' }],
+    [
+      {
+        path: 'src/infra/store.ts',
+        body: 'export function save() {}',
+        relation: 'imported',
+      },
+    ],
+  );
+  const questions = buildRequestBody(state).questions;
+  assert.ok(questions['dependency-direction']);
+  assert.equal(questions.comments, undefined);
+  assert.ok(
+    buildRequestBody(
+      buildFileState('a.ts', '// explain intent', 'write', [
+        { line: 1, text: '// explain intent' },
+      ]),
+    ).questions.comments,
+  );
 });
 
 test('formats a note that names the rule and the probability', () => {

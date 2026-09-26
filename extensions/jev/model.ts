@@ -11,12 +11,11 @@ export const JEV_MODEL = 'jev-latest';
 // noise on every edit.
 export const VIOLATION_PROBABILITY = 0.8;
 
-// The serialized state must stay well under the two documented budgets (64k
-// tokens for the whole request, 32k for the state plus the longest question). A
-// new file travels twice, as the body and as its added lines. A state that does
-// not fit is skipped, never truncated: half a file reads as a distorted picture
-// and Jev answers it with the same confidence.
-export const MAX_STATE_CHARACTERS = 60_000;
+// TypeSafe documents 32k tokens for state plus the longest question and 64k
+// for the full request. JSON UTF-8 bytes are a deliberately conservative
+// upper bound; no third-party tokenizer can promise the model's exact count.
+export const MAX_STATE_BYTES = 32_000;
+export const MAX_REQUEST_BYTES = 64_000;
 
 const NOUL_TYPE = 'noul';
 
@@ -31,8 +30,7 @@ export interface JevRule {
   readonly question: JevNoulQuestion;
 }
 
-// The six guide rules that a single file can answer and that no mechanical
-// check covers. Rules 11, 12, 15, 16, 17 and 18 need the module's neighbours.
+// Questions must only use evidence in the file and the selected direct neighbours.
 export const JEV_RULES: readonly JevRule[] = [
   {
     id: 'guard-clauses',
@@ -65,10 +63,11 @@ export const JEV_RULES: readonly JevRule[] = [
     question: {
       type: NOUL_TYPE,
       instructions:
-        'In `change.addedLines`, does a function both change state and return a value, or does something that reads like a query have a side effect?',
+        'In `change.addedLines`, does a function return a value while changing a parameter, shared state or an external resource, or does a getter/query cause such a side effect? Ignore changes to local collections created inside the function to build its result.',
       criteria: {
-        true: 'A function that returns data also mutates state, or a getter mutates',
-        false: 'Functions either change state or return data, never both',
+        true: 'A function returns data while changing caller-visible state, or a getter/query mutates that state',
+        false:
+          'Local accumulation and read-only file access do not change caller-visible state',
       },
     },
   },
@@ -102,14 +101,59 @@ export const JEV_RULES: readonly JevRule[] = [
     question: {
       type: NOUL_TYPE,
       instructions:
-        'In `change.addedLines`, is the same required, type or range check repeated after a boundary already owns that input?',
+        'Does `change.addedLines` repeat a required, type or range check that is visibly performed at the input boundary in `file.body` or `context.files`? Do not infer unseen validation.',
       criteria: {
-        true: 'A rule already validated at the boundary is checked again deeper in the code',
-        false: 'Validation happens once, at the boundary that owns the input',
+        true: 'The same check is visible both at the boundary and in the added lines',
+        false:
+          'The boundary check is not visible, or the added lines do not repeat it',
+      },
+    },
+  },
+  {
+    id: 'single-responsibility',
+    question: {
+      type: NOUL_TYPE,
+      instructions:
+        'Do the added lines give the changed function or class two unrelated reasons to change, visible in its body? Do not flag a function merely for coordinating focused collaborators.',
+      criteria: {
+        true: 'The changed unit itself performs two unrelated responsibilities with visible evidence',
+        false:
+          'The unit has one responsibility or only coordinates separate focused units',
+      },
+    },
+  },
+  {
+    id: 'dependency-direction',
+    question: {
+      type: NOUL_TYPE,
+      instructions:
+        'Do the added lines introduce an import from business/domain code to infrastructure, HTTP, or a framework? Use paths and bodies in `context.files` as evidence; never infer a layer from an unavailable file.',
+      criteria: {
+        true: 'A new inward-to-outward dependency is visible in the import and its related file',
+        false:
+          'No such dependency is visible, or the roles of the files are unclear',
+      },
+    },
+  },
+  {
+    id: 'comments',
+    question: {
+      type: NOUL_TYPE,
+      instructions:
+        'Does a comment in `change.addedLines` merely narrate obvious code instead of explaining non-obvious intent, a trade-off or a hazard?',
+      criteria: {
+        true: 'A newly added comment repeats what the adjacent code already says',
+        false: 'No comment was added, or it explains non-obvious intent',
       },
     },
   },
 ];
+
+export interface JevRelatedFile {
+  readonly path: string;
+  readonly body: string;
+  readonly relation: 'imported' | 'consumer';
+}
 
 export interface JevFileState {
   readonly file: {
@@ -120,6 +164,10 @@ export interface JevFileState {
   readonly change: {
     readonly kind: string;
     readonly addedLines: readonly string[];
+  };
+  readonly context: {
+    readonly files: readonly JevRelatedFile[];
+    readonly partial: boolean;
   };
 }
 
@@ -148,10 +196,13 @@ export function buildFileState(
   body: string,
   kind: string,
   lines: readonly AddedLine[],
+  relatedFiles: readonly JevRelatedFile[] = [],
+  partial = false,
 ): JevFileState {
   return {
     file: { path, language: languageForPath(path), body },
     change: { kind, addedLines: lines.map((line) => line.text) },
+    context: { files: relatedFiles, partial },
   };
 }
 
@@ -168,19 +219,38 @@ export function addedLinesForEdit(
   return edits.flatMap((edit) => addedLines(edit.oldText, edit.newText));
 }
 
-// The six questions are about code structure; a README or a lockfile would
-// spend a call on answers that mean nothing.
+// Questions are about code structure; a README or a lockfile has no useful state.
 export function isReviewablePath(path: string): boolean {
   return languageForPath(path) !== LANGUAGE.generic;
 }
 
 export function stateFitsBudget(state: JevFileState): boolean {
-  return JSON.stringify(state).length <= MAX_STATE_CHARACTERS;
+  const request = buildRequestBody(state);
+  const longestQuestion = Object.values(request.questions).reduce(
+    (longest, question) =>
+      Math.max(longest, Buffer.byteLength(JSON.stringify(question))),
+    0,
+  );
+  return (
+    Buffer.byteLength(JSON.stringify(state)) + longestQuestion <=
+      MAX_STATE_BYTES &&
+    Buffer.byteLength(JSON.stringify(request)) <= MAX_REQUEST_BYTES
+  );
 }
 
 export function buildRequestBody(file: JevFileState): JevRequestBody {
   const questions: Record<string, JevNoulQuestion> = {};
+  const hasImportedFile = file.context.files.some(
+    (related) => related.relation === 'imported',
+  );
+  const addedText = file.change.addedLines.join('\n');
   for (const rule of JEV_RULES) {
+    if (rule.id === 'dependency-direction' && !hasImportedFile) {
+      continue;
+    }
+    if (rule.id === 'comments' && !/(?:\/\/|\/\*|#)/u.test(addedText)) {
+      continue;
+    }
     questions[rule.id] = rule.question;
   }
   return { model: JEV_MODEL, state: file, questions };
@@ -197,6 +267,7 @@ export function parseEnvelope(text: string): JevResponseEnvelope | undefined {
 
 export function readFindings(
   envelope: JevResponseEnvelope,
+  askedRuleIds: ReadonlySet<string> = new Set(JEV_RULES.map((rule) => rule.id)),
 ): readonly JevFinding[] {
   const answers = envelope.answers;
   if (answers === undefined) {
@@ -204,6 +275,9 @@ export function readFindings(
   }
   const findings: JevFinding[] = [];
   for (const rule of JEV_RULES) {
+    if (!askedRuleIds.has(rule.id)) {
+      continue;
+    }
     const answer = answers[rule.id];
     if (answer === undefined || answer.noul < VIOLATION_PROBABILITY) {
       continue;

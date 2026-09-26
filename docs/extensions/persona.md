@@ -17,10 +17,10 @@ Array order sets how the rules read in the reminder; `plain-language` comes firs
 
 | Rule id | Instruction |
 | --- | --- |
-| `plain-language` | Plain words: subject and goal before the detail; everyday terms over concept jargon unless the user used them; define a necessary term in one line; explicit without repetition; no tangled chains such as "the registry resolves the provider through the auth resolver". |
+| `plain-language` | Say what the user needs to know or do before details. Use everyday words even when the user used a technical term; keep a term only if needed to understand or act, and explain it at first use. Stay accurate without repeating yourself. |
 | `direct` | Direct and dry. Short sentences. No preamble, no closing summary. |
 | `no-filler` | No filler. |
-| `no-invented-terms` | Name things as they are. Coin no intermediate term, abbreviation, codename, or technical concept word the user did not ask for. |
+| `no-invented-terms` | Do not coin intermediate terms, abbreviations, or codenames. Use the user's terms only when needed to answer. |
 | `short-prose` | Default to short prose. Lists or tables only to compare options or list more than three items. |
 | `user-language` | Answer in the user's language and variant. |
 
@@ -48,12 +48,13 @@ after the other extensions and skipped when the heading is already present.
 Because it runs on every user prompt, the reminder comes back after compaction
 with no extra hook. The reminder restates the catalog instead of duplicating
 it, so catalog edits propagate. It also carries two static Do/Don't example
-pairs (`PERSONA_EXAMPLES` in `prompt.ts`): one against tangled technical
-chains, one against concept jargon. The pairs are module-level literals with
-no per-turn data, so the reminder stays byte-identical across turns and the
-provider prompt cache holds; only a package release changes the prefix. The
-tool deliberately has no `promptGuidelines`: they repeated the same rules in
-another system-prompt section without changing the result.
+pairs (`PERSONA_EXAMPLES` in `prompt.ts`): one explains where the work list is
+kept without internal names, and one explains an unavoidable term at first use.
+The pairs are module-level literals with no per-turn data, so the reminder
+stays byte-identical across turns and the provider prompt cache holds; only a
+package release changes the prefix. The tool deliberately has no
+`promptGuidelines`: they repeated the same rules in another system-prompt
+section without changing the result.
 
 `sideroom_persona` takes no arguments and returns the full detail: every voice
 rule and every prohibition with its enforcement mode. With one voice there is
@@ -104,7 +105,10 @@ nothing to select, so the tool has no action parameter.
 
 `checks.test.ts` covers hits, semantic text symbols, misses, and scope
 filtering. `prompt.test.ts` covers the idempotent append, both example pairs,
-and the reminder length budget. `model.test.ts` covers the formatters and
-message extraction. `index.test.ts` covers blocking, path aliases, degradation,
-the steer cap and its `triggerTurn` options, the per-run footer counts, and the
-status.
+representative plain and jargon-heavy answers, and the reminder length budget.
+These text checks protect the shipped instructions; they do not score the
+clarity of a generated answer. The prose detector still checks only hard
+prohibitions, not whether a technical term was necessary. `model.test.ts`
+covers the formatters and message extraction. `index.test.ts` covers blocking,
+path aliases, degradation, the steer cap and its `triggerTurn` options, the
+per-run footer counts, and the status.

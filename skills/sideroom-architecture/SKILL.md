@@ -50,7 +50,14 @@ impact), or for a word conflict — that is `sideroom-domain-modeling`.
   technology label.
 - Present the decision as the current situation, the alternatives by their
   practical consequences, and one recommendation with a one-line justification.
-  Never reduce it to technology names.
+  Prefer the most maintainable option that can meet known growth needs over the
+  cheapest initial build; name its upfront cost and the cost of later changes.
+  Do not recommend maximum capacity merely for hypothetical growth. Never reduce
+  the alternatives to technology names.
+- If a missing figure could change which option is best, ask for it before
+  recommending an architecture. The preliminary question still needs a
+  justified recommended option (such as obtaining the figure); never invent
+  a target or recommend a solution without evidence.
 - One open architectural dimension blocks implementation. `Out of scope` closes
   a thread, is recorded, and is not re-asked.
 
@@ -77,10 +84,10 @@ an explicit `Out of scope` on each one you pick.
    codebase, and note any inconsistent pattern to name in a prompt.
 2. List the architectural decisions the change forces. Drop the ones the code
    already settles.
-3. For each remaining decision, pick the dimensions it touches and run one
-   `sideroom_ask` round: situation, alternatives by consequence, one
-   recommendation, each option with a `description`. Force a number or an
-   explicit `Out of scope`.
+3. For each remaining decision, pick the dimensions it touches. Ask for any
+   decisive missing figures first, then run a `sideroom_ask` round: situation,
+   alternatives by consequence, one evidence-backed recommendation, each option
+   with a `description`. Force a number or an explicit `Out of scope`.
 4. Repeat rounds until no architectural dimension is open. Do not implement
    with one open.
 5. Record an accepted decision as an ADR under `docs/adr/` only when it clears
