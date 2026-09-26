@@ -1,6 +1,8 @@
 # Sideroom Pi — the side room your agent was missing
 
-![The Sideroom Pi mark](https://raw.githubusercontent.com/RMRdeveloper/sideroom-pi/main/media/logo.png)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/RMRdeveloper/sideroom-pi/main/media/logo.png" alt="The Sideroom Pi mark" width="640">
+</p>
 
 [![npm version](https://img.shields.io/npm/v/@rmrdeveloper/sideroom-pi?label=npm&logo=npm)](https://www.npmjs.com/package/@rmrdeveloper/sideroom-pi)
 [![npm monthly downloads](https://img.shields.io/npm/dm/@rmrdeveloper/sideroom-pi?label=downloads&logo=npm)](https://www.npmjs.com/package/@rmrdeveloper/sideroom-pi)
