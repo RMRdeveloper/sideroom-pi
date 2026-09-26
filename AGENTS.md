@@ -105,11 +105,26 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
 - `skills/sideroom-persona/SKILL.md` owns the persona Do/Don't table, the
   plain-language bar, and the enforcement boundaries.
 
+- `site/astro.config.mjs` fixes the origin and the base path of the GitHub
+  Pages project page; `site/src/lib/urls.ts` derives every absolute address and
+  every in-page href from them, and `site/src/lib/crawl.ts` renders `robots.txt`
+  and the sitemap from the same origin.
+- `site/src/lib/schema.ts` builds the `SoftwareApplication` JSON-LD;
+  `site/src/layouts/Layout.astro` owns the head, the masthead and the colophon;
+  `site/src/i18n/` owns both dictionaries and the language tags;
+  `site/src/components/` and `site/src/pages/` hold the landing and policy
+  pages; `site/src/styles/site.css` is the whole stylesheet.
+- `site/public/` holds the published icons, the link card and the web manifest,
+  all derived from the source art in `media/`.
+- `DESIGN.md` owns the site's design system: palette, type scale, components and
+  the rules that decide them. `PRODUCT.md` owns the product brief: platform,
+  users, positioning, brand commitments and the evidence on hand.
 - `CONTRIBUTING.md` owns the contributor contract: setup, commands, design
   rules, commit and branch conventions, the changeset requirement, the extension
   recipe, and how to report an issue.
 - `.github/ISSUE_TEMPLATE/` owns the issue forms and the contact links;
-  `.github/pull_request_template.md` owns the pull request checklist.
+  `.github/pull_request_template.md` owns the pull request checklist, and
+  `.github/workflows/site.yml` checks `site/` and deploys it to GitHub Pages.
 - `CODE_OF_CONDUCT.md` owns community standards; `SECURITY.md` owns supported
   versions and private vulnerability reporting.
 
@@ -137,6 +152,10 @@ npm run version-packages
 Use Biome; do not add ESLint or Prettier. Conventional Commits. Node 22.19 or
 later. Release only through Changesets on protected `main`. Never publish
 locally.
+
+The site in `site/` has its own `package.json`: `cd site && npm install`, then
+`npm run check` for its own gate, `npm run dev` to serve it locally, and
+`npm run build` for the published files.
 
 Biome requires braces around every `if` body. Do not disable
 `style/useBlockStatements`. Follow `assets/artifacts/GUIDELINES_TEMPLATE.md`.

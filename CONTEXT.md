@@ -161,3 +161,9 @@ _Avoid: style rule, tone rule._
 One of the persona's four hard restrictions. An artifact prohibition blocks a `write`/`edit` that adds the forbidden content, degrading to a steer after repeated fires; a prose prohibition steers only.
 
 _Avoid: ban, hard rule._
+
+## Landing site
+
+The public surface under `site/`, built with Astro and kept out of the published package: one page in English at the root and Spanish under `/es/`. It is neither the package nor `docs/`, which holds internal documentation for contributors. The released changelog is not part of it: both languages link to `CHANGELOG.md` in the repository.
+
+_Avoid: the web, webpage, home, docs._
