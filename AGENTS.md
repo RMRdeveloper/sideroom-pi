@@ -114,6 +114,10 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   `site/src/i18n/` owns both dictionaries and the language tags;
   `site/src/components/` and `site/src/pages/` hold the landing and policy
   pages; `site/src/styles/site.css` is the whole stylesheet.
+- `site/src/lib/board.ts` is the board display model, tested by
+  `site/src/lib/board.test.ts`; `site/src/lib/batch.ts` and
+  `site/src/lib/languages.ts` hold the question-batch model and the language
+  catalogue the page prints.
 - `site/public/` holds the published icons, the link card and the web manifest,
   all derived from the source art in `media/`.
 - `DESIGN.md` owns the site's design system: palette, type scale, components and
