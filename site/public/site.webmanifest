@@ -1,0 +1,6 @@
+{
+  "name": "Sideroom Pi",
+  "short_name": "Sideroom Pi",
+  "icons": [{ "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }],
+  "theme_color": "#131211"
+}

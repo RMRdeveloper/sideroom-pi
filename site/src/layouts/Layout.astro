@@ -1,0 +1,178 @@
+---
+import '@fontsource-variable/archivo';
+import '@fontsource/ibm-plex-mono/400.css';
+import '@fontsource/ibm-plex-mono/500.css';
+import '@fontsource/ibm-plex-mono/600.css';
+import '../styles/site.css';
+import { copyFor, DEFAULT_LANGUAGE_TAG, type Locale, localeHome } from '../i18n/index.ts';
+import {
+  absoluteUrl,
+  CHANGELOG_URL,
+  ISSUES_URL,
+  NPM_URL,
+  REPO_URL,
+  SECURITY_URL,
+  withBase,
+} from '../lib/urls.ts';
+
+interface Props {
+  locale: Locale;
+  title: string;
+  description: string;
+  pathEn: string;
+  pathEs: string;
+  structuredData?: Record<string, unknown>;
+}
+
+// The language tags Open Graph expects for the two languages this site speaks.
+const OG_LOCALE = { en: 'en_US', es: 'es_ES' } as const;
+
+const { locale, title, description, pathEn, pathEs, structuredData } = Astro.props;
+const t = copyFor(locale);
+const root = localeHome(locale);
+const canonicalUrl = absoluteUrl(locale === 'en' ? pathEn : pathEs);
+const alternateLocale = locale === 'en' ? OG_LOCALE.es : OG_LOCALE.en;
+
+// One card serves every page; crawlers read its size from these values.
+const CARD_IMAGE_PATH = '/og-card.jpg';
+const CARD_IMAGE_WIDTH = '1200';
+const CARD_IMAGE_HEIGHT = '630';
+
+const sections = [
+  { id: 'faults', label: t.masthead.nav.faults },
+  { id: 'ask', label: t.masthead.nav.ask },
+  { id: 'board', label: t.masthead.nav.board },
+  { id: 'rules', label: t.masthead.nav.rules },
+  { id: 'session', label: t.masthead.nav.session },
+  { id: 'inside', label: t.masthead.nav.inside },
+];
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#131211" />
+    <link rel="icon" href={withBase('/favicon.png')} sizes="48x48" type="image/png" />
+    <link rel="apple-touch-icon" href={withBase('/apple-touch-icon.png')} />
+    <link rel="manifest" href={withBase('/site.webmanifest')} />
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="alternate" hreflang="en" href={absoluteUrl(pathEn)} />
+    <link rel="alternate" hreflang="es" href={absoluteUrl(pathEs)} />
+    <link rel="alternate" hreflang={DEFAULT_LANGUAGE_TAG} href={absoluteUrl(pathEn)} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={t.masthead.name} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:locale" content={OG_LOCALE[locale]} />
+    <meta property="og:locale:alternate" content={alternateLocale} />
+    <meta property="og:image" content={absoluteUrl(CARD_IMAGE_PATH)} />
+    <meta property="og:image:width" content={CARD_IMAGE_WIDTH} />
+    <meta property="og:image:height" content={CARD_IMAGE_HEIGHT} />
+    <meta property="og:image:alt" content={t.meta.cardAlt} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={absoluteUrl(CARD_IMAGE_PATH)} />
+    <meta name="twitter:image:alt" content={t.meta.cardAlt} />
+    {
+      structuredData && (
+        <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+      )
+    }
+  </head>
+  <body>
+    <a class="skip" href="#main">{t.skipToContent}</a>
+
+    <header class="masthead">
+      <div class="sheet masthead__inner">
+        <a class="masthead__name" href={withBase(root)}>{t.masthead.name}</a>
+        <nav class="masthead__nav" aria-label={t.masthead.name}>
+          {
+            sections.map((section) => (
+              <a
+                class="masthead__link"
+                href={`${withBase(root)}#${section.id}`}
+                data-section-link={section.id}
+              >
+                {section.label}
+              </a>
+            ))
+          }
+          <a class="masthead__link" href={CHANGELOG_URL}>{t.masthead.nav.changelog}</a>
+        </nav>
+        <a
+          class="masthead__switch"
+          href={withBase(t.switchHref)}
+          hreflang={locale === 'en' ? 'es' : 'en'}
+          aria-label={t.switchAria}>{t.switchLabel}</a>
+      </div>
+    </header>
+
+    <main id="main">
+      <slot />
+    </main>
+
+    <footer class="colophon">
+      <div class="sheet colophon__grid">
+        <p class="colophon__name">{t.masthead.name}</p>
+        <ul class="colophon__links">
+          <li><a href={NPM_URL}>{t.links.npm}</a></li>
+          <li><a href={REPO_URL}>{t.links.repo}</a></li>
+          <li><a href={CHANGELOG_URL}>{t.links.changelog}</a></li>
+          <li><a href={withBase(t.policyHref)}>{t.links.policy}</a></li>
+          <li><a href={ISSUES_URL}>{t.links.issues}</a></li>
+          <li><a href={SECURITY_URL}>{t.links.security}</a></li>
+        </ul>
+        <p class="colophon__note">{t.footer.built}</p>
+        <p class="colophon__note">{t.footer.state} {t.footer.license}</p>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<script>
+  // A long page in one scroll: the link for the section being read is the one
+  // that keeps its underline.
+  function trackCurrentSection(): void {
+    const links = [...document.querySelectorAll<HTMLAnchorElement>('[data-section-link]')];
+    const sections = links
+      .map((link) => {
+        const id = link.dataset.sectionLink ?? '';
+        const section = document.getElementById(id);
+        return section === null ? undefined : { link, section };
+      })
+      .filter((entry) => entry !== undefined);
+    if (sections.length === 0) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) {
+            continue;
+          }
+          for (const tracked of sections) {
+            if (tracked.section.id === entry.target.id) {
+              tracked.link.setAttribute('aria-current', 'location');
+              continue;
+            }
+            tracked.link.removeAttribute('aria-current');
+          }
+        }
+      },
+      { rootMargin: '-30% 0px -60% 0px' },
+    );
+
+    for (const tracked of sections) {
+      observer.observe(tracked.section);
+    }
+  }
+
+  trackCurrentSection();
+</script>

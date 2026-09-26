@@ -1,0 +1,329 @@
+---
+import { copyFor, type Locale } from '../i18n';
+import {
+  CUSTOM_VALUE,
+  OPEN_MARK,
+  OUT_OF_SCOPE_VALUE,
+  SUMMARY_TAB_ID,
+} from '../lib/batch.ts';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = copyFor(locale);
+
+const questions = t.ask.questions;
+
+// The reserved option that carries the reader's own answer.
+const customAnswerNumber = questions.length + 1;
+---
+
+<div class="batch" data-batch data-open-answer={t.ask.openAnswer}>
+  <div class="batch__tabs" role="tablist" aria-label={t.ask.tabsLabel}>
+    {
+      questions.map((question, index) => (
+        <button
+          class="batch__tab"
+          type="button"
+          role="tab"
+          id={`tab-${question.id}`}
+          aria-controls={`panel-${question.id}`}
+          aria-selected={index === 0}
+          tabindex={index === 0 ? 0 : -1}
+          data-tab={question.id}
+        >
+          <span class="batch__mark" aria-hidden="true" data-mark={question.id}>
+            {OPEN_MARK}
+          </span>
+          {question.label}
+        </button>
+      ))
+    }
+    <button
+      class="batch__tab"
+      type="button"
+      role="tab"
+      id={`tab-${SUMMARY_TAB_ID}`}
+      aria-controls={`panel-${SUMMARY_TAB_ID}`}
+      aria-selected="false"
+      tabindex="-1"
+      data-tab={SUMMARY_TAB_ID}
+    >
+      {t.ask.submit}
+    </button>
+  </div>
+
+  {
+    questions.map((question, questionIndex) => (
+      <div
+        class="batch__panel"
+        role="tabpanel"
+        id={`panel-${question.id}`}
+        aria-labelledby={`tab-${question.id}`}
+        tabindex="0"
+        hidden={questionIndex !== 0}
+        data-panel={question.id}
+      >
+        <fieldset class="batch__fieldset">
+          <legend class="batch__prompt">{question.prompt}</legend>
+
+          <div class="batch__options">
+            {question.options.map((option, optionIndex) => (
+              <label class="batch__option" data-option={option.value}>
+                <span class="batch__cursor" aria-hidden="true" />
+                <span class="batch__option-body">
+                  <span class="batch__option-head">
+                    <span class="batch__index">{String(optionIndex + 1)}.</span>
+                    <span class="batch__option-label">{option.label}</span>
+                    {question.recommendedValue === option.value ? (
+                      <span class="batch__tag">{t.ask.recommended}</span>
+                    ) : null}
+                  </span>
+                  <span class="batch__description">{option.description}</span>
+                </span>
+                <input
+                  class="batch__input"
+                  type="radio"
+                  name={`question-${question.id}`}
+                  value={option.value}
+                />
+              </label>
+            ))}
+
+            <label class="batch__option" data-option={OUT_OF_SCOPE_VALUE}>
+              <span class="batch__cursor" aria-hidden="true" />
+              <span class="batch__option-body">
+                <span class="batch__option-head">
+                  <span class="batch__index">{String(question.options.length + 1)}.</span>
+                  <span class="batch__option-label">{t.ask.outOfScope}</span>
+                </span>
+              </span>
+              <input
+                class="batch__input"
+                type="radio"
+                name={`question-${question.id}`}
+                value={OUT_OF_SCOPE_VALUE}
+              />
+            </label>
+          </div>
+
+          <div class="batch__custom" data-option={CUSTOM_VALUE}>
+            <span class="batch__cursor" aria-hidden="true" />
+            <div>
+              <label class="batch__option-head">
+                <span class="batch__index">{String(customAnswerNumber)}.</span>
+                <span class="batch__option-label">{t.ask.custom}</span>
+                <input
+                  class="batch__input"
+                  type="radio"
+                  name={`question-${question.id}`}
+                  value={CUSTOM_VALUE}
+                />
+              </label>
+              <div class="batch__writer">
+                <label class="visually-hidden" for={`written-${question.id}`}>
+                  {t.ask.custom}
+                </label>
+                <input
+                  class="batch__text"
+                  id={`written-${question.id}`}
+                  type="text"
+                  placeholder={t.ask.customPlaceholder}
+                  data-custom-text={question.id}
+                />
+                <button class="batch__write" type="button" data-custom-write={question.id}>
+                  {t.ask.write}
+                </button>
+              </div>
+            </div>
+          </div>
+        </fieldset>
+      </div>
+    ))
+  }
+
+  <div
+    class="batch__panel"
+    role="tabpanel"
+    id={`panel-${SUMMARY_TAB_ID}`}
+    aria-labelledby={`tab-${SUMMARY_TAB_ID}`}
+    tabindex="0"
+    hidden
+    data-panel={SUMMARY_TAB_ID}
+  >
+    <div class="batch__summary">
+      {
+        questions.map((question) => (
+          <p class="batch__summary-row">
+            <span class="batch__summary-label">{question.label}</span>
+            <span class="batch__summary-open" data-summary-value={question.id}>
+              {t.ask.openAnswer}
+            </span>
+          </p>
+        ))
+      }
+    </div>
+  </div>
+
+  <p class="batch__help">{t.ask.help}</p>
+</div>
+
+<script>
+  import { ANSWERED_MARK, CUSTOM_VALUE, OPEN_MARK, SUMMARY_TAB_ID } from '../lib/batch.ts';
+
+  const QUESTION_PANEL = '[data-panel]';
+  const BATCH_TAB = '[data-tab]';
+  const CHOSEN_OPTION = '[data-option]';
+  const OPTION_INDEX = '.batch__index';
+  const OPTION_LABEL = '.batch__option-label';
+
+  function selectTab(root: HTMLElement, tabId: string): void {
+    for (const tab of root.querySelectorAll<HTMLButtonElement>(BATCH_TAB)) {
+      const chosen = tab.dataset.tab === tabId;
+      tab.setAttribute('aria-selected', String(chosen));
+      tab.tabIndex = chosen ? 0 : -1;
+    }
+
+    for (const panel of root.querySelectorAll<HTMLElement>(QUESTION_PANEL)) {
+      panel.hidden = panel.dataset.panel !== tabId;
+    }
+  }
+
+  function handleTabKey(
+    root: HTMLElement,
+    tabs: HTMLButtonElement[],
+    tab: HTMLButtonElement,
+    event: KeyboardEvent,
+  ): void {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') {
+      return;
+    }
+
+    event.preventDefault();
+    const step = event.key === 'ArrowRight' ? 1 : -1;
+    const index = tabs.indexOf(tab);
+    const next = tabs[(index + step + tabs.length) % tabs.length];
+    if (next === undefined) {
+      throw new Error('The batch has no tab to focus');
+    }
+    next.focus();
+    selectTab(root, next.dataset.tab ?? '');
+  }
+
+  function readOptionText(option: HTMLElement, selector: string): string {
+    const element = option.querySelector(selector);
+    if (element === null || element.textContent === null) {
+      throw new Error(`The batch option is missing ${selector}`);
+    }
+    return element.textContent;
+  }
+
+  function optionAnswer(option: HTMLElement): string {
+    const indexText = readOptionText(option, OPTION_INDEX);
+    const labelText = readOptionText(option, OPTION_LABEL);
+    return `${indexText} ${labelText}`;
+  }
+
+  function findPanel(root: HTMLElement, questionId: string): HTMLElement {
+    for (const panel of root.querySelectorAll<HTMLElement>(QUESTION_PANEL)) {
+      if (panel.dataset.panel === questionId) {
+        return panel;
+      }
+    }
+    throw new Error(`The panel for ${questionId} is missing`);
+  }
+
+  function refreshAnswers(root: HTMLElement): void {
+    const openAnswerLabel = root.dataset.openAnswer ?? '';
+    for (const panel of root.querySelectorAll<HTMLElement>(QUESTION_PANEL)) {
+      const questionId = panel.dataset.panel ?? '';
+      if (questionId === SUMMARY_TAB_ID) {
+        continue;
+      }
+
+      const chosenInput = panel.querySelector<HTMLInputElement>('input:checked');
+      const summaryLine = root.querySelector<HTMLElement>(`[data-summary-value="${questionId}"]`);
+      if (summaryLine === null) {
+        throw new Error(`The summary line for ${questionId} is missing`);
+      }
+
+      for (const option of panel.querySelectorAll<HTMLElement>(CHOSEN_OPTION)) {
+        const isChosen = chosenInput !== null && option.dataset.option === chosenInput.value;
+        option.dataset.selected = String(isChosen);
+      }
+
+      const chosenOption = chosenInput === null ? null : chosenInput.closest(CHOSEN_OPTION);
+      summaryLine.textContent =
+        chosenOption instanceof HTMLElement ? optionAnswer(chosenOption) : openAnswerLabel;
+      summaryLine.classList.toggle('batch__summary-open', chosenInput === null);
+
+      const tabMark = root.querySelector<HTMLElement>(`[data-mark="${questionId}"]`);
+      if (tabMark === null) {
+        throw new Error(`The tab mark for ${questionId} is missing`);
+      }
+      tabMark.textContent = chosenInput === null ? OPEN_MARK : ANSWERED_MARK;
+    }
+  }
+
+  function writeCustomAnswer(root: HTMLElement, questionId: string): void {
+    const panel = findPanel(root, questionId);
+    const textField = panel.querySelector<HTMLInputElement>('[data-custom-text]');
+    const customInput = panel.querySelector<HTMLInputElement>(`input[value="${CUSTOM_VALUE}"]`);
+    if (textField === null || customInput === null) {
+      throw new Error(`The custom answer for ${questionId} is missing`);
+    }
+
+    const written = textField.value.trim();
+    if (written === '') {
+      textField.setAttribute('aria-invalid', 'true');
+      textField.focus();
+      return;
+    }
+
+    textField.removeAttribute('aria-invalid');
+    customInput.checked = true;
+    const customLabel = panel.querySelector<HTMLElement>(
+      `[data-option="${CUSTOM_VALUE}"] ${OPTION_LABEL}`,
+    );
+    if (customLabel === null) {
+      throw new Error(`The custom option label for ${questionId} is missing`);
+    }
+    customLabel.textContent = written;
+    refreshAnswers(root);
+  }
+
+  function initBatch(): void {
+    const root = document.querySelector<HTMLElement>('[data-batch]');
+    if (root === null) {
+      throw new Error('The question batch markup is missing');
+    }
+
+    const tabs = [...root.querySelectorAll<HTMLButtonElement>(BATCH_TAB)];
+    for (const tab of tabs) {
+      tab.addEventListener('click', () => {
+        selectTab(root, tab.dataset.tab ?? '');
+      });
+      tab.addEventListener('keydown', (event) => {
+        handleTabKey(root, tabs, tab, event);
+      });
+    }
+
+    for (const panel of root.querySelectorAll<HTMLElement>(QUESTION_PANEL)) {
+      panel.addEventListener('change', () => {
+        refreshAnswers(root);
+      });
+    }
+
+    for (const button of root.querySelectorAll<HTMLButtonElement>('[data-custom-write]')) {
+      button.addEventListener('click', () => {
+        writeCustomAnswer(root, button.dataset.customWrite ?? '');
+      });
+    }
+
+    refreshAnswers(root);
+  }
+
+  initBatch();
+</script>

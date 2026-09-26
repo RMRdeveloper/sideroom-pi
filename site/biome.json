@@ -1,0 +1,12 @@
+{
+  "extends": ["../biome.json"],
+  "files": {
+    "includes": [
+      "src/**/*.{ts,mjs}",
+      "scripts/**/*.mjs",
+      "astro.config.mjs",
+      "*.json"
+    ],
+    "ignoreUnknown": true
+  }
+}
