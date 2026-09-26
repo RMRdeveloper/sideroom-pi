@@ -19,16 +19,15 @@ import {
   type JevFailure,
   type JevTransport,
 } from './client.ts';
+import { buildContextualState } from './context.ts';
 import {
   type AddedLine,
   addedLinesForEdit,
   addedLinesForWrite,
-  buildFileState,
   findingKey,
   formatFindings,
   isReviewablePath,
   type JevFinding,
-  stateFitsBudget,
 } from './model.ts';
 
 export const JEV_TRANSIENT_FAILURE_LIMIT = 3;
@@ -177,13 +176,17 @@ export function registerJevGuard(
     if (body === undefined) {
       return undefined;
     }
-    const fileState = buildFileState(
+    if (ctx.signal?.aborted === true) {
+      return undefined;
+    }
+    const fileState = buildContextualState(
+      ctx.cwd,
       pending.relativePath,
       body,
       pending.kind,
       pending.lines,
     );
-    if (!stateFitsBudget(fileState) || ctx.signal?.aborted === true) {
+    if (fileState === undefined) {
       return undefined;
     }
 
@@ -269,7 +272,7 @@ function registerSuccess(state: JevGuardState): void {
   state.transientFailures = 0;
 }
 
-// A deletion-only edit leaves nothing for the six questions to read, and only
+// A deletion-only edit leaves nothing for the questions to read, and only
 // the project-relative path of a supported language may leave the machine.
 function isWorthAsking(mutation: PendingMutation): boolean {
   return mutation.lines.length > 0 && isReviewablePath(mutation.relativePath);

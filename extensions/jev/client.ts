@@ -105,7 +105,8 @@ export async function askJev(
   file: JevFileState,
   signal: AbortSignal | undefined,
 ): Promise<JevAttempt> {
-  const body = JSON.stringify(buildRequestBody(file));
+  const requestBody = buildRequestBody(file);
+  const body = JSON.stringify(requestBody);
   let response: JevHttpResponse;
   try {
     response = await transport({ apiKey, body, signal });
@@ -130,7 +131,10 @@ export async function askJev(
     return { findings: [], model: undefined, failure: undefined };
   }
   return {
-    findings: readFindings(envelope),
+    findings: readFindings(
+      envelope,
+      new Set(Object.keys(requestBody.questions)),
+    ),
     model: envelope.model,
     failure: undefined,
   };

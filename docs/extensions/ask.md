@@ -76,6 +76,22 @@ answer. When cancelled or unavailable, `details` has empty `answers` and
 copy in the user's language while keeping ids, option values, and tool code in
 English. TUI chrome stays English.
 
+## Choosing a recommendation
+
+The agent supplies the recommended option; the tool marks it but does not
+judge it or select it for the user. `ASK_PROMPT_GUIDELINES` directs the agent
+to read the repository first, reuse established choices, and ask about
+architectural decisions rather than assume them. Its recommendation favors
+maintainability and growth for known needs over the lowest initial cost. It
+states the upfront cost without assuming growth that has not been shown.
+
+If a missing fact or figure could change the recommendation, the agent asks
+for it first. The preliminary question still needs a defensible recommended
+option, such as gathering the missing evidence, not an unsupported solution.
+For architectural choices it describes each option's practical consequences
+and gives a one-line reason for the recommendation. The user remains free to
+choose any option.
+
 ## Files
 
 | File | Role |

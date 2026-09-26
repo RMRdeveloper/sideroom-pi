@@ -42,6 +42,10 @@ test('registers sideroom_ask as a sequential parent-agent tool', () => {
   assert.match(guidelines, /sideroom-architecture skill/);
   assert.match(guidelines, /practical consequences/);
   assert.match(guidelines, /one-line justification/);
+  assert.match(guidelines, /evidence-backed long-term quality/);
+  assert.match(guidelines, /growth for known needs over initial speed/);
+  assert.match(guidelines, /ask for them first through sideroom_ask/);
+  assert.match(guidelines, /not an unsupported solution/);
   assert.equal(guidelines.length <= 1400, true);
 });
 
@@ -56,6 +60,8 @@ test('keeps the architecture decision contract self-contained', () => {
   assert.match(skill, /do not march the whole\s+catalog/);
   assert.match(skill, /Quantify or decline/);
   assert.match(skill, /Out of scope/);
+  assert.match(skill, /maintainable option that can meet known growth needs/);
+  assert.match(skill, /ask for it before\s+recommending an architecture/);
 });
 
 test('keeps the grill decision classification self-contained', () => {
@@ -73,6 +79,9 @@ test('keeps the grill decision classification self-contained', () => {
     skill,
     /persistence, public contracts, or future change difficulty/,
   );
+  assert.match(skill, /sustainable quality/);
+  assert.match(skill, /cheapest initial build/);
+  assert.match(skill, /preliminary round before recommending a solution/);
 });
 
 test('prepares stringified questions before execute sees native arrays', () => {
