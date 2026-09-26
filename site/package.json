@@ -27,6 +27,7 @@
     "@biomejs/biome": "^2.5.11",
     "@iconify-json/mdi": "^1.2.3",
     "@iconify-json/simple-icons": "^1.2.97",
+    "@types/node": "^22.20.4",
     "astro-icon": "^1.2.0",
     "typescript": "^5.9.2"
   }
