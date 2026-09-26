@@ -1,0 +1,29 @@
+---
+import { BOARD_STATUS_COLUMN, type BoardItem, boardIdWidth, statusMark } from '../lib/board.ts';
+
+interface Props {
+  rows: BoardItem[];
+  title: string;
+  hint?: string;
+}
+
+const { rows, title, hint } = Astro.props;
+const columns = `--board-id: ${String(boardIdWidth(rows))}ch; --board-status: ${String(BOARD_STATUS_COLUMN)}ch`;
+---
+
+<div class="board" style={columns}>
+  <p class="board__head">{title}</p>
+  <ul class="board__rows">
+    {
+      rows.map((row) => (
+        <li class:list={['board__row', `board__row--${row.status}`]}>
+          <span class="board__mark" aria-hidden="true">{statusMark(row.status)}</span>
+          <span class="board__id">{row.id}</span>
+          <span class="board__status">{row.status}</span>
+          <span class="board__content">{row.content}</span>
+        </li>
+      ))
+    }
+  </ul>
+  {hint ? <p class="board__hint">{hint}</p> : null}
+</div>

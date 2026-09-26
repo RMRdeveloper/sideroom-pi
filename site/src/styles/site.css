@@ -1,0 +1,1066 @@
+/* One dark ground, and colour only where the tool reports a state.
+   Everything the page shows is something the tool produces: a board row, a
+   question, a command, a line of rule output. Nothing here is invented. */
+
+:root {
+  color-scheme: dark;
+
+  --ground: #131211;
+  --well: #0b0a09;
+  --raised: #1b1917;
+  --line: rgba(242, 237, 227, 0.1);
+  --line-strong: rgba(242, 237, 227, 0.24);
+
+  --ink: #f2ede3;
+  --ink-dim: #a49d8f;
+  --ink-mute: #8b8477;
+
+  /* The two verdicts the rules tool can print, and nothing else. */
+  --block: #ff6a50;
+  --warn: #ffb340;
+
+  --lit: #f2ede3;
+  --lit-ink: #131211;
+
+  --face-text: "Archivo Variable", "Helvetica Neue", Arial, sans-serif;
+  --face-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --fs-display: clamp(2.25rem, 5.2vw, 3.75rem);
+  --fs-title: clamp(1.5rem, 2.6vw, 2rem);
+  --fs-h3: 1.125rem;
+  --fs-body: 1.0625rem;
+  --fs-small: 0.9375rem;
+  --fs-code: 0.8125rem;
+  --fs-cell: 0.75rem;
+
+  --s1: 0.25rem;
+  --s2: 0.5rem;
+  --s3: 0.75rem;
+  --s4: 1rem;
+  --s5: 1.5rem;
+  --s6: 2.25rem;
+  --s7: 3.5rem;
+  --s8: 5.5rem;
+
+  --sheet: 74rem;
+  --gutter: clamp(1.25rem, 4vw, 3rem);
+  --measure: 66ch;
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--face-text);
+  font-size: var(--fs-body);
+  font-weight: 400;
+  line-height: 1.65;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+p {
+  margin: 0;
+}
+
+img,
+video {
+  display: block;
+  max-width: 100%;
+}
+
+code,
+pre {
+  font-family: var(--face-mono);
+}
+
+a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.25em;
+  text-decoration-color: var(--ink-mute);
+  transition: text-decoration-color 180ms var(--ease);
+}
+
+a:hover {
+  text-decoration-color: var(--ink);
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+::selection {
+  background: var(--lit);
+  color: var(--lit-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--lit);
+  outline-offset: 2px;
+}
+
+/* Layout --------------------------------------------------------------- */
+
+.sheet {
+  width: 100%;
+  max-width: var(--sheet);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.section {
+  padding-top: var(--s7);
+}
+
+.section--last {
+  padding-bottom: var(--s7);
+}
+
+.section__head {
+  border-top: 1px solid var(--line-strong);
+  padding-top: var(--s4);
+  max-width: var(--measure);
+  scroll-margin-top: 7rem;
+}
+
+.section__title {
+  font-size: var(--fs-title);
+}
+
+.section__lead {
+  margin-top: var(--s3);
+  color: var(--ink-dim);
+}
+
+.section__body {
+  margin-top: var(--s6);
+}
+
+.subtitle {
+  font-size: var(--fs-h3);
+  margin-bottom: var(--s3);
+}
+
+.prose {
+  max-width: var(--measure);
+}
+
+.prose > * + * {
+  margin-top: var(--s4);
+}
+
+.prose strong {
+  font-weight: 650;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.skip {
+  position: absolute;
+  left: -100vw;
+  top: 0;
+  z-index: 20;
+  background: var(--lit);
+  color: var(--lit-ink);
+  padding: 0.6rem 1rem;
+  font-size: var(--fs-small);
+  text-decoration: none;
+}
+
+.skip:focus {
+  left: 0;
+}
+
+.stack-5 > * + * {
+  margin-top: var(--s5);
+}
+
+/* The opening: the claim, the command, and the board that is running. */
+
+.hero {
+  padding-top: var(--s7);
+}
+
+.hero__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: var(--s7) var(--s8);
+  align-items: start;
+}
+
+.hero__claim {
+  font-size: var(--fs-display);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  max-width: 18ch;
+}
+
+.hero__offer {
+  margin-top: var(--s5);
+  font-size: 1.125rem;
+  color: var(--ink-dim);
+  max-width: 46ch;
+}
+
+.hero__install {
+  margin-top: var(--s6);
+}
+
+.hero__note {
+  margin-top: var(--s3);
+  font-size: var(--fs-small);
+  color: var(--ink-dim);
+  max-width: 46ch;
+}
+
+.hero__link {
+  margin-top: var(--s2);
+  font-size: var(--fs-small);
+}
+
+.link-line {
+  margin-top: var(--s3);
+  font-size: var(--fs-small);
+}
+
+/* The board. The rows are the tool's own lines: mark, id, status, content. */
+
+.board {
+  border: 1px solid var(--line);
+  background: var(--well);
+}
+
+.board__head {
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--face-mono);
+  font-size: var(--fs-code);
+  font-weight: 600;
+}
+
+.board__rows {
+  margin: 0;
+  padding: var(--s2) 0;
+  list-style: none;
+}
+
+.board__row {
+  display: grid;
+  grid-template-columns: 1ch var(--board-id) var(--board-status) minmax(0, 1fr);
+  column-gap: 1ch;
+  padding: 0.3rem var(--s4);
+  font-family: var(--face-mono);
+  font-size: var(--fs-code);
+}
+
+/* The terminal paints the step in progress green. On this ground it takes the
+   lit face instead, which is the same inverted treatment the terminal gives the
+   row it has selected. */
+.board__row--in_progress {
+  background: var(--lit);
+  color: var(--lit-ink);
+  font-weight: 600;
+}
+
+.board__row--pending {
+  color: var(--ink);
+}
+
+.board__row--completed {
+  color: var(--ink-mute);
+}
+
+.board__mark {
+  text-align: center;
+}
+
+.board__status {
+  color: inherit;
+}
+
+.board__row--pending .board__status,
+.board__row--completed .board__status {
+  color: var(--ink-mute);
+}
+
+.board__hint {
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--line);
+  font-family: var(--face-mono);
+  font-size: var(--fs-cell);
+  color: var(--ink-mute);
+}
+
+.board__lead {
+  margin-bottom: var(--s3);
+  font-size: var(--fs-small);
+  font-weight: 650;
+}
+
+.board__caption {
+  margin-top: var(--s4);
+  font-size: var(--fs-small);
+  color: var(--ink-dim);
+  max-width: 52ch;
+}
+
+.board__head-title {
+  display: block;
+}
+
+/* The question batch, printed the way the terminal prints it. */
+
+.batch {
+  border: 1px solid var(--line);
+  background: var(--raised);
+  max-width: 52rem;
+}
+
+.batch__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  background: var(--line);
+}
+
+.batch__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5ch;
+  flex: 1 1 8rem;
+  background: var(--raised);
+  border: 0;
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+  font-size: var(--fs-small);
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: background-color 180ms var(--ease), color 180ms var(--ease);
+}
+
+.batch__tab:hover {
+  background: var(--well);
+  color: var(--ink);
+}
+
+.batch__tab[aria-selected="true"] {
+  background: var(--lit);
+  color: var(--lit-ink);
+  font-weight: 650;
+}
+
+.batch__mark {
+  font-family: var(--face-mono);
+  font-size: 0.8em;
+}
+
+.batch__panel {
+  --batch-inset: var(--s5);
+  padding: var(--batch-inset);
+}
+
+.batch__fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.batch__panel[hidden] {
+  display: none;
+}
+
+.batch__prompt {
+  font-size: var(--fs-h3);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  max-width: 40ch;
+  margin-bottom: var(--s4);
+}
+
+.batch__options {
+  display: grid;
+}
+
+.batch__option {
+  display: grid;
+  grid-template-columns: 1ch minmax(0, 1fr);
+  column-gap: var(--s3);
+  margin-inline: calc(var(--batch-inset) * -1);
+  border-top: 1px solid var(--line);
+  padding: var(--s3) var(--batch-inset);
+  cursor: pointer;
+  transition: background-color 160ms var(--ease), color 160ms var(--ease);
+}
+
+.batch__option:hover {
+  background: var(--well);
+}
+
+.batch__option[data-selected="true"] {
+  background: var(--lit);
+  color: var(--lit-ink);
+}
+
+.batch__option[data-selected="true"]:hover {
+  background: var(--lit);
+}
+
+.batch__option:focus-within {
+  outline: 2px solid var(--lit);
+  outline-offset: -2px;
+}
+
+.batch__option[data-selected="true"]:focus-within {
+  outline-color: var(--lit-ink);
+}
+
+.batch__cursor {
+  font-family: var(--face-mono);
+  font-size: var(--fs-code);
+  color: var(--ink-mute);
+}
+
+/* The terminal marks the row under the cursor with a chevron, and the page
+   marks the answer that was taken the same way. */
+.batch__option[data-selected="true"] .batch__cursor::after {
+  content: ">";
+}
+
+.batch__option[data-selected="true"] .batch__cursor {
+  color: var(--lit-ink);
+}
+
+.batch__option-body {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.batch__option-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.batch__index {
+  font-family: var(--face-mono);
+  font-size: var(--fs-code);
+  color: var(--ink-mute);
+}
+
+.batch__option-label {
+  font-weight: 650;
+}
+
+.batch__tag {
+  font-family: var(--face-mono);
+  font-size: var(--fs-cell);
+  color: var(--ink-mute);
+}
+
+.batch__option[data-selected="true"] .batch__index,
+.batch__option[data-selected="true"] .batch__tag {
+  color: rgba(19, 18, 17, 0.7);
+}
+
+.batch__description {
+  font-size: var(--fs-small);
+  color: var(--ink-dim);
+  max-width: 60ch;
+}
+
+.batch__option[data-selected="true"] .batch__description {
+  color: rgba(19, 18, 17, 0.78);
+}
+
+.batch__input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.batch__custom {
+  display: grid;
+  grid-template-columns: 1ch minmax(0, 1fr);
+  column-gap: var(--s3);
+  margin-inline: calc(var(--batch-inset) * -1);
+  border-top: 1px solid var(--line);
+  padding: var(--s3) var(--batch-inset) 0;
+}
+
+.batch__writer {
+  display: flex;
+  margin-top: var(--s3);
+  border: 1px solid var(--line-strong);
+  background: var(--well);
+  max-width: 32rem;
+}
+
+.batch__text {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0.6rem 0.75rem;
+  font-size: var(--fs-small);
+}
+
+.batch__text::placeholder {
+  color: var(--ink-mute);
+}
+
+.batch__text[aria-invalid="true"] {
+  outline: 2px solid var(--block);
+  outline-offset: -2px;
+}
+
+.batch__write {
+  border: 0;
+  border-left: 1px solid var(--line-strong);
+  background: transparent;
+  padding: 0 var(--s4);
+  font-family: var(--face-mono);
+  font-size: var(--fs-cell);
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: background-color 180ms var(--ease), color 180ms var(--ease);
+}
+
+.batch__write:hover {
+  background: var(--lit);
+  color: var(--lit-ink);
+}
+
+.batch__summary {
+  display: grid;
+  gap: var(--s2);
+}
+
+.batch__summary-row {
+  display: grid;
+  grid-template-columns: minmax(0, 10rem) minmax(0, 1fr);
+  column-gap: var(--s4);
+  font-family: var(--face-mono);
+  font-size: var(--fs-code);
+}
+
+.batch__summary-label {
+  color: var(--ink-mute);
+}
+
+.batch__summary-open {
+  color: var(--warn);
+}
+
+.batch__help {
+  border-top: 1px solid var(--line);
+  padding: var(--s3) var(--s5);
+  font-family: var(--face-mono);
+  font-size: var(--fs-cell);
+  color: var(--ink-mute);
+}
+
+.batch__caption {
+  margin-top: var(--s4);
+  font-size: var(--fs-small);
+  color: var(--ink-dim);
+  max-width: 62ch;
+}
+
+/* The command well. */
+
+.cmd {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--line-strong);
+  background: var(--well);
+  max-width: 40rem;
+  min-width: 0;
+}
+
+.cmd__code {
+  flex: 1;
+  min-width: 0;
+  padding: 0.85rem 1rem;
+  font-family: var(--face-mono);
+  font-size: var(--fs-code);
+  white-space: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.cmd__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 0;
+  border-left: 1px solid var(--line-strong);
+  background: transparent;
+  padding: 0 var(--s4);
+  font-family: var(--face-mono);
+  font-size: var(--fs-cell);
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: background-color 180ms var(--ease), color 180ms var(--ease);
+}
+
+.cmd__button:hover,
+.cmd__button[data-copied="true"] {
+  background: var(--lit);
+  color: var(--lit-ink);
+}
+
+.cmd__icon {
+  width: 0.85rem;
+  height: 0.85rem;
+  flex: none;
+}
+
+.cmd__icon--done {
+  display: none;
+}
+
+.cmd__button[data-copied="true"] .cmd__icon--done {
+  display: block;
+}
+
+.cmd__button[data-copied="true"] .cmd__icon--copy {
+  display: none;
+}
+
+/* Row lists: one fact per row, separated by a single line. */
+
+.rows {
+  border-top: 1px solid var(--line-strong);
+}
+
+/* A list opens on a rule. When a sentence sits directly above it, the rule needs
+   its own gap, or it reads as an underline of that sentence. */
+p + .rows {
+  margin-top: var(--s4);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  padding: var(--s4) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.rows--tool .row {
+  grid-template-columns: minmax(0, 1fr) 9rem;
+  column-gap: var(--s6);
+}
+
+.rows--named .row {
+  grid-template-columns: 12rem minmax(0, 1fr);
+  column-gap: var(--s6);
+}
+
+.row__title {
+  font-weight: 650;
+}
+
+.row__body {
+  margin-top: var(--s1);
+  font-size: var(--fs-small);
+  color: var(--ink-dim);
+  max-width: 64ch;
+}
+
+.rows--named .row__body {
+  margin-top: 0;
+  max-width: 62ch;
+}
+
+.row__note {
+  font-family: var(--face-mono);
+  font-size: var(--fs-code);
+  color: var(--ink-dim);
+}
+
+.row__name {
+  font-family: var(--face-mono);
+  font-size: var(--fs-code);
+  font-weight: 500;
+}
+
+.row__icon {
+  width: 1.1em;
+  height: 1.1em;
+  margin-right: 0.45em;
+  vertical-align: -0.2em;
+  color: var(--ink-dim);
+}
+
+/* The three verdicts a write can come back with. */
+
+.outcomes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s6);
+  margin-bottom: var(--s7);
+}
+
+.outcome {
+  border-top: 1px solid var(--line-strong);
+  padding-top: var(--s3);
+}
+
+.outcome__label {
+  font-size: var(--fs-small);
+  font-weight: 650;
+}
+
+.outcome--block .outcome__label {
+  color: var(--block);
+}
+
+.outcome--warn .outcome__label {
+  color: var(--warn);
+}
+
+.outcome__body {
+  margin-top: var(--s2);
+  font-size: var(--fs-small);
+  color: var(--ink-dim);
+}
+
+.outcome__output {
+  margin: var(--s4) 0 0;
+  padding: var(--s3);
+  border: 1px solid var(--line);
+  background: var(--well);
+  font-family: var(--face-mono);
+  font-size: var(--fs-cell);
+  line-height: 1.7;
+  overflow-x: auto;
+}
+
+.outcome__output-line {
+  display: block;
+  white-space: pre;
+}
+
+.lines {
+  border-top: 1px solid var(--line-strong);
+}
+
+.line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7rem 11rem;
+  column-gap: var(--s5);
+  align-items: baseline;
+  padding: var(--s3) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.line__code {
+  font-family: var(--face-mono);
+  font-size: var(--fs-code);
+  overflow-wrap: anywhere;
+}
+
+.line__verdict {
+  font-size: var(--fs-small);
+  font-weight: 650;
+}
+
+.line--block .line__verdict {
+  color: var(--block);
+}
+
+.line--warn .line__verdict {
+  color: var(--warn);
+}
+
+.line__rule {
+  font-family: var(--face-mono);
+  font-size: var(--fs-cell);
+  color: var(--ink-mute);
+}
+
+/* Captures. */
+
+.capture {
+  margin: 0;
+}
+
+.capture__frame {
+  border: 1px solid var(--line-strong);
+  background: var(--well);
+  padding: clamp(0.35rem, 1vw, 0.7rem);
+}
+
+.capture__media {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.capture__caption {
+  margin-top: var(--s3);
+  font-size: var(--fs-small);
+  color: var(--ink-dim);
+  max-width: 62ch;
+}
+
+/* Two-column section shapes. */
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: var(--s6);
+  align-items: start;
+}
+
+.split--top {
+  gap: var(--s7);
+}
+
+.column-stack > * + * {
+  margin-top: var(--s6);
+}
+
+/* The words this page uses. */
+
+.terms {
+  display: grid;
+  gap: var(--s4);
+  margin: 0;
+}
+
+.term {
+  border-top: 1px solid var(--line);
+  padding-top: var(--s2);
+}
+
+.term__name {
+  font-size: var(--fs-small);
+  font-weight: 650;
+}
+
+.term__body {
+  margin: var(--s1) 0 0;
+  font-size: var(--fs-small);
+  color: var(--ink-dim);
+}
+
+/* Masthead and colophon. */
+
+.masthead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--ground);
+  border-bottom: 1px solid var(--line);
+}
+
+.masthead__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2) var(--s5);
+  padding-block: var(--s3);
+}
+
+.masthead__name {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+.masthead__name:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--ink);
+}
+
+.masthead__nav {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2) var(--s4);
+  font-size: var(--fs-small);
+}
+
+.masthead__link {
+  color: var(--ink-dim);
+  text-decoration: none;
+}
+
+.masthead__link:hover,
+.masthead__link[aria-current="location"] {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--ink);
+}
+
+.masthead__switch {
+  color: var(--ink-dim);
+  font-size: var(--fs-small);
+}
+
+.colophon {
+  padding-top: var(--s7);
+  padding-bottom: var(--s6);
+  border-top: 1px solid var(--line-strong);
+}
+
+.colophon__grid {
+  display: grid;
+  grid-template-columns: 14rem minmax(0, 1fr);
+  gap: var(--s4) var(--s6);
+  align-items: start;
+}
+
+.colophon__links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2) var(--s5);
+  font-size: var(--fs-small);
+}
+
+.colophon__note {
+  font-size: var(--fs-small);
+  color: var(--ink-dim);
+}
+
+.colophon__name {
+  font-weight: 700;
+}
+
+@media (max-width: 1000px) {
+  .hero__grid,
+  .split,
+  .outcomes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .split--top {
+    gap: var(--s6);
+  }
+}
+
+@media (max-width: 720px) {
+  .masthead__inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--s2) var(--s4);
+  }
+
+  .masthead__name {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .masthead__switch {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .masthead__nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+    padding-bottom: var(--s1);
+  }
+
+  .masthead__link {
+    white-space: nowrap;
+  }
+
+  .row,
+  .rows--tool .row,
+  .rows--named .row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--s2);
+  }
+
+  .line {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--s2) var(--s4);
+  }
+
+  .line__rule {
+    grid-column: 1 / -1;
+  }
+
+  .colophon__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .board__row {
+    grid-template-columns: 1ch minmax(0, 1fr) auto;
+    column-gap: 1ch;
+  }
+
+  .board__content {
+    grid-column: 2 / -1;
+  }
+
+  .batch__panel {
+    --batch-inset: var(--s4);
+  }
+
+  .batch__summary-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

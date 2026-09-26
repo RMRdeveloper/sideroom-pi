@@ -1,0 +1,92 @@
+---
+interface Props {
+  command: string;
+  copyLabel: string;
+  copiedLabel: string;
+}
+
+const { command, copyLabel, copiedLabel } = Astro.props;
+---
+
+<div class="cmd" data-command>
+  <code class="cmd__code">{command}</code>
+  <button class="cmd__button" type="button" data-copy={command} data-copied-label={copiedLabel}>
+    <svg
+      class="cmd__icon cmd__icon--copy"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.5"
+    >
+      <rect x="2.5" y="2.5" width="8" height="8"></rect>
+      <rect x="5.5" y="5.5" width="8" height="8"></rect>
+    </svg>
+    <svg
+      class="cmd__icon cmd__icon--done"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+    >
+      <path d="M3 8.4l3.2 3.2L13 4.6"></path>
+    </svg>
+    <span class="cmd__label" aria-live="polite">{copyLabel}</span>
+  </button>
+</div>
+
+<script>
+  const COPIED_RESET_MS = 2200;
+
+  function initCopyButtons(): void {
+    const buttons = document.querySelectorAll<HTMLButtonElement>('[data-copy]');
+
+    for (const button of buttons) {
+      button.addEventListener('click', () => {
+        void copyCommand(button);
+      });
+    }
+  }
+
+  async function copyCommand(button: HTMLButtonElement): Promise<void> {
+    const command = button.dataset.copy;
+    const copiedLabel = button.dataset.copiedLabel;
+    const label = button.querySelector<HTMLElement>('.cmd__label');
+    if (!command || !copiedLabel || !label) {
+      throw new Error('A copy button is missing its command or its labels');
+    }
+
+    const originalLabel = label.textContent ?? '';
+    try {
+      await navigator.clipboard.writeText(command);
+    } catch {
+      // A blocked clipboard is an expected denial, not a failure to hide.
+      // The command is selected instead so it can be copied by hand.
+      selectCommandText(button);
+      return;
+    }
+
+    button.dataset.copied = 'true';
+    label.textContent = copiedLabel;
+    window.setTimeout(() => {
+      delete button.dataset.copied;
+      label.textContent = originalLabel;
+    }, COPIED_RESET_MS);
+  }
+
+  function selectCommandText(button: HTMLButtonElement): void {
+    const code = button.closest('.cmd')?.querySelector('.cmd__code');
+    const selection = window.getSelection();
+    if (!code || !selection) {
+      return;
+    }
+
+    const range = document.createRange();
+    range.selectNodeContents(code);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  initCopyButtons();
+</script>

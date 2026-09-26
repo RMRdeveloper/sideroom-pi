@@ -1,0 +1,14 @@
+---
+interface Props {
+  id: string;
+  title: string;
+  lead?: string;
+}
+
+const { id, title, lead } = Astro.props;
+---
+
+<header class="section__head" id={id}>
+  <h2 class="section__title">{title}</h2>
+  {lead ? <p class="section__lead">{lead}</p> : null}
+</header>
