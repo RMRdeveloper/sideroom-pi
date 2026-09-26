@@ -1,5 +1,50 @@
 # Changelog
 
+## 8.9.0
+
+### Minor Changes
+
+- 890f647: Add a one-shot guidelines review steer. After any successful `write`/`edit`, `extensions/guidelines/review.ts` sends a hidden `agent_settled` message asking the agent to re-check every changed file against the loaded language guide and run the relevant formatter, linter, type checks, and tests. Fires at most once per turn; resets on interactive input and `session_start`.
+- 8232ef4: Add an optional Jev review. After a successful `write` or `edit`,
+  `extensions/jev/` asks TypeSafe's Jev decision model about the six guide rules
+  no mechanical check can decide (3, 4, 7, 8, 9, 10) on the changed file, and
+  appends a note to the tool result when an answer clears the probability cutoff.
+  It never blocks, never reaches the system prompt, and sends only the file body
+  and the added lines. Without a key nothing is called; on quota exhaustion, a
+  rejected key, or an unreachable endpoint it goes quiet instead of slowing the
+  turn down. The key comes from `TYPESAFE_API_KEY` or from
+  `getAgentDir()/sideroom.json`, captured with `F10` through a masked screen.
+- 8232ef4: Count Jev's requests per session. `jev` appends the total to its footer label
+  (`jev: ready (jev-1.13.0) · 12 calls`) and to the `F10` capture screen. The
+  count resets on `session_start`, is never persisted, and is omitted while zero;
+  the endpoint returns no token or cost figures, so calls are the only unit
+  available.
+- 3c32d60: Sharpen the persona voice. `plain-language` becomes the first voice rule and
+  now names the concept jargon to avoid (`hook`, `pipeline`, `registry`,
+  `resolver`, `guardrail`, `invariant`) unless the user used it. The injected
+  reminder carries two static Do/Don't example pairs, and persona steers send
+  `triggerTurn: true` so a correction still reaches the model when the run is
+  already idle.
+- 3c32d60: Turn the persona footer status into the current run's enforcement counts.
+  `persona` shows `persona: direct · 2 blocks · 1 steer` and drops back to
+  `persona: direct` on the next `before_agent_start`, replacing the fixed
+  prohibition count.
+
+### Patch Changes
+
+- 03a10c7: Stop the walkthrough offer from racing the guidelines review. Both fire on
+  `agent_settled`, and Pi runs their deferred steers in extension load order,
+  which comes from the filesystem, so the questionnaire could appear before the
+  review. `extensions/explain/` now holds its steer back one settle and offers at
+  the next one, after the review has run. A settle that mutates below the
+  five-file threshold still arms the delay, so a review turn that crosses the
+  threshold is not lost.
+- a80ad94: Fix the todo board watchdog so it fires once per turn instead of once per run.
+  `extensions/todo/guards.ts` kept `steerFromUs` set until the next interactive
+  input, so the propose nudge silenced every later update steer in the same run
+  and the agent updated the whole board only after finishing the work. It now
+  resets on `turn_start` with the other per-turn counters.
+
 ## 8.8.0
 
 ### Minor Changes
