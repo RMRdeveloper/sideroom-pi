@@ -54,9 +54,10 @@ export function recordMutation(state: ExplainState, pathKey: string): void {
   state.mutatedSinceSettle = true;
 }
 
-// The guidelines review steers at the first settle after a mutation, and
-// agent_settled runs both deferred steers in extension load order. Explain
-// holds its own steer back one settle so the review always runs first.
+// The guidelines review steers at the first settle boundary after a mutation,
+// and both handlers run in an extension load order Sideroom does not control.
+// Explain holds its steer back one boundary so the review always runs first;
+// the review's continuation is what brings the next boundary.
 export function decideOffer(
   state: ExplainState,
   mode: string,

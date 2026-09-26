@@ -77,9 +77,12 @@ dead-locked.
 ### What steering means
 
 The extension sends a corrective steer after a degraded artifact block or a
-prohibited assistant message. Steers use `triggerTurn: true` so they reach the
-model even when the run is already idle. At most three steers are sent per
-agent run.
+prohibited assistant message. Both moments happen while the agent is working, so
+the steer travels through `pi.sendMessage` with `{ triggerTurn: true, deliverAs:
+'steer' }` and joins the current run. A steer sent after the run ended belongs
+to the guidelines review and the walkthrough offer, which append a
+`custom_message` entry on `agent_before_settle` instead.
+At most three steers are sent per agent run.
 
 ## Boundaries
 

@@ -19,6 +19,7 @@ test('injects the guidelines reminder once per system prompt', () => {
     on(name: string, handler: EventHandler) {
       chain(handlers, name, handler);
     },
+    events: { on() {} },
   } as unknown as ExtensionAPI;
 
   registerGuidelines(api);
@@ -49,6 +50,7 @@ test('requires completed reads before a later tool round can mutate', () => {
     on(name: string, handler: EventHandler) {
       chain(handlers, name, handler);
     },
+    events: { on() {} },
   } as unknown as ExtensionAPI;
 
   registerGuidelines(api);
@@ -169,6 +171,7 @@ test('resolves relative and dotted guide paths against the session cwd', () => {
     on(name: string, handler: EventHandler) {
       chain(handlers, name, handler);
     },
+    events: { on() {} },
   } as unknown as ExtensionAPI;
 
   registerGuidelines(api);
@@ -219,6 +222,7 @@ test('resolves symlinked guide paths to the catalog location', {
     on(name: string, handler: EventHandler) {
       chain(handlers, name, handler);
     },
+    events: { on() {} },
   } as unknown as ExtensionAPI;
 
   registerGuidelines(api);
@@ -275,6 +279,7 @@ test('resets the gate after compaction so stale reads cannot authorize mutations
     on(name: string, handler: EventHandler) {
       chain(handlers, name, handler);
     },
+    events: { on() {} },
   } as unknown as ExtensionAPI;
 
   registerGuidelines(api);

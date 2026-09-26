@@ -30,6 +30,7 @@ const STATUS_LABEL: Readonly<Record<JevStatus, string>> = {
   [JEV_STATUS.noKey]: 'jev: no key (F10)',
   [JEV_STATUS.quota]: 'jev: out of quota (F10)',
   [JEV_STATUS.auth]: 'jev: key rejected (F10)',
+  [JEV_STATUS.rateLimited]: 'jev: rate limited',
   [JEV_STATUS.unavailable]: 'jev: unreachable',
 };
 

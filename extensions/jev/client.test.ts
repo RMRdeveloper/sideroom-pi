@@ -19,7 +19,7 @@ test('maps a status code to the failure policy', () => {
   assert.equal(classifyStatus(401), JEV_FAILURE.auth);
   assert.equal(classifyStatus(403), JEV_FAILURE.auth);
   assert.equal(classifyStatus(402), JEV_FAILURE.quota);
-  assert.equal(classifyStatus(429), JEV_FAILURE.transient);
+  assert.equal(classifyStatus(429), JEV_FAILURE.rateLimited);
   assert.equal(classifyStatus(503), JEV_FAILURE.transient);
   assert.equal(classifyStatus(200), undefined);
 });
@@ -32,6 +32,7 @@ test('returns findings, and the served model, from a good answer', async () => {
     ),
     'key',
     FILE,
+    undefined,
   );
 
   assert.equal(attempt.failure, undefined);
@@ -48,18 +49,53 @@ test('reports a failure instead of throwing when the transport rejects', async (
     },
     'key',
     FILE,
+    undefined,
   );
 
   assert.equal(attempt.failure, JEV_FAILURE.transient);
   assert.equal(attempt.findings, undefined);
 });
 
+test('reports a cancel, not a network failure, when the user aborted', async () => {
+  const controller = new AbortController();
+  const attempt = await askJev(
+    async (request) => {
+      controller.abort();
+      assert.equal(request.signal, controller.signal);
+      throw new Error('aborted');
+    },
+    'key',
+    FILE,
+    controller.signal,
+  );
+
+  assert.equal(attempt.failure, JEV_FAILURE.cancelled);
+});
+
 test('reports the failure class for a bad status', async () => {
-  const quota = await askJev(transportReturning(402, ''), 'key', FILE);
+  const quota = await askJev(
+    transportReturning(402, ''),
+    'key',
+    FILE,
+    undefined,
+  );
   assert.equal(quota.failure, JEV_FAILURE.quota);
 
-  const auth = await askJev(transportReturning(401, ''), 'key', FILE);
+  const auth = await askJev(
+    transportReturning(401, ''),
+    'key',
+    FILE,
+    undefined,
+  );
   assert.equal(auth.failure, JEV_FAILURE.auth);
+
+  const limited = await askJev(
+    transportReturning(429, ''),
+    'key',
+    FILE,
+    undefined,
+  );
+  assert.equal(limited.failure, JEV_FAILURE.rateLimited);
 });
 
 test('treats an unusable body as no answer, not as a failure', async () => {
@@ -67,6 +103,7 @@ test('treats an unusable body as no answer, not as a failure', async () => {
     transportReturning(200, 'nonsense'),
     'key',
     FILE,
+    undefined,
   );
   assert.equal(attempt.failure, undefined);
   assert.deepEqual(attempt.findings, []);
@@ -85,7 +122,11 @@ test('posts to the packaged endpoint with a bearer token', async () => {
 
   try {
     const transport = createFetchTransport(1_000);
-    const response = await transport({ apiKey: 'secret', body: '{}' });
+    const response = await transport({
+      apiKey: 'secret',
+      body: '{}',
+      signal: undefined,
+    });
     assert.equal(response.status, 200);
   } finally {
     globalThis.fetch = originalFetch;
@@ -95,4 +136,31 @@ test('posts to the packaged endpoint with a bearer token', async () => {
   const headers = calls[0]?.init?.headers as Record<string, string>;
   assert.equal(headers.Authorization, 'Bearer secret');
   assert.equal(headers['Content-Type'], 'application/json');
+});
+
+test('cuts the request when the run is aborted', async () => {
+  const signals: (AbortSignal | null | undefined)[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (
+    _url: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    signals.push(init?.signal);
+    return new Response('{"answers":{}}', { status: 200 });
+  }) as typeof fetch;
+
+  const controller = new AbortController();
+  try {
+    await createFetchTransport(60_000)({
+      apiKey: 'secret',
+      body: '{}',
+      signal: controller.signal,
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(signals[0]?.aborted, false);
+  controller.abort();
+  assert.equal(signals[0]?.aborted, true);
 });

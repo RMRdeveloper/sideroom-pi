@@ -40,8 +40,12 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   and review state on `session_start`.
 - `extensions/guidelines/prompt.ts` owns the reminder text and idempotent append.
 - `extensions/guidelines/review.ts` owns the end-of-turn review steer: arms on a
-  successful `write`/`edit`, fires once on `agent_settled`, and resets on
-  interactive `input` and `session_start`.
+  successful `write`/`edit`, fires once on `agent_before_settle`, and resets on
+  idle interactive `input` and `session_start`.
+- `extensions/shared/settle.ts` owns the end-of-run rules the review and the
+  walkthrough offer share: when a settle boundary accepts a steer, how to
+  append a hidden steer without dropping another handler's entries, and which
+  `input` opens a new user turn.
 - `extensions/monorepo-skills/index.ts` composes trusted child-folder skill
   discovery; `extensions/monorepo-skills/scan.ts` owns the bounded,
   ignore-aware walk and Pi-compatible location rules;
@@ -56,9 +60,12 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   status-to-failure map, and the injectable transport; `extensions/jev/model.ts`
   owns the wire shapes, the six questions, the cutoff, and the note text;
   `extensions/jev/key.ts` owns environment-first key resolution and the
-  owner-only config file; `extensions/jev/guard.ts` owns the events, dedup, the
-  circuit breaker, the session call count, and the fail-open paths;
-  `extensions/jev/ui.ts` owns the masked capture screen and the footer labels.
+  owner-only config file; `extensions/jev/guard.ts` owns the events, the
+  filters, dedup, the circuit breaker, the rate-limit pause, the session call
+  count, and the fail-open paths; `extensions/jev/ui.ts` owns the masked
+  capture screen and the footer labels.
+- `extensions/shared/review-note.ts` owns the `sideroom:review-note` event Jev
+  emits and the guidelines review collects.
 - `extensions/rules/index.ts` composes the guidelines rule gate;
   `extensions/rules/catalog.ts` owns rule severities and language detection;
   `extensions/rules/model.ts` owns added-line diffing and result formatting;
@@ -166,9 +173,10 @@ Biome requires braces around every `if` body. Do not disable
   reapply after `sideroom:todo-widget-refreshed` so it remains below the board.
 - `guidelines` injects a short reminder and blocks `write`/`edit` until exact
   full-file reads load the packaged skill body and one complete language guide. After any successful
-  mutation it sends one hidden review steer on `agent_settled`, at most once per
-  turn, asking the agent to re-check the changed files against the loaded guide
-  and run the project checks. Do not add a slash command or a writer subagent.
+  mutation it appends one hidden review steer on `agent_before_settle`, at most
+  once per turn, asking the agent to re-check the changed files against the
+  loaded guide and run the project checks. Do not add a slash command or a
+  writer subagent.
 - `sideroom_rules` checks only lines added by a `write`/`edit`, blocks braceless
   conditionals and swallowed errors, notes softer violations on the result, and
   degrades a repeatedly firing block. It writes no files and reads no project
@@ -176,10 +184,14 @@ Biome requires braces around every `if` body. Do not disable
 - `jev` is an optional semantic review that adds no dependency beyond `fetch`.
   It asks one decision model about the six guide rules no mechanical check can
   decide (3, 4, 7, 8, 9, 10) on the file a `write`/`edit` just changed, and
-  appends a note to the tool result. It never blocks, never reaches the system
-  prompt, sends only the file and the added lines, skips a body over 60k
-  characters instead of truncating it, stops calling on quota or a rejected key,
-  and does nothing at all without a key. The key comes from `TYPESAFE_API_KEY`
+  emits each finding on `sideroom:review-note` for the guidelines review to
+  carry in its end-of-run steer, never on the tool result. It never blocks,
+  never reaches the system prompt, and asks only about project files in a
+  supported language whose change added lines. It sends only the
+  project-relative path, the body, and the added lines, skips a serialized
+  state over 60k characters instead of truncating it, follows the run's abort
+  signal, pauses on `429` until the next idle prompt, stops calling on quota or
+  a rejected key, and does nothing at all without a key. The key comes from `TYPESAFE_API_KEY`
   or from `getAgentDir()/sideroom.json` at mode `0600`, captured through `F10`
   and never written to the session. The call count is per session, resets on
   `session_start`, and is never persisted.
@@ -190,11 +202,18 @@ Biome requires braces around every `if` body. Do not disable
   drops back to `persona: direct` on the next `before_agent_start`.
 - `explain` offers a walkthrough through `sideroom_ask` at most once per turn,
   only after successful `write`/`edit` results touched at least five distinct
-  files, and only in the TUI. It fires on `agent_settled`, never `agent_end`, so
-  the offer never lands on work that a retry or a compaction is about to redo.
-  It holds the steer back one settle, because the guidelines review steers on
-  the same event and the two would otherwise race in extension load order.
-  It has no tool and no persisted state.
+  files, and only in the TUI. It fires on `agent_before_settle`, never
+  `agent_end`, so the offer never lands on work that a retry or a compaction is
+  about to redo. It holds the steer back one boundary, because the guidelines
+  review steers on the same event and the two would otherwise race in extension
+  load order. It has no tool and no persisted state.
+- End-of-run steers go on `agent_before_settle` as `custom_message` entries
+  with `continue: true`, never through `sendMessage` on `agent_settled`.
+  `agent_settled` is notification-only: a steer there opens a second run after
+  the user saw the agent stop, and it fires after Escape too. Skip the steer
+  when the outcome is not `completed` or a user message is pending, keep the
+  entries earlier handlers proposed, and reset turn state only on `input` that
+  arrives while the agent is idle. This needs Pi 0.87.0 or later.
 - `sideroom_done` steers, never blocks, and does nothing when no check command
   is detected. It clears green after any later successful mutation, notes once
   per run when code files changed and no test file did, and caps its steering.

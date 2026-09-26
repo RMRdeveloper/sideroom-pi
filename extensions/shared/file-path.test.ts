@@ -10,7 +10,7 @@ import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { resolveFileToolPath } from './file-path.ts';
+import { projectRelativePath, resolveFileToolPath } from './file-path.ts';
 
 test('resolves the path aliases accepted by Pi file tools', () => {
   assert.equal(
@@ -52,5 +52,42 @@ test('canonicalizes existing files across aliases', () => {
     );
   } finally {
     rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('describes a project file relative to the working directory', () => {
+  assert.equal(
+    projectRelativePath('/work', resolve('/work/src/app.ts')),
+    join('src', 'app.ts'),
+  );
+  assert.equal(
+    projectRelativePath('/work', resolve('/work/..hidden.ts')),
+    '..hidden.ts',
+  );
+});
+
+test('refuses a path outside the working directory', () => {
+  assert.equal(
+    projectRelativePath('/work', resolve('/other/app.ts')),
+    undefined,
+  );
+  assert.equal(projectRelativePath('/work', resolve('/app.ts')), undefined);
+  assert.equal(projectRelativePath('/work', resolve('/work')), undefined);
+});
+
+test('matches a missing file under a symlinked working directory', () => {
+  const realRoot = mkdtempSync(join(tmpdir(), 'sideroom-file-root-'));
+  const linkRoot = `${realRoot}-link`;
+  try {
+    symlinkSync(realRoot, linkRoot);
+    const missingPath = resolveFileToolPath(linkRoot, 'src/new.ts');
+    assert.ok(missingPath);
+    assert.equal(
+      projectRelativePath(linkRoot, missingPath),
+      join('src', 'new.ts'),
+    );
+  } finally {
+    rmSync(linkRoot, { force: true });
+    rmSync(realRoot, { recursive: true, force: true });
   }
 });
