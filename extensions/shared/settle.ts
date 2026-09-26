@@ -2,12 +2,16 @@ import type {
   AgentBeforeSettleEvent,
   AgentBeforeSettleEventResult,
   InputEvent,
+  InputSource,
 } from '@earendil-works/pi-coding-agent';
 
 const COMPLETED_OUTCOME = 'completed';
 const USER_ROLE = 'user';
 const CUSTOM_MESSAGE_ENTRY = 'custom_message';
-const USER_INPUT_SOURCES: ReadonlySet<string> = new Set(['interactive', 'rpc']);
+const USER_INPUT_SOURCES: ReadonlySet<InputSource> = new Set([
+  'interactive',
+  'rpc',
+]);
 
 // A message typed while the agent runs joins the current run as a steer or
 // follow-up; only input that arrives idle opens a new turn.
