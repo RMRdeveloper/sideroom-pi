@@ -1,0 +1,19 @@
+---
+import LandingPage from '../components/LandingPage.astro';
+import { copyFor } from '../i18n';
+import Layout from '../layouts/Layout.astro';
+import { softwareApplicationSchema } from '../lib/schema.ts';
+
+const t = copyFor('en');
+---
+
+<Layout
+  locale="en"
+  title={t.meta.homeTitle}
+  description={t.meta.homeDescription}
+  pathEn="/"
+  pathEs="/es/"
+  structuredData={softwareApplicationSchema('en')}
+>
+  <LandingPage locale="en" />
+</Layout>

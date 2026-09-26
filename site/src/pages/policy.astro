@@ -1,0 +1,17 @@
+---
+import PolicyPage from '../components/PolicyPage.astro';
+import { copyFor } from '../i18n';
+import Layout from '../layouts/Layout.astro';
+
+const t = copyFor('en');
+---
+
+<Layout
+  locale="en"
+  title={t.meta.policyTitle}
+  description={t.meta.policyDescription}
+  pathEn="/policy/"
+  pathEs="/es/politica/"
+>
+  <PolicyPage locale="en" />
+</Layout>

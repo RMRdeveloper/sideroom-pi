@@ -1,0 +1,310 @@
+---
+import { Icon } from 'astro-icon/components';
+import previewClip from '../../../media/preview.mp4';
+import previewStill from '../../../media/preview.png';
+import { copyFor, type Locale } from '../i18n';
+import {
+  BOARD_STATUS,
+  type BoardItem,
+  type BoardStatus,
+  countByStatus,
+  selectVisibleBoardRows,
+} from '../lib/board.ts';
+import { SUPPORTED_LANGUAGES } from '../lib/languages.ts';
+import { NPM_URL, withBase } from '../lib/urls.ts';
+import Board from './Board.astro';
+import Command from './Command.astro';
+import QuestionBatch from './QuestionBatch.astro';
+import SectionHead from './SectionHead.astro';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = copyFor(locale);
+
+// The board as it stood while this page was being rebuilt: the first three
+// steps are done, the fourth is the one in progress.
+const COMPLETED_STEPS = 3;
+const WIDGET_ROWS = 5;
+
+function stepStatus(index: number): BoardStatus {
+  if (index < COMPLETED_STEPS) {
+    return BOARD_STATUS.COMPLETED;
+  }
+  if (index === COMPLETED_STEPS) {
+    return BOARD_STATUS.IN_PROGRESS;
+  }
+  return BOARD_STATUS.PENDING;
+}
+
+const boardItems: BoardItem[] = t.board.steps.map((step, index) => ({
+  ...step,
+  status: stepStatus(index),
+}));
+
+const visibleRows = selectVisibleBoardRows(boardItems, WIDGET_ROWS);
+const widgetRows = visibleRows.indexes.flatMap((index) => {
+  const item = boardItems[index];
+  return item === undefined ? [] : [item];
+});
+
+const preview = { width: 1600, height: 1000 };
+---
+
+<section class="sheet hero" id="top">
+  <div class="hero__grid">
+    <div>
+      <h1 class="hero__claim">{t.opening.claim}</h1>
+      <p class="hero__offer">{t.opening.offer}</p>
+      <div class="hero__install">
+        <Command
+          command={t.opening.command}
+          copyLabel={t.opening.copy}
+          copiedLabel={t.opening.copied}
+        />
+        <p class="hero__note">{t.opening.installNote}</p>
+        <p class="hero__link"><a href={NPM_URL}>{t.links.npm}</a></p>
+      </div>
+    </div>
+
+    <div>
+      <p class="board__lead">{t.opening.boardTitle}</p>
+      <Board
+        rows={widgetRows}
+        title={t.board.header(
+          countByStatus(boardItems, BOARD_STATUS.IN_PROGRESS),
+          countByStatus(boardItems, BOARD_STATUS.PENDING),
+        )}
+        hint={visibleRows.hiddenCount > 0 ? t.board.hidden(visibleRows.hiddenCount) : undefined}
+      />
+      <p class="board__caption">{t.opening.boardCaption}</p>
+    </div>
+  </div>
+</section>
+
+<section class="sheet section">
+  <SectionHead id="faults" title={t.faults.title} lead={t.faults.lead} />
+
+  <div class="section__body">
+    <div class="rows rows--tool">
+      {
+        t.faults.rows.map((row) => (
+          <div class="row">
+            <div>
+              <p class="row__title">{row.symptom}</p>
+              <p class="row__body">{row.seen}</p>
+            </div>
+            <p class="row__note">{row.tool}</p>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<section class="sheet section">
+  <SectionHead id="ask" title={t.ask.title} lead={t.ask.lead} />
+
+  <div class="section__body">
+    <QuestionBatch locale={locale} />
+    <p class="batch__caption">{t.ask.caption}</p>
+  </div>
+</section>
+
+<section class="sheet section">
+  <SectionHead id="board" title={t.board.title} lead={t.board.lead} />
+
+  <div class="section__body column-stack">
+    <div>
+      <h3 class="subtitle">{t.board.fullTitle}</h3>
+      <Board
+        rows={boardItems}
+        title={t.board.overlayTitle(boardItems.length)}
+        hint={t.board.overlayHint}
+      />
+      <p class="board__caption">{t.board.fullCaption}</p>
+    </div>
+
+    <div class="split split--top">
+      <div>
+        <h3 class="subtitle">{t.board.behavioursTitle}</h3>
+        <div class="rows">
+          {
+            t.board.behaviours.map((behaviour) => (
+              <div class="row">
+                <p class="row__title">{behaviour.rule}</p>
+                <p class="row__body">{behaviour.detail}</p>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+
+      <figure class="capture">
+        <div class="capture__frame">
+          <video
+            class="capture__media"
+            controls
+            muted
+            loop
+            playsinline
+            preload="none"
+            poster={previewStill.src}
+            width={preview.width}
+            height={preview.height}
+            aria-label={t.board.videoAlt}
+          >
+            <source src={previewClip} type="video/mp4" />
+          </video>
+        </div>
+        <figcaption class="capture__caption">{t.board.videoCaption}</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="sheet section">
+  <SectionHead id="rules" title={t.rules.title} lead={t.rules.lead} />
+
+  <div class="section__body">
+    <div class="outcomes">
+      {
+        t.rules.outcomes.map((outcome) => (
+          <div class:list={['outcome', `outcome--${outcome.id}`]}>
+            <p class="outcome__label">{outcome.label}</p>
+            <p class="outcome__body">{outcome.body}</p>
+            {outcome.output.length > 0 ? (
+              <pre class="outcome__output">
+                {outcome.output.map((line) => (
+                  <span class="outcome__output-line">{line}</span>
+                ))}
+              </pre>
+            ) : null}
+          </div>
+        ))
+      }
+    </div>
+
+    <h3 class="subtitle">{t.rules.linesTitle}</h3>
+    <div class="lines">
+      {
+        t.rules.lines.map((line) => (
+          <div class:list={['line', `line--${line.state}`]}>
+            <code class="line__code">{line.code}</code>
+            <span class="line__verdict">{line.verdict}</span>
+            <span class="line__rule">{line.rule}</span>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<section class="sheet section">
+  <SectionHead id="session" title={t.session.title} lead={t.session.lead} />
+
+  <div class="section__body split">
+    <div class="prose">
+      <p>{t.session.body}</p>
+      <h3>{t.session.skillsTitle}</h3>
+      <p>{t.session.skillsBody}</p>
+    </div>
+
+    <div>
+      <h3 class="subtitle">{t.session.termsTitle}</h3>
+      <dl class="terms">
+        {
+          t.session.terms.map((term) => (
+            <div class="term">
+              <dt class="term__name">
+                <a href={term.href}>{term.term}</a>
+              </dt>
+              <dd class="term__body">{term.body}</dd>
+            </div>
+          ))
+        }
+      </dl>
+    </div>
+  </div>
+</section>
+
+<section class="sheet section">
+  <SectionHead id="inside" title={t.inside.title} lead={t.inside.lead} />
+
+  <div class="section__body column-stack">
+    <div>
+      <h3 class="subtitle">{t.inside.toolsTitle}</h3>
+      <div class="rows rows--named">
+        {
+          t.inside.tools.map((tool) => (
+            <div class="row">
+              <p class="row__name">{tool.name}</p>
+              <p class="row__body">{tool.does}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+
+    <div>
+      <h3 class="subtitle">{t.inside.jevTitle}</h3>
+      <p class="row__body">{t.inside.jevLead}</p>
+      <div class="rows">
+        {
+          t.inside.jevRows.map((row) => (
+            <div class="row">
+              <p class="row__title">{row.term}</p>
+              <p class="row__body">{row.body}</p>
+            </div>
+          ))
+        }
+      </div>
+      <p class="link-line"><a href={withBase(t.policyHref)}>{t.policy.linkFromJev}</a></p>
+    </div>
+
+    <div>
+      <h3 class="subtitle">{t.inside.skillsTitle}</h3>
+      <div class="rows rows--named">
+        {
+          t.inside.skills.map((skill) => (
+            <div class="row">
+              <p class="row__name">{skill.name}</p>
+              <p class="row__body">{skill.does}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+
+    <div>
+      <h3 class="subtitle">{t.inside.languagesTitle}</h3>
+      <p class="row__body">{t.inside.languagesLead}</p>
+      <div class="rows rows--named">
+        {
+          SUPPORTED_LANGUAGES.map((language) => (
+            <div class="row">
+              <p class="row__title">
+                <Icon class="row__icon" name={language.icon} aria-hidden="true" />
+                {language.name}
+              </p>
+              <p class="row__body">
+                <code>{language.extensions}</code>
+              </p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sheet section section--last">
+  <SectionHead id="close" title={t.close.title} lead={t.close.note} />
+
+  <div class="section__body">
+    <h3 class="subtitle">{t.close.stepTitle}</h3>
+    <p class="prose">{t.close.stepBody}</p>
+  </div>
+</section>

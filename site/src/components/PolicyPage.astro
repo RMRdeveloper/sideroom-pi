@@ -1,0 +1,78 @@
+---
+import { copyFor, type Locale } from '../i18n';
+import { LICENSE_URL, SECURITY_URL, TYPESAFE_ENDPOINT } from '../lib/urls.ts';
+import SectionHead from './SectionHead.astro';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = copyFor(locale);
+---
+
+<div class="sheet policy">
+  <header class="section__head">
+    <h1 class="section__title">{t.policy.title}</h1>
+    <p class="section__lead">{t.policy.lead}</p>
+  </header>
+
+  <section class="section">
+    <SectionHead id="sends" title={t.policy.sendsTitle} lead={t.policy.sendsLead} />
+    <div class="section__body rows rows--named">
+      {
+        t.policy.sendsRows.map((row) => (
+          <div class="row">
+            <p class="row__title">{row.term}</p>
+            <p class="row__body">{row.body}</p>
+          </div>
+        ))
+      }
+      <div class="row">
+        <p class="row__title">{t.policy.destinationTerm}</p>
+        <p class="row__body">
+          <code>{TYPESAFE_ENDPOINT}</code>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <SectionHead id="consent" title={t.policy.aloneTitle} lead={t.policy.aloneLead} />
+    <div class="section__body prose">
+      {t.policy.aloneBody.map((paragraph) => <p>{paragraph}</p>)}
+    </div>
+  </section>
+
+  <section class="section">
+    <SectionHead id="session" title={t.policy.sessionTitle} lead={t.policy.sessionLead} />
+    <p class="section__body prose">{t.policy.sessionBody}</p>
+  </section>
+
+  <section class="section">
+    <SectionHead id="site" title={t.policy.siteTitle} lead={t.policy.siteLead} />
+    <p class="section__body prose">{t.policy.siteBody}</p>
+  </section>
+
+  <section class="section section--last">
+    <SectionHead id="licence" title={t.policy.licenceTitle} lead={t.policy.licenceLead} />
+    <div class="section__body rows rows--named">
+      {
+        t.policy.licenceRows.map((row) => (
+          <div class="row">
+            <p class="row__title">{row.term}</p>
+            <p class="row__body">{row.body}</p>
+          </div>
+        ))
+      }
+    </div>
+    <p class="link-line"><a href={LICENSE_URL}>{t.policy.licenceLink}</a></p>
+    <p class="link-line"><a href={SECURITY_URL}>{t.policy.securityLink}</a></p>
+  </section>
+</div>
+
+<style>
+  .policy {
+    padding-top: var(--s7);
+  }
+</style>

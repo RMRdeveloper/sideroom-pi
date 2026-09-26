@@ -28,10 +28,14 @@ Hard choices that passed the ADR gates, kept under `docs/adr/`.
 - [adr/0004-board-block-session-message.md](./adr/0004-board-block-session-message.md) — the board block travels as a session message; supersedes the injection part of 0002.
 - [adr/0005-monorepo-skills.md](./adr/0005-monorepo-skills.md) — trusted, bounded discovery of skills in monorepo child folders.
 - [adr/0006-jev-related-source-context.md](./adr/0006-jev-related-source-context.md) — privacy boundary and size limits for related source sent to Jev.
+- [adr/0007-bilingual-site-and-changelog-translation.md](./adr/0007-bilingual-site-and-changelog-translation.md) — the bilingual site and the checked changelog translation; superseded by 0008.
+- [adr/0008-keep-the-release-history-on-github.md](./adr/0008-keep-the-release-history-on-github.md) — the released changelog stays in the repository, and the site links to it.
 
 ## Related top-level documents
 
 - [`README.md`](../README.md) — product overview and install instructions.
+- [`DESIGN.md`](../DESIGN.md) — the site's design system: palette, type scale, components, and the rules that decide them.
+- [`PRODUCT.md`](../PRODUCT.md) — the product brief behind the site: platform, users, positioning, and brand commitments.
 - [`CONTRIBUTING.md`](../CONTRIBUTING.md) — setup, commands, design rules, and the pull request flow.
 - [`AGENTS.md`](../AGENTS.md) — source of truth for tools, paths, and commands.
 - [`CONTEXT.md`](../CONTEXT.md) — domain glossary.
