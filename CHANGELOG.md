@@ -1,5 +1,46 @@
 # Changelog
 
+## 8.10.0
+
+### Minor Changes
+
+- 9915cb3: Tighten the Jev review and hand its findings to the guidelines review.
+  
+  - Jev findings no longer land on each tool result. `extensions/jev/` emits them
+    on `sideroom:review-note`, and the guidelines review carries them in its
+    end-of-run steer, with one follow-up per turn for notes that arrive after the
+    review fired.
+  - No request is made for files outside a supported language (READMEs, JSON,
+    YAML, lockfiles), for edits that add no lines, or for files outside the
+    working directory.
+  - The request carries the path relative to the working directory, resolved the
+    way Pi's file tools resolve it, so an absolute path the model wrote never
+    leaves the machine and one file is deduplicated however it was spelled.
+  - The 60k budget now measures the whole serialized state, which covers a new
+    file travelling as both body and added lines.
+  - Escape cuts a request in flight through the run's abort signal, and a
+    cancelled request no longer counts toward switching Jev off.
+  - A rate limit (`429`) pauses Jev until the next idle prompt and shows
+    `jev: rate limited` instead of counting as an outage.
+  - A message typed during a run no longer clears the per-turn dedup, and
+    recorded calls another extension blocked are dropped on `turn_end` and
+    `session_start`.
+
+### Patch Changes
+
+- 9915cb3: Stop the guidelines review and the walkthrough offer from taking over the next
+  request. Both steered through `sendMessage` on `agent_settled`, which Pi
+  documents as notification-only: each steer opened a new run after the agent had
+  already stopped, fired after Escape and after errors, and a message typed during
+  the run re-armed the review, so asking for the explanation could start another
+  review instead. They now append a hidden `custom_message` entry on
+  `agent_before_settle` with `continue: true`, so the steer stays inside the same
+  run. They skip aborted or errored runs and runs with a pending user message,
+  keep the entries earlier handlers proposed, and reset only on input that
+  arrives while the agent is idle. `extensions/shared/settle.ts` holds these
+  shared rules. `agent_before_settle` needs Pi 0.87.0 or later; the development
+  dependencies move to 0.87.1.
+
 ## 8.9.0
 
 ### Minor Changes
