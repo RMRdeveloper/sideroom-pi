@@ -193,15 +193,19 @@ Reading the guide covers the mechanical rules. `jev` covers the other kind: one
 optional call to TypeSafe's Jev decision model about the six guide rules a
 single file can answer (guard clauses, fail fast, command/query separation,
 null handling, immutability, validate once) on the file a `write` or `edit` just
-changed. The answer arrives as a probability, and a note is appended to the tool
-result when it clears the cutoff.
+changed. The answer arrives as a probability, and when it clears the cutoff the
+note travels with the guidelines review at the end of the run instead of
+interrupting each edit. READMEs, JSON, lockfiles, deletion-only edits, and files
+outside the project are never sent.
 
 It never blocks and never enters the system prompt. The state is the file and
 the added lines and nothing else — no conversation, no session, no neighbours.
 The footer counts the calls the session made, and `F10` shows the same count
 beside the key source. Without a key nothing is called, and when Jev runs out of
 quota, rejects the key,
-or stops answering, the extension goes quiet without touching the turn. The key
+or stops answering, the extension goes quiet without touching the turn. A rate
+limit only pauses it until your next prompt, and Escape cuts a request in
+flight. The key
 lives in `TYPESAFE_API_KEY` or in your agent directory, and `F10` captures it
 without ever writing it to the session.
 
@@ -230,11 +234,12 @@ nothing is detectable, the gate does nothing.
 
 When an implementation settles, `explain` steers the agent to offer a
 walkthrough through `sideroom_ask`: explain the changes only, how to test them
-only, both, or nothing. It fires on `agent_settled`, the point where
-no retry, compaction, or queued message is left, so the offer never lands on
-work that is about to be redone. It waits one settle so the guidelines review
-runs first; both fire on `agent_settled`, and Pi would otherwise order them by
-extension load. Once per turn, only when the turn touched at least five distinct
+only, both, or nothing. It fires on `agent_before_settle`, after every retry
+and compaction recovery, so the offer never lands on work that is about to be
+redone, and it stays inside the same run. It waits one boundary so the
+guidelines review runs first; both use the same event, and Pi would otherwise
+order them by extension load. It stays quiet after Escape, after an error, and
+while a message you typed is waiting. Once per turn, only when the turn touched at least five distinct
 files, and only in the TUI, because `sideroom_ask` cannot run anywhere else. No
 tool, no widget, no persisted state.
 
@@ -312,10 +317,12 @@ also fully read the packaged guide matching the target path. Reads with
 The extension blocks the mutation until the required reads succeed; unsupported
 languages use the shared table. Do not route around
 the gate through Bash or another file-mutation path. After any successful
-`write`/`edit`, one hidden review steer fires on `agent_settled` (at most once
-per turn) asking the agent to re-check every changed file against the loaded
-guide and run the relevant project checks. Interactive input clears the steer
-flags; `before_agent_start` does not, so a steer continuation never re-triggers
+`write`/`edit`, one hidden review steer fires on `agent_before_settle` (at most
+once per turn) asking the agent to re-check every changed file against the
+loaded guide and run the relevant project checks. It is skipped after Escape,
+after an error, and while a user message is pending. Interactive input sent
+while the agent is idle clears the steer flags; a message typed during a run
+and `before_agent_start` do not, so a steer continuation never re-triggers
 itself.
 
 ### Monorepo-skills contract
@@ -347,15 +354,21 @@ itself.
 
 - Off without a key: no request, and behavior identical to a package without
   this extension.
-- Warn only. A finding is text appended to the tool result; nothing blocks and
-  nothing reaches the system prompt.
-- One request per successful `write`/`edit`, with six `noul` questions on one
-  shared state of the file body and the added lines.
-- A body over 60k characters is skipped rather than truncated. An answer at or
-  above `0.8` probability becomes a note.
-- Quota (`402`) and a rejected key (`401`, `403`) stop the calls immediately;
-  network errors, `429` and `5xx` stop after three consecutive failures. A
-  success rearms the breaker, and `F10` rearms it by hand.
+- Warn only. A finding goes to the guidelines review on `sideroom:review-note`
+  and rides its end-of-run steer, with one follow-up per turn for notes that
+  arrive after the review fired; nothing blocks and nothing reaches the system
+  prompt.
+- One request per successful `write`/`edit` of a project file in a supported
+  language that added lines, with six `noul` questions on one shared state of
+  the project-relative path, the file body, and the added lines.
+- A serialized state over 60k characters is skipped rather than truncated. An
+  answer at or above `0.8` probability becomes a note.
+- The request follows the run's abort signal; a cancelled request is not a
+  failure.
+- Quota (`402`) and a rejected key (`401`, `403`) stop the calls immediately. A
+  rate limit (`429`) pauses them until the next idle prompt. Network errors and
+  other `4xx`/`5xx` stop after three consecutive failures. A success rearms the
+  breaker, and `F10` rearms it by hand.
 - Every request increments a session call counter, shown in the footer and on
   `F10`; it resets on `session_start` and is never persisted.
 - The key comes from `TYPESAFE_API_KEY` or from
@@ -390,12 +403,13 @@ itself.
 
 ### Explain contract
 
-- Trigger: `agent_settled` with at least five distinct files mutated since the
-  last user prompt, in TUI mode. File identity follows Pi's path aliases and
-  canonicalizes existing paths.
-- One settle of delay: the guidelines review steers on the same event, and Pi
-  runs both deferred steers in extension load order, so `explain` offers at the
-  next settle.
+- Trigger: `agent_before_settle` with at least five distinct files mutated
+  since the last idle user prompt, in TUI mode, on a completed run with no user
+  message pending. File identity follows Pi's path aliases and canonicalizes
+  existing paths.
+- One boundary of delay: the guidelines review steers on the same event, and Pi
+  runs both handlers in extension load order, so `explain` offers at the next
+  boundary.
 - The steer names the intent; the agent writes the question in the user's
   language with four options, one of them a decline, and one recommendation.
   `sideroom_ask` still adds *Out of scope* and the custom answer.

@@ -70,8 +70,11 @@ nothing to select, so the tool has no action parameter.
   after degradation the mutation passes and a steer asks for a corrective edit.
 - **Prose.** `message_end` inspects the finished assistant message through
   `assistantMessageText` and sends one corrective steer per violating message.
-  Steers pass `{ triggerTurn: true, deliverAs: 'steer' }` so a correction still
-  reaches the model when the run is already idle.
+  Steers pass `{ triggerTurn: true, deliverAs: 'steer' }`, which queues the
+  correction into the current run: `message_end` and a degraded block both happen
+  while the agent works. A steer sent after the run ended is a hidden
+  `custom_message` entry on `agent_before_settle` instead, the way the guidelines
+  review and the walkthrough offer steer.
 
 ### Circuit breaker
 

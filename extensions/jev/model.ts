@@ -1,4 +1,4 @@
-import { languageForPath } from '../rules/catalog.ts';
+import { LANGUAGE, languageForPath } from '../rules/catalog.ts';
 import { type AddedLine, addedLines } from '../rules/model.ts';
 
 export type { AddedLine } from '../rules/model.ts';
@@ -11,8 +11,9 @@ export const JEV_MODEL = 'jev-latest';
 // noise on every edit.
 export const VIOLATION_PROBABILITY = 0.8;
 
-// The state must stay well under the two documented budgets (64k tokens for the
-// whole request, 32k for the state plus the longest question). A file that does
+// The serialized state must stay well under the two documented budgets (64k
+// tokens for the whole request, 32k for the state plus the longest question). A
+// new file travels twice, as the body and as its added lines. A state that does
 // not fit is skipped, never truncated: half a file reads as a distorted picture
 // and Jev answers it with the same confidence.
 export const MAX_STATE_CHARACTERS = 60_000;
@@ -167,8 +168,14 @@ export function addedLinesForEdit(
   return edits.flatMap((edit) => addedLines(edit.oldText, edit.newText));
 }
 
-export function stateFitsBudget(body: string): boolean {
-  return body.length <= MAX_STATE_CHARACTERS;
+// The six questions are about code structure; a README or a lockfile would
+// spend a call on answers that mean nothing.
+export function isReviewablePath(path: string): boolean {
+  return languageForPath(path) !== LANGUAGE.generic;
+}
+
+export function stateFitsBudget(state: JevFileState): boolean {
+  return JSON.stringify(state).length <= MAX_STATE_CHARACTERS;
 }
 
 export function buildRequestBody(file: JevFileState): JevRequestBody {

@@ -1,6 +1,6 @@
 import { realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { isAbsolute, join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const FILE_URL_PREFIX = 'file://';
@@ -27,6 +27,31 @@ export function resolveFileToolPath(
     ? resolve(localPath)
     : resolve(cwd, localPath);
   return realpathOr(absolutePath);
+}
+
+// A file that does not exist yet keeps its unresolved path, so it is matched
+// against the literal working directory as well as the canonical one.
+export function projectRelativePath(
+  cwd: string,
+  absolutePath: string,
+): string | undefined {
+  const literalRoot = resolve(cwd);
+  for (const root of new Set([realpathOr(literalRoot), literalRoot])) {
+    const relativePath = relative(root, absolutePath);
+    if (isInsideRoot(relativePath)) {
+      return relativePath;
+    }
+  }
+  return undefined;
+}
+
+function isInsideRoot(relativePath: string): boolean {
+  return (
+    relativePath.length > 0 &&
+    relativePath !== '..' &&
+    !relativePath.startsWith(`..${sep}`) &&
+    !isAbsolute(relativePath)
+  );
 }
 
 function normalizeFileToolPath(path: string): string {

@@ -11,7 +11,7 @@ import {
   type JevStatus,
   registerJevGuard,
   resetJevGuard,
-  resetJevUsage,
+  resetJevSession,
 } from './guard.ts';
 import {
   clearStoredKey,
@@ -75,7 +75,7 @@ export default function registerJev(pi: ExtensionAPI): void {
   });
 
   pi.on('session_start', (_event, ctx) => {
-    resetJevUsage(guardState);
+    resetJevSession(guardState);
     publish(currentStatus(), ctx);
   });
 

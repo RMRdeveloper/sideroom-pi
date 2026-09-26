@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import type {
   ExtensionAPI,
   ExtensionContext,
 } from '@earendil-works/pi-coding-agent';
-import type { JevTransport } from './client.ts';
+import { isReviewNote, REVIEW_NOTE_EVENT } from '../shared/review-note.ts';
+import type { JevHttpRequest, JevTransport } from './client.ts';
 import {
   createJevGuardState,
   guardStatus,
@@ -16,7 +17,7 @@ import {
   type JevStatus,
   registerJevGuard,
   resetJevGuard,
-  resetJevUsage,
+  resetJevSession,
   shouldCallJev,
 } from './guard.ts';
 
@@ -25,53 +26,70 @@ type EventHandler = (event: never, ctx?: never) => unknown;
 interface Harness {
   readonly handlers: Map<string, EventHandler>;
   readonly statuses: JevStatus[];
-  readonly calls: string[];
+  readonly requests: JevHttpRequest[];
+  readonly notes: string[];
   readonly cwd: string;
   readonly ctx: ExtensionContext;
   readonly guardState: JevGuardState;
   apiKey: string | undefined;
+  signal: AbortSignal | undefined;
   transport: JevTransport;
 }
 
-interface ToolOutcome {
-  readonly content: readonly { readonly text?: string }[];
+interface WriteOptions {
+  readonly path?: string;
+  readonly content?: string;
+  readonly toolCallId?: string;
+}
+
+interface SentState {
+  readonly file: { readonly path: string };
 }
 
 function createHarness(): Harness {
-  const handlers = new Map<string, EventHandler>();
-  const statuses: JevStatus[] = [];
-  const calls: string[] = [];
   const cwd = mkdtempSync(join(tmpdir(), 'sideroom-jev-guard-'));
+  const harness: Harness = {
+    handlers: new Map(),
+    statuses: [],
+    requests: [],
+    notes: [],
+    cwd,
+    ctx: {} as ExtensionContext,
+    guardState: createJevGuardState(),
+    apiKey: 'test-key',
+    signal: undefined,
+    transport: async () => ({ status: 200, text: '{"answers":{}}' }),
+  };
   const ctx = {
     cwd,
     ui: { setStatus() {} },
+    get signal() {
+      return harness.signal;
+    },
   } as unknown as ExtensionContext;
-
-  const harness = {
-    handlers,
-    statuses,
-    calls,
-    cwd,
-    ctx,
-    guardState: createJevGuardState(),
-    apiKey: 'test-key' as string | undefined,
-    transport: (async () => ({
-      status: 200,
-      text: '{"answers":{}}',
-    })) as JevTransport,
-  } satisfies Harness;
+  Object.assign(harness, { ctx });
 
   const api = {
     on(name: string, handler: EventHandler) {
-      handlers.set(name, handler);
+      harness.handlers.set(name, handler);
+    },
+    events: {
+      emit(channel: string, payload: unknown) {
+        if (channel === REVIEW_NOTE_EVENT && isReviewNote(payload)) {
+          harness.notes.push(payload.text);
+        }
+      },
     },
   } as unknown as ExtensionAPI;
 
   registerJevGuard(api, harness.guardState, {
     apiKey: () => harness.apiKey,
-    transport: (request) => harness.transport(request),
+    transport: (request) => {
+      harness.requests.push(request);
+      return harness.transport(request);
+    },
     report: (status) => {
-      statuses.push(status);
+      harness.statuses.push(status);
     },
   });
   return harness;
@@ -90,42 +108,63 @@ function handlerOf(harness: Harness, name: string): EventHandler {
   return handler;
 }
 
-async function writeFile(
+function callTool(
   harness: Harness,
-  options: {
-    readonly path?: string;
-    readonly content?: string;
-    readonly toolCallId?: string;
-  } = {},
-): Promise<ToolOutcome | undefined> {
-  const path = options.path ?? 'src/example.ts';
-  const content = options.content ?? 'const a = 1;\n';
-  const toolCallId = options.toolCallId ?? 'w1';
-
+  toolName: string,
+  toolCallId: string,
+  input: Record<string, unknown>,
+): void {
   handlerOf(harness, 'tool_call')(
-    { toolName: 'write', toolCallId, input: { path, content } } as never,
+    { toolName, toolCallId, input } as never,
     harness.ctx as never,
   );
-  const absolutePath = join(harness.cwd, path);
-  mkdirSync(dirname(absolutePath), { recursive: true });
-  writeFileSync(absolutePath, content);
-  return (await handlerOf(harness, 'tool_result')(
+}
+
+function finishTool(
+  harness: Harness,
+  toolName: string,
+  toolCallId: string,
+  path: string,
+): Promise<unknown> {
+  return handlerOf(harness, 'tool_result')(
     {
-      toolName: 'write',
+      toolName,
       toolCallId,
       input: { path },
       content: [],
       isError: false,
     } as never,
     harness.ctx as never,
-  )) as ToolOutcome | undefined;
+  ) as Promise<unknown>;
 }
 
-function notesOf(outcome: ToolOutcome | undefined): string {
-  if (outcome === undefined) {
-    return '';
-  }
-  return outcome.content.map((block) => block.text ?? '').join('\n');
+async function writeFile(
+  harness: Harness,
+  options: WriteOptions = {},
+): Promise<unknown> {
+  const path = options.path ?? 'src/example.ts';
+  const toolCallId = options.toolCallId ?? 'w1';
+  const content = options.content ?? `const call = '${toolCallId}';\n`;
+
+  callTool(harness, 'write', toolCallId, { path, content });
+  const absolutePath = resolve(harness.cwd, path);
+  mkdirSync(dirname(absolutePath), { recursive: true });
+  writeFileSync(absolutePath, content);
+  return finishTool(harness, 'write', toolCallId, path);
+}
+
+function input(
+  harness: Harness,
+  source: string,
+  streamingBehavior?: string,
+): void {
+  handlerOf(harness, 'input')({ source, streamingBehavior } as never);
+}
+
+function sentPath(request: JevHttpRequest | undefined): string {
+  assert.ok(request);
+  const body = JSON.parse(request.body) as { readonly state: SentState };
+  return body.state.file.path;
 }
 
 function answering(noul: number): JevTransport {
@@ -135,44 +174,43 @@ function answering(noul: number): JevTransport {
   });
 }
 
-test('appends a note when a rule clears the cutoff', async () => {
+test('hands a finding to the review instead of the tool result', async () => {
   await withHarness(async (harness) => {
     harness.transport = answering(0.93);
-    const note = notesOf(await writeFile(harness));
-    assert.match(note, /Sideroom Jev review flagged src\/example\.ts/);
-    assert.match(note, /\[guard-clauses\]/);
+    assert.equal(await writeFile(harness), undefined);
+
+    assert.equal(harness.notes.length, 1);
+    assert.match(
+      harness.notes[0] ?? '',
+      /Sideroom Jev review flagged src\/example\.ts/,
+    );
+    assert.match(harness.notes[0] ?? '', /\[guard-clauses\]/);
     assert.deepEqual(harness.statuses, [JEV_STATUS.ready]);
     assert.equal(harness.guardState.calls, 1);
   });
 });
 
-test('appends nothing when every answer stays under the cutoff', async () => {
+test('hands nothing over when every answer stays under the cutoff', async () => {
   await withHarness(async (harness) => {
     harness.transport = answering(0.2);
-    assert.equal(await writeFile(harness), undefined);
-    assert.equal(harness.calls.length, 0);
+    await writeFile(harness);
+    assert.equal(harness.requests.length, 1);
+    assert.deepEqual(harness.notes, []);
   });
 });
 
 test('never calls Jev without a key, and says so', async () => {
   await withHarness(async (harness) => {
     harness.apiKey = undefined;
-    assert.equal(await writeFile(harness), undefined);
+    await writeFile(harness);
     assert.deepEqual(harness.statuses, [JEV_STATUS.noKey]);
-    assert.equal(harness.guardState.calls, 0);
+    assert.equal(harness.requests.length, 0);
   });
 });
 
 test('ignores a failed mutation', async () => {
   await withHarness(async (harness) => {
-    handlerOf(harness, 'tool_call')(
-      {
-        toolName: 'write',
-        toolCallId: 'w1',
-        input: { path: 'src/example.ts', content: 'x' },
-      } as never,
-      harness.ctx as never,
-    );
+    callTool(harness, 'write', 'w1', { path: 'src/example.ts', content: 'x' });
     const outcome = await handlerOf(harness, 'tool_result')(
       {
         toolName: 'write',
@@ -184,30 +222,130 @@ test('ignores a failed mutation', async () => {
       harness.ctx as never,
     );
     assert.equal(outcome, undefined);
+    assert.equal(harness.requests.length, 0);
   });
 });
 
 test('ignores a result with no mutation behind it', async () => {
   await withHarness(async (harness) => {
-    const outcome = await handlerOf(harness, 'tool_result')(
-      {
-        toolName: 'write',
-        toolCallId: 'unknown',
-        input: { path: 'src/example.ts' },
-        content: [],
-        isError: false,
-      } as never,
-      harness.ctx as never,
-    );
-    assert.equal(outcome, undefined);
+    await finishTool(harness, 'write', 'unknown', 'src/example.ts');
+    assert.equal(harness.requests.length, 0);
+  });
+});
+
+test('skips files outside a supported language', async () => {
+  await withHarness(async (harness) => {
+    await writeFile(harness, { path: 'README.md', content: '# Title\n' });
+    await writeFile(harness, {
+      path: 'package-lock.json',
+      content: '{}\n',
+      toolCallId: 'w2',
+    });
+    assert.equal(harness.requests.length, 0);
+    assert.deepEqual(harness.statuses, []);
+  });
+});
+
+test('skips an edit that adds no lines', async () => {
+  await withHarness(async (harness) => {
+    const path = 'src/example.ts';
+    mkdirSync(join(harness.cwd, 'src'), { recursive: true });
+    writeFileSync(join(harness.cwd, path), 'const a = 1;\n');
+
+    callTool(harness, 'edit', 'e1', {
+      path,
+      edits: [
+        { oldText: 'const a = 1;\nconst b = 2;\n', newText: 'const a = 1;\n' },
+      ],
+    });
+    await finishTool(harness, 'edit', 'e1', path);
+    assert.equal(harness.requests.length, 0);
+  });
+});
+
+test('skips a file outside the working directory', async () => {
+  await withHarness(async (harness) => {
+    const outside = resolve(harness.cwd, '..', 'elsewhere.ts');
+    callTool(harness, 'write', 'w1', {
+      path: outside,
+      content: 'const a = 1;\n',
+    });
+    await finishTool(harness, 'write', 'w1', outside);
+    assert.equal(harness.requests.length, 0);
+  });
+});
+
+test('sends the project-relative path however the model spelled it', async () => {
+  await withHarness(async (harness) => {
+    harness.transport = answering(0.95);
+    await writeFile(harness, { path: join(harness.cwd, 'src/example.ts') });
+    await writeFile(harness, {
+      path: './src/example.ts',
+      toolCallId: 'w2',
+      content: 'const b = 2;\n',
+    });
+
+    assert.equal(sentPath(harness.requests[0]), join('src', 'example.ts'));
+    assert.equal(sentPath(harness.requests[1]), join('src', 'example.ts'));
+    assert.equal(harness.notes.length, 1);
+  });
+});
+
+test('makes no request once the run is already aborted', async () => {
+  await withHarness(async (harness) => {
+    const controller = new AbortController();
+    controller.abort();
+    harness.signal = controller.signal;
+    await writeFile(harness);
+    assert.equal(harness.requests.length, 0);
+    assert.equal(harness.guardState.calls, 0);
+  });
+});
+
+test('passes the run signal and does not count an Escape as a failure', async () => {
+  await withHarness(async (harness) => {
+    for (let index = 0; index < 4; index += 1) {
+      const controller = new AbortController();
+      harness.signal = controller.signal;
+      harness.transport = async (request) => {
+        assert.equal(request.signal, controller.signal);
+        controller.abort();
+        throw new Error('aborted');
+      };
+      await writeFile(harness, { toolCallId: `w${String(index)}` });
+    }
+
+    assert.equal(harness.requests.length, 4);
+    assert.equal(shouldCallJev(harness.guardState), true);
+    assert.equal(guardStatus(harness.guardState), JEV_STATUS.ready);
+  });
+});
+
+test('pauses on a rate limit until the next idle prompt', async () => {
+  await withHarness(async (harness) => {
+    harness.transport = async () => ({ status: 429, text: '' });
+    await writeFile(harness, { toolCallId: 'w1' });
+    await writeFile(harness, { toolCallId: 'w2' });
+
+    assert.equal(harness.requests.length, 1);
+    assert.equal(harness.statuses.at(-1), JEV_STATUS.rateLimited);
+    assert.equal(harness.guardState.transientFailures, 0);
+
+    input(harness, 'interactive', 'steer');
+    await writeFile(harness, { toolCallId: 'w3' });
+    assert.equal(harness.requests.length, 1);
+
+    input(harness, 'interactive');
+    harness.transport = answering(0.1);
+    await writeFile(harness, { toolCallId: 'w4' });
+    assert.equal(harness.requests.length, 2);
+    assert.equal(guardStatus(harness.guardState), JEV_STATUS.ready);
   });
 });
 
 test('stops calling after three transient failures, and the screen re-arms it', async () => {
   await withHarness(async (harness) => {
-    let attempts = 0;
     harness.transport = async () => {
-      attempts += 1;
       throw new Error('offline');
     };
 
@@ -215,7 +353,7 @@ test('stops calling after three transient failures, and the screen re-arms it', 
       await writeFile(harness, { toolCallId: `w${String(index)}` });
     }
 
-    assert.equal(attempts, 3);
+    assert.equal(harness.requests.length, 3);
     assert.equal(shouldCallJev(harness.guardState), false);
     assert.equal(guardStatus(harness.guardState), JEV_STATUS.unavailable);
 
@@ -227,16 +365,12 @@ test('stops calling after three transient failures, and the screen re-arms it', 
 
 test('stops at the first quota failure and reports it', async () => {
   await withHarness(async (harness) => {
-    let attempts = 0;
-    harness.transport = async () => {
-      attempts += 1;
-      return { status: 402, text: '' };
-    };
+    harness.transport = async () => ({ status: 402, text: '' });
 
     await writeFile(harness, { toolCallId: 'w1' });
     await writeFile(harness, { toolCallId: 'w2' });
 
-    assert.equal(attempts, 1);
+    assert.equal(harness.requests.length, 1);
     assert.equal(guardStatus(harness.guardState), JEV_STATUS.quota);
     assert.equal(harness.statuses.at(-1), JEV_STATUS.quota);
   });
@@ -246,14 +380,25 @@ test('does not repeat the same rule on the same file twice in a turn', async () 
   await withHarness(async (harness) => {
     harness.transport = answering(0.95);
 
-    const first = notesOf(await writeFile(harness, { toolCallId: 'w1' }));
-    const second = notesOf(await writeFile(harness, { toolCallId: 'w2' }));
-    assert.match(first, /\[guard-clauses\]/);
-    assert.equal(second, '');
+    await writeFile(harness, { toolCallId: 'w1' });
+    await writeFile(harness, { toolCallId: 'w2' });
+    assert.equal(harness.notes.length, 1);
 
-    handlerOf(harness, 'input')({ source: 'interactive' } as never);
-    const third = notesOf(await writeFile(harness, { toolCallId: 'w3' }));
-    assert.match(third, /\[guard-clauses\]/);
+    input(harness, 'interactive');
+    await writeFile(harness, { toolCallId: 'w3' });
+    assert.equal(harness.notes.length, 2);
+  });
+});
+
+test('does not re-arm on a message typed while the run is active', async () => {
+  await withHarness(async (harness) => {
+    harness.transport = answering(0.95);
+
+    await writeFile(harness, { toolCallId: 'w1' });
+    input(harness, 'interactive', 'steer');
+    input(harness, 'interactive', 'followUp');
+    await writeFile(harness, { toolCallId: 'w2' });
+    assert.equal(harness.notes.length, 1);
   });
 });
 
@@ -262,30 +407,49 @@ test('does not re-arm on extension-sourced input', async () => {
     harness.transport = answering(0.95);
 
     await writeFile(harness, { toolCallId: 'w1' });
-    handlerOf(harness, 'input')({ source: 'extension' } as never);
-    const second = notesOf(await writeFile(harness, { toolCallId: 'w2' }));
-    assert.equal(second, '');
+    input(harness, 'extension');
+    await writeFile(harness, { toolCallId: 'w2' });
+    assert.equal(harness.notes.length, 1);
   });
 });
 
-test('counts session calls and starts a new session from zero', async () => {
+test('forgets a call that never produced a result when the turn ends', async () => {
   await withHarness(async (harness) => {
-    await writeFile(harness, { toolCallId: 'w1' });
-    await writeFile(harness, { toolCallId: 'w2' });
-    assert.equal(harness.guardState.calls, 2);
+    callTool(harness, 'write', 'blocked', {
+      path: 'src/example.ts',
+      content: 'const a = 1;\n',
+    });
+    assert.equal(harness.guardState.pending.size, 1);
 
-    resetJevUsage(harness.guardState);
+    handlerOf(harness, 'turn_end')({} as never, harness.ctx as never);
+    assert.equal(harness.guardState.pending.size, 0);
+  });
+});
+
+test('starts a new session from zero calls and empty turn memory', async () => {
+  await withHarness(async (harness) => {
+    harness.transport = answering(0.95);
+    await writeFile(harness, { toolCallId: 'w1' });
+    callTool(harness, 'write', 'w2', {
+      path: 'src/other.ts',
+      content: 'const b = 2;\n',
+    });
+    assert.equal(harness.guardState.calls, 1);
+
+    resetJevSession(harness.guardState);
     assert.equal(harness.guardState.calls, 0);
+    assert.equal(harness.guardState.pending.size, 0);
+    assert.equal(harness.guardState.notedThisTurn.size, 0);
   });
 });
 
 test('skips a file that is too large for the state budget', async () => {
   await withHarness(async (harness) => {
-    const outcome = await writeFile(harness, {
+    await writeFile(harness, {
       content: 'x'.repeat(70_000),
       path: 'src/huge.ts',
     });
-    assert.equal(outcome, undefined);
+    assert.equal(harness.requests.length, 0);
     assert.deepEqual(harness.statuses, []);
   });
 });

@@ -25,6 +25,9 @@ in Pi.
 - npm and Git.
 - A Pi installation to test against (`pi --version`). Pi and `pi-tui` are
   peer dependencies and devDependencies here; `typebox` is a peer dependency.
+- Pi 0.87.0 or later to develop against. The end-of-run steers build on
+  `agent_before_settle`, which ships in that release, and the devDependencies
+  track 0.87.1.
 
 ## Setup
 
@@ -85,6 +88,7 @@ Use Biome. Do not add ESLint, Prettier, or a competing formatter.
 | Path | Holds |
 | --- | --- |
 | `extensions/` | One folder per tool. `extensions/<name>/index.ts` is the Pi entry point; helper files in that folder are not extensions. |
+| `extensions/shared/` | No entry point: file-tool path rules, the missing-file read, the end-of-run steer rules, the `sideroom:review-note` event, and the prompt-cache contract test. |
 | `skills/` | The packaged skills, including the language guides under `sideroom-guidelines/references/languages/`. |
 | `assets/artifacts/GUIDELINES_TEMPLATE.md` | Canonical seed for the guidelines rules. Never pasted into the system prompt. |
 | `scripts/` | Maintainer tooling, including the preview renderer. |
@@ -119,6 +123,16 @@ These are not style preferences; a change that breaks one is rejected.
   firing block degrades to a warning instead of dead-locking the agent.
 - `sideroom_done` steers, never blocks, and stays silent when it cannot detect a
   check command.
+- An end-of-run steer is a hidden `custom_message` entry appended on
+  `agent_before_settle` with `continue: true`, never a `sendMessage` on
+  `agent_settled`. It is skipped when the run did not complete or a user message
+  is pending, it keeps the entries earlier handlers proposed, and its turn state
+  resets only on input that arrives while the agent is idle.
+- `jev` only asks about project files in a supported language whose change added
+  lines, sends the project-relative path, and hands its findings to the
+  guidelines review on `sideroom:review-note` instead of the tool result. It
+  never blocks, never reaches the system prompt, and degrades instead of
+  trapping the agent when the service fails.
 
 ## Commit messages
 
@@ -132,7 +146,8 @@ docs(readme): document the board row cap and the F9 overlay
 ```
 
 Common scopes: `ask`, `todo`, `modified-files`, `guidelines`, `rules`, `done`,
-`skills`, `scripts`, `packaging`, `docs`, `ci`, `deps`, `release`.
+`persona`, `jev`, `explain`, `monorepo-skills`, `skills`, `scripts`,
+`packaging`, `docs`, `ci`, `deps`, `release`.
 
 The repository ships `.husky/pre-commit` and `.husky/commit-msg`, but husky is
 not a dependency and those hooks only run when your local Git points
