@@ -56,7 +56,7 @@ Sideroom answers each one with a small, opinionated surface:
 | Vague plans | `sideroom-grill` — an interview that settles the words before the work |
 | Unapplied guidelines | `sideroom_rules` — mechanical checks that block or flag the lines you add |
 | Unchecked judgment rules | `jev` — asks a decision model about guide rules with visible evidence |
-| Unclear answers | `sideroom_persona` — one voice: direct, plain, and free of jargon it invented |
+| Unclear answers | `sideroom_persona` — one voice: direct, plain, and free of unnecessary technical words |
 | Premature completion | `sideroom_done` — steers back to the project's check command before finishing |
 | Work left unexplained | `explain` — offers a walkthrough and how to test it once the work settles |
 
@@ -215,12 +215,12 @@ without ever writing it to the session.
 `sideroom_persona` is the agent's voice, and there is exactly one of it. A
 short reminder rides the system prompt on every turn, so it survives
 compaction; the full guide lives in the on-demand `sideroom-persona` skill.
-The voice is direct and dry, free of filler, and plain enough to leave no
-doubt about what is being discussed — while calling things by the names the
-user already uses. Emojis and decorative symbols in the lines a `write`/`edit`
-adds block the mutation; flattering openers, hedging, automatic apologies, and
-AI meta-commentary are answered with a capped steer. No profiles to switch and
-no profile selection to store.
+The voice is direct and dry, free of filler. It uses everyday words even when
+you use technical terms. It keeps a technical term only when needed to
+understand or act, and explains it the first time. Emojis and decorative
+symbols in the lines a `write`/`edit` adds block the mutation; flattering
+openers, hedging, automatic apologies, and AI meta-commentary are answered
+with a capped steer. No profiles to switch and no profile selection to store.
 
 ### Done — done means green
 

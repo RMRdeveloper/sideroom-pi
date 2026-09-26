@@ -18,8 +18,8 @@ const ENFORCEMENT_SUMMARY =
 // Static Do/Don't pairs. Literals only: no per-turn data, so the reminder
 // stays byte-identical across turns and the provider prompt cache holds.
 export const PERSONA_EXAMPLES = [
-  "Do: Enable the flag to skip cache (enableCache). Don't: The registry resolves the provider through the auth resolver pipeline.",
-  "Do: This runs when the session closes (session_save). Don't: The lifecycle hook tears down session-scoped resources via the cleanup path.",
+  "Do: Your work list stays with this conversation, not in project files. Don't: Session-scoped board state persists outside the repository.",
+  "Do: To get a fresh answer, turn off the cache (stored results). Don't: Disable the cache invalidation pipeline.",
 ] as const;
 
 export const PERSONA_REMINDER = `${PERSONA_REMINDER_HEADING}

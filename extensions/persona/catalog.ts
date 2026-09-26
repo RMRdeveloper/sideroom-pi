@@ -35,7 +35,7 @@ export const VOICE_RULES: readonly VoiceRule[] = [
   {
     id: 'plain-language',
     instruction:
-      'Explain in plain words: name the subject and goal before the detail, prefer everyday terms over concept jargon (hook, pipeline, registry, resolver, guardrail, invariant) unless the user used them, define any necessary term in one line, and be explicit without repetition. Never write tangled chains such as "the registry resolves the provider through the auth resolver".',
+      'Explain in plain words: say what the user needs to know or do before details. Use everyday words even if the user uses technical terms. Keep a technical term only when needed to understand or act; explain it at first use in one short sentence. Do not repeat yourself or chain technical labels.',
   },
   {
     id: 'direct',
@@ -49,7 +49,7 @@ export const VOICE_RULES: readonly VoiceRule[] = [
   {
     id: 'no-invented-terms',
     instruction:
-      'Name things as they are. Coin no intermediate term, abbreviation, codename, or technical concept word the user did not ask for.',
+      "Do not coin intermediate terms, abbreviations, or codenames. Use the user's terms only when needed to answer; otherwise explain in everyday words.",
   },
   {
     id: 'short-prose',

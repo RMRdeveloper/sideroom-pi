@@ -55,12 +55,31 @@ test("ships both static Do/Don't example pairs with no per-turn data", () => {
   }
   assert.match(
     PERSONA_EXAMPLES[0],
-    /auth resolver pipeline/,
-    'tangled chain pair',
+    /Do: Your work list stays with this conversation, not in project files/,
   );
-  assert.match(PERSONA_EXAMPLES[1], /lifecycle hook/, 'concept jargon pair');
+  assert.match(
+    PERSONA_EXAMPLES[0],
+    /Don't: Session-scoped board state persists outside the repository/,
+  );
+  assert.match(
+    PERSONA_EXAMPLES[1],
+    /Do: To get a fresh answer, turn off the cache \(stored results\)/,
+  );
+  assert.match(
+    PERSONA_EXAMPLES[1],
+    /Don't: Disable the cache invalidation pipeline/,
+  );
   // Reminder must not pick up session-specific values.
   assert.doesNotMatch(PERSONA_REMINDER, /\d{4}-\d{2}-\d{2}/);
+});
+
+test('requires a reason to use technical terms, even when the user used one', () => {
+  const plainRule = VOICE_RULES.find((rule) => rule.id === 'plain-language');
+  assert.ok(plainRule);
+  assert.match(plainRule.instruction, /even if the user uses technical terms/);
+  assert.match(plainRule.instruction, /only when needed to understand or act/);
+  assert.match(plainRule.instruction, /explain it at first use/);
+  assert.doesNotMatch(plainRule.instruction, /unless the user used them/);
 });
 
 test('ships a skill that fits one read and stays in sync', () => {
@@ -77,8 +96,10 @@ test('ships a skill that fits one read and stays in sync', () => {
   assert.match(skill, /fires three times degrades to a steer/);
   assert.match(skill, /three steers are sent per\s+agent run/);
   assert.match(skill, /triggerTurn: true/);
-  assert.match(skill, /auth resolver pipeline/);
-  assert.match(skill, /lifecycle hook/);
+  assert.match(skill, /Where is the session-scoped work board\?/);
+  assert.match(skill, /Your work list stays with this conversation/);
+  assert.match(skill, /Replace a user's unnecessary technical term/);
+  assert.match(skill, /cache \(stored results\)/);
 });
 
 test('keeps the packaged skill path inside the repository', () => {
