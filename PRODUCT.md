@@ -79,7 +79,8 @@ graph, no leftover plan committed next to real code.
   board.
 - `media/preview.mp4` — a short real capture.
 - `media/logo.png` — the mark as the README shows it: 640 × 336 with a
-  128-colour palette, derived from `media/logo-square.png` with `npx sharp-cli`.
+  128-colour palette and the drawing at 70% of the height, the share it takes on
+  the link card, derived from `media/logo-square.png` with `npx sharp-cli`.
 - `CHANGELOG.md`, `docs/architecture.md`, `CONTEXT.md`, `docs/adr/`.
 - The npm version and download badges used by the README.
 
