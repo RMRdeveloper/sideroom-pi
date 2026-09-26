@@ -1,5 +1,16 @@
 # Changelog
 
+## 8.11.0
+
+### Minor Changes
+
+- 3470b53: Review changed code with up to four directly related source files when Jev is enabled. Ignore hidden, ignored, symlinked, and sensitive-named neighbours, and keep each file complete within conservative bounds for Jev's official request limits. Only ask the new responsibility, dependency-direction, and comment questions when the supplied evidence supports them; missing neighbours never block an edit.
+
+### Patch Changes
+
+- 9f3f6d6: Make grill recommendations favor evidence-backed long-term quality over the cheapest initial build. Ask for decisive missing facts before recommending an architectural solution, without assuming maximum future scale.
+- 57a2127: Make Sideroom's voice favor everyday words even when a user uses a technical term. Explain necessary terms at first use and teach the change with clearer examples, without blocking legitimate technical language.
+
 ## 8.10.0
 
 ### Minor Changes
