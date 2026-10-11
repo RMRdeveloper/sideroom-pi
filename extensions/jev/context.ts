@@ -4,6 +4,7 @@ import ignore from 'ignore';
 import { LANGUAGE, languageForPath } from '../rules/catalog.ts';
 import {
   buildFileState,
+  isTestPath,
   type JevFileState,
   type JevRelatedFile,
   stateFitsBudget,
@@ -52,19 +53,31 @@ export function buildContextualState(
         references(candidate.path, candidate.body),
         path,
       );
-      if (!importedByTarget && !consumesTarget) {
+      const companionTest = isCompanionTest(path, candidate.path);
+      const testedSource = isCompanionTest(candidate.path, path);
+      if (
+        !importedByTarget &&
+        !consumesTarget &&
+        !companionTest &&
+        !testedSource
+      ) {
         return [];
       }
       return [
         {
           ...candidate,
-          relation: importedByTarget ? 'imported' : 'consumer',
+          relation: isTestPath(candidate.path)
+            ? 'test'
+            : importedByTarget || testedSource
+              ? 'imported'
+              : 'consumer',
         } as const,
       ];
     })
     .sort((left, right) => {
       if (left.relation !== right.relation) {
-        return left.relation === 'imported' ? -1 : 1;
+        const priority = { test: 0, consumer: 1, imported: 2 };
+        return priority[left.relation] - priority[right.relation];
       }
       return compareText(left.path, right.path);
     });
@@ -324,4 +337,24 @@ function matchesReference(names: ReadonlySet<string>, path: string): boolean {
     }
   }
   return false;
+}
+
+// Naming is evidence only for a sibling test, never for a repository-wide basename match.
+function isCompanionTest(source: string, candidate: string): boolean {
+  if (
+    isTestPath(source) ||
+    !isTestPath(candidate) ||
+    posix.dirname(source) !== posix.dirname(candidate)
+  ) {
+    return false;
+  }
+  const stem = posix.basename(source, extname(source));
+  const testStem = posix.basename(candidate, extname(candidate));
+  return (
+    testStem === `${stem}.test` ||
+    testStem === `${stem}.spec` ||
+    testStem === `${stem}_test` ||
+    testStem === `test_${stem}` ||
+    testStem === `${stem}Test`
+  );
 }

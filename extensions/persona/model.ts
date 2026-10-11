@@ -1,11 +1,4 @@
-import {
-  PERSONA_SKILL_PATH,
-  PERSONA_TOOL_NAME,
-  PROHIBITIONS,
-  type Prohibition,
-  TEXT_SCOPE,
-  VOICE_RULES,
-} from './catalog.ts';
+import { PERSONA_TOOL_NAME, PROHIBITIONS, VOICE_RULES } from './catalog.ts';
 import type { ProhibitionViolation } from './checks.ts';
 
 // Pi narrows these blocks before handing the message over; the shape is
@@ -43,22 +36,6 @@ export function personaToolDetails(): PersonaToolDetails {
     voiceRules: VOICE_RULES.map((rule) => rule.id),
     prohibitions: PROHIBITIONS.map((prohibition) => prohibition.id),
   };
-}
-
-export function formatPersonaDetail(): string {
-  return [
-    'Sideroom persona: one always-on voice; no profiles or switching.',
-    '',
-    'Voice rules',
-    ...VOICE_RULES.map((rule) => `- ${rule.instruction}`),
-    '',
-    'Hard prohibitions',
-    ...PROHIBITIONS.map(
-      (prohibition) => `- ${prohibition.rule} (${enforcementOf(prohibition)})`,
-    ),
-    '',
-    `Complete guide: ${PERSONA_SKILL_PATH}`,
-  ].join('\n');
 }
 
 export function formatBlockReason(
@@ -111,11 +88,4 @@ export function assistantMessageText(content: readonly TextBlock[]): string {
     parts.push(block.text ?? '');
   }
   return parts.join('\n');
-}
-
-function enforcementOf(prohibition: Prohibition): string {
-  if (prohibition.scopes.includes(TEXT_SCOPE.artifact)) {
-    return 'blocked on write and edit';
-  }
-  return 'corrected with a steer';
 }

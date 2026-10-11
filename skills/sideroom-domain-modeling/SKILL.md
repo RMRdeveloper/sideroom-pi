@@ -1,6 +1,6 @@
 ---
 name: sideroom-domain-modeling
-description: "Resolve domain-language conflicts and naming decisions. Use when terms are ambiguous, overloaded, or used inconsistently; when deciding what belongs in CONTEXT.md; or when a domain choice may need an ADR. Use for one or a few terms, not for simply reading CONTEXT.md, scanning an entire repository, or reshaping modules."
+description: "Resolve ambiguous business terms, entity names, statuses, or relationships while designing or changing domain code. Use when one term has multiple meanings, code and glossary disagree, or a resolved term belongs in CONTEXT.md; also handles qualifying ADRs. A full interview is not required. Skip mechanical symbol renames and glossary lookups; use sideroom-domain-scaffold for a repository-wide glossary."
 license: MIT
 metadata:
   author: RMRdeveloper

@@ -3,6 +3,7 @@ import {
   JEV_ENDPOINT,
   type JevFileState,
   type JevFinding,
+  type JevRequestBody,
   parseEnvelope,
   readFindings,
 } from './model.ts';
@@ -105,7 +106,27 @@ export async function askJev(
   file: JevFileState,
   signal: AbortSignal | undefined,
 ): Promise<JevAttempt> {
-  const requestBody = buildRequestBody(file);
+  return askJevRequest({
+    transport,
+    apiKey,
+    requestBody: buildRequestBody(file),
+    signal,
+  });
+}
+
+interface JevRequestInput {
+  readonly transport: JevTransport;
+  readonly apiKey: string;
+  readonly requestBody: JevRequestBody;
+  readonly signal: AbortSignal | undefined;
+}
+
+export async function askJevRequest({
+  transport,
+  apiKey,
+  requestBody,
+  signal,
+}: JevRequestInput): Promise<JevAttempt> {
   const body = JSON.stringify(requestBody);
   let response: JevHttpResponse;
   try {

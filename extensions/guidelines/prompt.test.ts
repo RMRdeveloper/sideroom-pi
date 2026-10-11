@@ -81,7 +81,9 @@ test('keeps every language guide in structural parity with the canonical seed', 
     assert.deepEqual(extractRules(guide), canonicalRules, file);
     assert.equal((guide.match(/^RULE:/gm) ?? []).length, 19, file);
     assert.equal((guide.match(/^WHY:/gm) ?? []).length, 1, file);
-    assert.equal((guide.match(/^```/gm) ?? []).length, 38, file);
+    const canonicalGuide =
+      guide.split('\n## Language-specific conventions\n')[0] ?? guide;
+    assert.equal((canonicalGuide.match(/^```/gm) ?? []).length, 38, file);
     assert.match(
       guide,
       /\*\*When in doubt:\*\* fail fast, keep it flat, keep it small\./,

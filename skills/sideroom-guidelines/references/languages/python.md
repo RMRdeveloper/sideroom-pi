@@ -205,7 +205,7 @@ def create_user(validated_payload, repository):
 
 ### 12. DRY (real duplication only)
 
-RULE: Extract when at least 2 of 3 hold: (a) the logic appears 3+ times, (b) a future rule change would need to touch all occurrences at once, (c) the copies represent the same domain concept. Do not extract on the first or second occurrence, and do not extract look-alike code that belongs to different concepts (a user's email validation vs a vendor's) — they will diverge.
+RULE: Extract when at least 2 of 3 hold: (a) the logic appears 3+ times, (b) a future rule change would need to touch all occurrences at once, (c) the copies represent the same domain concept. Do not extract solely to anticipate reuse on the first or second occurrence, and do not extract look-alike code that belongs to different concepts (a user's email validation vs a vendor's) — they will diverge. Extraction for a present responsibility, clear contract, or testability is valid even with one caller.
 
 ```python
 # bad — extracted after one real use
@@ -218,7 +218,7 @@ def normalize_ticket_status(status):
 
 ### 13. KISS
 
-RULE: Ship the simplest solution for the current, real requirement. No configurability, hooks, or layers added "just in case."
+RULE: Choose the simplest design that fully satisfies the current requirements and preserves required behavior. Avoid configurability, hooks, or layers without a demonstrated need; do not remove necessary structure just to reduce code size.
 
 ```python
 # bad
@@ -231,7 +231,7 @@ def format_price(value):
 
 ### 14. YAGNI
 
-RULE: Don't add fields, params, or branches for a use case that hasn't arrived. (Differs from KISS: KISS simplifies the chosen solution; YAGNI stops you building the unrequested one.)
+RULE: Avoid capabilities for hypothetical future use cases without evidence. User requirements, established project contracts, required error handling, compatibility, and meaningful tests are current needs, not speculation. Never use YAGNI to omit them or remove existing supported behavior. Apply it to the proposed change, not as a reason to refactor unrelated code.
 
 ```python
 # bad

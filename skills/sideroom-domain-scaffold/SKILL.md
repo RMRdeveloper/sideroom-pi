@@ -1,6 +1,6 @@
 ---
 name: sideroom-domain-scaffold
-description: "Build or complete a code-first CONTEXT.md for a repository with missing or thin domain vocabulary. Use when the user asks to document or survey the repo, scaffold a brownfield glossary, or derive domain terms from central business code. Do not use for resolving one naming conflict or conducting an interactive design interview."
+description: "Derive and merge a domain glossary in CONTEXT.md from existing business code. Use when asked to document domain vocabulary, explain business entities and relationships across a repository, or build or complete a brownfield glossary. Resolve terms from code and collect conflicts for later questions. Skip generic README or API documentation, a single naming conflict, and feature planning."
 license: MIT
 metadata:
   author: RMRdeveloper
@@ -11,9 +11,11 @@ metadata:
 
 ## Activation Contract
 
-Load this skill on explicit request ("document my repo", "scaffold the
-glossary") over a codebase whose domain language is missing or thin. The
-code is the source of truth. Nobody is interviewed while the modeling runs.
+Load this skill when a request calls for deriving or completing domain
+vocabulary across an existing codebase ("document the business entities",
+"scaffold the glossary", "explain the domain and its relationships"). A
+generic request to document a repository needs this skill only when domain
+vocabulary is part of the requested output. The code is the source of truth. Nobody is interviewed while the modeling runs.
 
 ## Hard Rules
 

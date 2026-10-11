@@ -1,7 +1,6 @@
 export interface DoneState {
   mutated: boolean;
   checksGreen: boolean;
-  steeredThisTurn: boolean;
   steerCount: number;
   mutatedSource: boolean;
   mutatedTest: boolean;
@@ -27,7 +26,6 @@ export function createDoneState(): DoneState {
   return {
     mutated: false,
     checksGreen: false,
-    steeredThisTurn: false,
     steerCount: 0,
     mutatedSource: false,
     mutatedTest: false,
@@ -38,7 +36,6 @@ export function createDoneState(): DoneState {
 export function resetDoneRun(state: DoneState): void {
   state.mutated = false;
   state.checksGreen = false;
-  state.steeredThisTurn = false;
   state.steerCount = 0;
   state.mutatedSource = false;
   state.mutatedTest = false;
@@ -63,7 +60,6 @@ export function shouldSteerDone(
     hasCommand &&
     state.mutated &&
     !state.checksGreen &&
-    !state.steeredThisTurn &&
     state.steerCount < MAX_DONE_STEERS
   );
 }
@@ -86,5 +82,5 @@ export function formatDoneSteer(display: string): string {
 }
 
 export function formatMissingTestNotice(): string {
-  return 'This run changed code files and no test file. Add or update the test that covers the change before finishing.';
+  return 'This run changed code files and no test file. Check whether existing tests cover the changed behavior; add or update a test if coverage is missing, then rerun the relevant checks before finishing.';
 }

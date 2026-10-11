@@ -66,7 +66,8 @@ guards without a tool. `persona` persists no profile state, so it ships
 owns the CLI disable check, and `prompt.ts` owns its static prompt note.
 `guidelines` pairs `guard.ts` (the read gate) with `review.ts` (the one-shot
 review steer). `jev` has no tool and no persisted state: `client.ts` owns the
-single HTTP call, `key.ts` the owner-only key file, and `ui.ts` the masked `F10`
+single HTTP call, `workflow.ts` bounded questionnaire/completion requests and
+observed evidence, `key.ts` the owner-only key file, and `ui.ts` the masked `F10`
 screen.
 
 ## Lifecycle events
@@ -77,12 +78,12 @@ Extensions subscribe through `pi.on(event, handler)`. The events Sideroom uses:
 | --- | --- | --- |
 | `input` | todo, rules, done, explain, guidelines, jev | Reset per-turn state on a real user prompt (`source: 'interactive'` or `'rpc'`). `guidelines`, `explain`, and `jev` reset only when the prompt arrives while the agent is idle, so a message typed during a run does not re-arm them; `jev` clears its per-turn dedup set and its rate-limit pause; a steer or `session_start` does not re-arm. |
 | `turn_start` | todo, done | Reset per-turn state. |
-| `tool_call` | guidelines, rules, done, persona, jev | Inspect a call before it runs. Return `{ block: true, reason }` to reject it. `jev` records the added lines here, because a `write` erases the previous content, and only for project files in a supported language whose change added lines. |
+| `tool_call` | guidelines, rules, done, persona, jev | Inspect a call before it runs. Return `{ block: true, reason }` to reject it. `jev` records the added lines here, because a `write` erases the previous content, for project files in a supported language; deletion-only results invalidate cached completion evidence without requesting a code review. |
 | `tool_execution_start` | todo | Observe any tool starting; drives the propose nudge. |
 | `tool_result` | modified-files, guidelines, rules, done, explain, jev | Observe results. May append content for `rules` warnings, record reads, arm the `guidelines` review steer, count a mutated file for `explain`, note a successful mutation, or ask `jev` for a semantic review, whose findings go to the `guidelines` review on `sideroom:review-note` instead of the tool result. |
-| `turn_end` | todo, done, jev | Inspect the finished turn; drives watchdog and done steering. `jev` drops calls another extension blocked, which never reach `tool_result`. |
+| `turn_end` | todo, jev | Inspect the finished turn; drives the board watchdog. `jev` drops calls another extension blocked, which never reach `tool_result`. |
 | `message_end` | persona | Inspect the finished assistant message and steer on a persona violation. |
-| `agent_before_settle` | explain, guidelines | The last point where a run can continue, after retries and compaction recovery. `guidelines` appends its one-shot review steer here, at most once per turn, carrying any `jev` notes gathered so far, plus one follow-up per turn for notes that arrive after it fired; `explain` holds its offer back to the next boundary so the review always runs first. Both return a hidden `custom_message` entry with `continue: true`, keep earlier handlers' entries, and skip aborted or errored runs and runs with a pending user message. `agent_settled` is notification-only, so no steer is sent there. |
+| `agent_before_settle` | guidelines, done, explain | Quiet end-of-run boundary after retries and compaction recovery. The shared settle guard queries eligible stages through `sideroom:settle-priority`: review and late semantic notes first, checks and coverage notice second, walkthrough last. At most one stage appends a hidden `custom_message` with `continue: true`, preserving earlier entries. Aborts, errors, any pending message or an earlier continuation postpone the steer without consuming it. `agent_settled` is notification-only. |
 | `resources_discover` | monorepo-skills | Returns trusted child-folder skill paths before Pi rebuilds the system prompt. |
 | `before_agent_start` | todo, guidelines, monorepo-skills, persona | `todo` returns `{ message }` with the board block; the others return `{ systemPrompt }` with static reminders. |
 | `session_start`, `session_tree`, `session_compact` | todo, modified-files, guidelines, persona, explain, jev | Rebuild and redraw state after load, branch navigation, or compaction; `persona` publishes its footer status; `jev` resets its session call count, drops recorded calls and its dedup set, and republishes its status; `guidelines` clears its read state and its review-steer flags on `session_start`. |
@@ -155,7 +156,9 @@ pi.events.emit('sideroom:review-note', { text });
 
 `guidelines` subscribes and carries the turn's notes in its review steer. That
 channel lives in `extensions/shared/review-note.ts`, which owns the event name
-and the payload check. These two are the only cross-extension couplings.
+and the payload check. The shared settle guard also queries pending finish stages through
+`sideroom:settle-priority`; the request stays in memory and is never persisted
+or sent to the model.
 
 ## Steering the agent
 
@@ -178,13 +181,15 @@ A steer sent at the end of the run does not go through `sendMessage`. It is a
 hidden `custom_message` entry appended on `agent_before_settle` with
 `continue: true`, so Pi continues the same run instead of opening a second one
 after the user already saw the agent stop. `extensions/shared/settle.ts` holds
-the rules both end-of-run steers share: the boundary accepts a steer only for a
-completed run with no user message pending, the entries earlier handlers
-proposed are kept, and turn state resets only on input that arrives while the
+the rules all three end-of-run stages share: the boundary accepts a steer only for a
+completed run with no queued messages or earlier continuation. Entries earlier
+handlers proposed are kept, and turn state resets only on input that arrives while the
 agent is idle. `guidelines` gates its review with `steeredThisTurn` and gives
 notes that arrive after it fired one follow-up per turn; `explain` gates its
-offer with `offeredThisTurn` and holds it back one boundary so the review always
-runs first.
+offer with `offeredThisTurn`. The synchronous `sideroom:settle-priority` event
+queries pending stages across distinct extension APIs: review, including semantic
+follow-ups, then checks, then the offer. This avoids load-order races and fixed
+boundary delays without sharing state across Pi sessions.
 
 ## Interactivity
 
@@ -235,6 +240,7 @@ language guide; those files are also part of the published package.
 | `sideroom-persona` | The single voice contract: Do/Don't table, plain-language bar, and enforcement boundaries. |
 | `sideroom-grill` | Interviews a fuzzy plan in `sideroom_ask` rounds. |
 | `sideroom-architecture` | Surfaces the architectural decisions a change forces so they are asked, not assumed. |
+| `sideroom-codebase-design` | Surveys codebase friction, designs module improvements, and plans growth and migration in text. |
 | `sideroom-domain-modeling` | Resolves language conflicts; writes `CONTEXT.md` and offers ADRs. |
 | `sideroom-domain-scaffold` | Code-first repository scan that builds or completes `CONTEXT.md`. |
 

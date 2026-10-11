@@ -11,6 +11,7 @@ Maintainable documentation for the Sideroom Pi package. Start here.
 | [extensions/todo.md](./extensions/todo.md) | `sideroom_todo` work board, capped widget, `F9` overlay, persistence, and skip prevention. |
 | [extensions/modified-files.md](./extensions/modified-files.md) | Session edited-file tracking, compact widget, and `F8` overlay. |
 | [extensions/guidelines.md](./extensions/guidelines.md) | Pre-edit read gate, the packaged coding skill, and the end-of-turn review steer. |
+| [skills.md](./skills.md) | Skill selection, activation boundaries, discovery diagnostics, and manual routing checks. |
 | [extensions/monorepo-skills.md](./extensions/monorepo-skills.md) | Trusted discovery of child-folder `.pi/skills` and `.agents/skills`. |
 | [extensions/rules.md](./extensions/rules.md) | Added-line rule checks, blocking, warnings, and the circuit breaker. |
 | [extensions/jev.md](./extensions/jev.md) | The optional Jev review: evidence-based questions, bounded related source, the request budget, fail-open behavior, and the `F10` key screen. |
@@ -30,6 +31,8 @@ Hard choices that passed the ADR gates, kept under `docs/adr/`.
 - [adr/0006-jev-related-source-context.md](./adr/0006-jev-related-source-context.md) — privacy boundary and size limits for related source sent to Jev.
 - [adr/0007-bilingual-site-and-changelog-translation.md](./adr/0007-bilingual-site-and-changelog-translation.md) — the bilingual site and the checked changelog translation; superseded by 0008.
 - [adr/0008-keep-the-release-history-on-github.md](./adr/0008-keep-the-release-history-on-github.md) — the released changelog stays in the repository, and the site links to it.
+
+- [adr/0009-jev-workflow-and-test-review.md](./adr/0009-jev-workflow-and-test-review.md) — evidence-based tests, consumer compatibility and bounded workflow review.
 
 ## Related top-level documents
 
