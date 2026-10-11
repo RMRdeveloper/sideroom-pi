@@ -1,6 +1,6 @@
 ---
 name: sideroom-architecture
-description: "Surface the architectural decisions a change forces so they are asked, not silently assumed. Use when a feature or change touches module boundaries, data ownership, integration contracts, failure behavior, quality attributes, operations, cost, lock-in, or reversibility, or when the user says the architecture is not settled. Do not use for a trivial or reversible change, a pure glossary lookup, or an already-closed spec."
+description: "Resolve architectural choices before code: module boundaries, data ownership, API or integration contracts, persistence, failure and retry behavior, deployment, capacity, cost, or provider choice. Use when designing or changing these and the repository or user has not settled the choice, even if the feature requirements are clear. Skip routine changes that reuse established contracts; use sideroom-grill when the broader plan is also open."
 license: MIT
 metadata:
   author: RMRdeveloper
@@ -25,8 +25,10 @@ throughput, availability), operations, cost, lock-in, or the difficulty of
 changing course later. It runs under `sideroom-grill` for the architectural
 part of an interview, and on its own when only the architecture is open.
 
-Do not load it for a minor decision (reversible, no boundary or contract
-impact), or for a word conflict — that is `sideroom-domain-modeling`.
+Clear feature requirements do not settle the architecture by themselves.
+Load this skill if a consequential choice remains, even when it is reversible.
+Do not load it for routine changes that reuse established boundaries and
+contracts, or for a word conflict — that is `sideroom-domain-modeling`.
 
 ## Hard Rules
 

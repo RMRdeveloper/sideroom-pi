@@ -147,12 +147,70 @@ export const JEV_RULES: readonly JevRule[] = [
       },
     },
   },
+  {
+    id: 'testability',
+    question: {
+      type: NOUL_TYPE,
+      instructions:
+        'Do the added lines hardcode clock, network or randomness inside business logic, making deterministic tests difficult? Do not flag infrastructure adapters or entry points merely for using their own APIs.',
+      criteria: {
+        true: 'Business behavior directly depends on an uncontrollable external dependency with no visible injection point',
+        false:
+          'Dependencies are supplied, or the code is the adapter/composition boundary itself',
+      },
+    },
+  },
+  {
+    id: 'contract-compatibility',
+    question: {
+      type: NOUL_TYPE,
+      instructions:
+        'Do added lines change a function signature, return shape or behavior in a way that demonstrably conflicts with a supplied non-test consumer? Require a concrete mismatch in visible code; do not speculate about unseen callers.',
+      criteria: {
+        true: 'A supplied consumer calls or interprets the changed contract incompatibly',
+        false:
+          'Visible consumers remain compatible, or there is insufficient evidence',
+      },
+    },
+  },
+  {
+    id: 'test-quality',
+    question: {
+      type: NOUL_TYPE,
+      instructions:
+        'For behavior touched by the added lines, do supplied related tests have a demonstrable blind spot: assertions that cannot detect that behavior failing, or an explicit changed error branch left untested? Use both production and test bodies. Never infer absent repository coverage from missing files or partial context. Do not request tests that mirror implementation or cover unrelated code.',
+      criteria: {
+        true: 'Visible relevant tests fail to assert the changed observable behavior or a visible changed error case, with concrete evidence',
+        false:
+          'Assertions cover the behavior, the change is low-impact, or evidence is incomplete',
+      },
+    },
+  },
+  {
+    id: 'unnecessary-abstraction',
+    question: {
+      type: NOUL_TYPE,
+      instructions:
+        'Do the added lines introduce a demonstrably redundant layer or combine visibly different domain concepts solely for similar syntax? Require evidence in supplied bodies. A single caller, delegation, injection, compatibility or a clear responsibility is not by itself a violation. Never infer requirements are absent or recommend removing required behavior.',
+      criteria: {
+        true: 'The added abstraction duplicates an existing role without adding a contract, responsibility or testability, or mixes visibly distinct concepts',
+        false:
+          'It serves a present responsibility or contract, or evidence is insufficient',
+      },
+    },
+  },
 ];
+
+export function isTestPath(path: string): boolean {
+  return /(?:^|\/)(?:__tests__|tests?|specs?)\/|(?:[._-](?:test|spec)|_test)\.[^/]+$|(?:^|\/)test_[^/]+$|Test\.java$/u.test(
+    path,
+  );
+}
 
 export interface JevRelatedFile {
   readonly path: string;
   readonly body: string;
-  readonly relation: 'imported' | 'consumer';
+  readonly relation: 'imported' | 'consumer' | 'test';
 }
 
 export interface JevFileState {
@@ -173,7 +231,7 @@ export interface JevFileState {
 
 export interface JevRequestBody {
   readonly model: string;
-  readonly state: JevFileState;
+  readonly state: unknown;
   readonly questions: Readonly<Record<string, JevNoulQuestion>>;
 }
 
@@ -225,14 +283,17 @@ export function isReviewablePath(path: string): boolean {
 }
 
 export function stateFitsBudget(state: JevFileState): boolean {
-  const request = buildRequestBody(state);
+  return requestFitsBudget(buildRequestBody(state));
+}
+
+export function requestFitsBudget(request: JevRequestBody): boolean {
   const longestQuestion = Object.values(request.questions).reduce(
     (longest, question) =>
       Math.max(longest, Buffer.byteLength(JSON.stringify(question))),
     0,
   );
   return (
-    Buffer.byteLength(JSON.stringify(state)) + longestQuestion <=
+    Buffer.byteLength(JSON.stringify(request.state)) + longestQuestion <=
       MAX_STATE_BYTES &&
     Buffer.byteLength(JSON.stringify(request)) <= MAX_REQUEST_BYTES
   );
@@ -243,12 +304,27 @@ export function buildRequestBody(file: JevFileState): JevRequestBody {
   const hasImportedFile = file.context.files.some(
     (related) => related.relation === 'imported',
   );
+  const hasConsumer = file.context.files.some(
+    (related) => related.relation === 'consumer' && !isTestPath(related.path),
+  );
+  const hasTest =
+    isTestPath(file.file.path) ||
+    file.context.files.some((related) => isTestPath(related.path));
+  const hasProduction =
+    !isTestPath(file.file.path) ||
+    file.context.files.some((related) => !isTestPath(related.path));
   const addedText = file.change.addedLines.join('\n');
   for (const rule of JEV_RULES) {
     if (rule.id === 'dependency-direction' && !hasImportedFile) {
       continue;
     }
     if (rule.id === 'comments' && !/(?:\/\/|\/\*|#)/u.test(addedText)) {
+      continue;
+    }
+    if (rule.id === 'contract-compatibility' && !hasConsumer) {
+      continue;
+    }
+    if (rule.id === 'test-quality' && (!hasTest || !hasProduction)) {
       continue;
     }
     questions[rule.id] = rule.question;
@@ -274,15 +350,17 @@ export function readFindings(
     return [];
   }
   const findings: JevFinding[] = [];
-  for (const rule of JEV_RULES) {
-    if (!askedRuleIds.has(rule.id)) {
+  for (const ruleId of askedRuleIds) {
+    const answer = answers[ruleId];
+    if (
+      answer === undefined ||
+      !Number.isFinite(answer.noul) ||
+      answer.noul > 1 ||
+      answer.noul < VIOLATION_PROBABILITY
+    ) {
       continue;
     }
-    const answer = answers[rule.id];
-    if (answer === undefined || answer.noul < VIOLATION_PROBABILITY) {
-      continue;
-    }
-    findings.push({ ruleId: rule.id, probability: answer.noul });
+    findings.push({ ruleId, probability: answer.noul });
   }
   return findings;
 }
@@ -299,7 +377,7 @@ export function formatFindings(
     `Sideroom Jev review flagged ${path}:`,
     ...findings.map(
       (finding) =>
-        `- [${finding.ruleId}] Jev scored ${finding.probability.toFixed(2)} probability that the added lines break this rule. Verify against the loaded guide before changing anything.`,
+        `- [${finding.ruleId}] Jev scored ${finding.probability.toFixed(2)} probability of a review concern. Verify the supplied evidence and applicable contract against the loaded guide before changing anything. Missing context is not proof of a violation.`,
     ),
   ].join('\n');
 }

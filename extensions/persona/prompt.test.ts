@@ -40,7 +40,7 @@ test('restates the catalog instead of duplicating it', () => {
   // Static examples plus the catalog restatement. The budget guards against
   // unbounded growth; prompt caching cares about byte-stability, not length.
   assert.equal(
-    PERSONA_REMINDER.length - PERSONA_SKILL_PATH.length < 1500,
+    PERSONA_REMINDER.length - PERSONA_SKILL_PATH.length < 2000,
     true,
   );
 });

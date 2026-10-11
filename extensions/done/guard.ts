@@ -6,6 +6,11 @@ import {
   isToolCallEventType,
   isWriteToolResult,
 } from '@earendil-works/pi-coding-agent';
+import {
+  registerSettleGuard,
+  SETTLE_PRIORITY,
+  withHiddenSteer,
+} from '../shared/settle.ts';
 import { type CheckCommand, commandMatches } from './detect.ts';
 import {
   DONE_GATE_TYPE,
@@ -25,18 +30,21 @@ export type ResolveCommand = (
 
 export type ResolveTestSetup = (ctx: Pick<ExtensionContext, 'cwd'>) => boolean;
 
-export function registerDoneGuard(
-  pi: ExtensionAPI,
-  state: DoneState,
-  resolveCommand: ResolveCommand,
-  resolveTestSetup: ResolveTestSetup,
-): void {
+interface DoneGuardOptions {
+  readonly pi: ExtensionAPI;
+  readonly state: DoneState;
+  readonly resolveCommand: ResolveCommand;
+  readonly resolveTestSetup: ResolveTestSetup;
+}
+
+export function registerDoneGuard({
+  pi,
+  state,
+  resolveCommand,
+  resolveTestSetup,
+}: DoneGuardOptions): void {
   const checkRuns = new Set<string>();
   const mutationPaths = new Map<string, string>();
-
-  pi.on('turn_start', () => {
-    state.steeredThisTurn = false;
-  });
 
   pi.on('tool_call', (event, ctx) => {
     if (
@@ -72,41 +80,38 @@ export function registerDoneGuard(
     }
     if (isBashToolResult(event)) {
       const wasCheck = checkRuns.delete(event.toolCallId);
-      if (wasCheck && !event.isError) {
-        state.checksGreen = true;
+      if (wasCheck) {
+        state.checksGreen = !event.isError;
       }
     }
   });
 
-  pi.on('turn_end', (_event, ctx) => {
-    const check = resolveCommand(ctx);
-    if (check !== undefined && shouldSteerDone(state, true)) {
-      state.steeredThisTurn = true;
-      state.steerCount += 1;
-      pi.sendMessage(
-        {
+  registerSettleGuard(pi, {
+    priority: SETTLE_PRIORITY.done,
+    pending: (ctx) =>
+      shouldSteerDone(state, resolveCommand(ctx) !== undefined) ||
+      shouldNoticeMissingTest(state, resolveTestSetup(ctx)),
+    handle: (event, ctx) => {
+      const check = resolveCommand(ctx);
+      if (check !== undefined && shouldSteerDone(state, true)) {
+        state.steerCount += 1;
+        return withHiddenSteer({
+          event,
           customType: DONE_GATE_TYPE,
           content: formatDoneSteer(check.display),
-          display: false,
-        },
-        { triggerTurn: true, deliverAs: 'steer' },
-      );
-      return;
-    }
-
-    if (!shouldNoticeMissingTest(state, resolveTestSetup(ctx))) {
-      return;
-    }
-    state.noticedMissingTest = true;
-    state.steerCount += 1;
-    pi.sendMessage(
-      {
+        });
+      }
+      if (!shouldNoticeMissingTest(state, resolveTestSetup(ctx))) {
+        return;
+      }
+      state.noticedMissingTest = true;
+      state.steerCount += 1;
+      return withHiddenSteer({
+        event,
         customType: MISSING_TEST_NOTICE_TYPE,
         content: formatMissingTestNotice(),
-        display: false,
-      },
-      { triggerTurn: true, deliverAs: 'steer' },
-    );
+      });
+    },
   });
 }
 

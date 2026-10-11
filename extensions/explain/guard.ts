@@ -4,7 +4,8 @@ import {
   isWriteToolResult,
 } from '@earendil-works/pi-coding-agent';
 import {
-  acceptsSettleSteer,
+  registerSettleGuard,
+  SETTLE_PRIORITY,
   startsUserTurn,
   withHiddenSteer,
 } from '../shared/settle.ts';
@@ -54,15 +55,16 @@ export function registerExplainGuard(
   // agent_before_settle runs after retries and compaction recovery, so the
   // walkthrough is never offered over reworked work, and its continuation
   // stays inside the same run instead of starting a second one.
-  pi.on('agent_before_settle', (event, ctx) => {
-    if (!acceptsSettleSteer(event)) {
-      return;
-    }
-    const decision = decideOffer(state, ctx.mode);
-    applyOfferDecision(state, decision);
-    if (decision !== EXPLAIN_DECISION.send) {
-      return;
-    }
-    return withHiddenSteer(event, EXPLAIN_OFFER_TYPE, EXPLAIN_OFFER);
+  registerSettleGuard(pi, {
+    priority: SETTLE_PRIORITY.explain,
+    pending: (ctx) => decideOffer(state, ctx.mode) === EXPLAIN_DECISION.send,
+    handle: (event, ctx) => {
+      applyOfferDecision(state, decideOffer(state, ctx.mode));
+      return withHiddenSteer({
+        event,
+        customType: EXPLAIN_OFFER_TYPE,
+        content: EXPLAIN_OFFER,
+      });
+    },
   });
 }

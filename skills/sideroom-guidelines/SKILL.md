@@ -1,6 +1,6 @@
 ---
 name: sideroom-guidelines
-description: "Apply Sideroom's mandatory coding workflow before implementing, refactoring, or fixing Java, Laravel/PHP, JavaScript/JSX, TypeScript/TSX, Python, Go, or Rust code. Load this skill and the exact language guide before mutation. Do not use for unrelated prose or domain-only discussions."
+description: "Follow the mandatory coding workflow before any write or edit, including bug fixes, features, refactors, tests, configuration, and documentation edits. Read the complete skill first; also read the exact language guide for Java, PHP/Laravel, JavaScript/JSX, TypeScript/TSX, Python, Go, or Rust targets. Discussion or read-only investigation alone does not require loading it."
 license: MIT
 metadata:
   author: RMRdeveloper
@@ -15,7 +15,7 @@ Load this whole skill with `read`, without `offset` or `limit`, before the first
 
 ## Hard Rules
 
-- Treat every rule in the loaded language guide as mandatory for changed code.
+- Apply the loaded guide to changed code in the context of the full user requirements and established project contracts. Architectural rules require demonstrated evidence; KISS, DRY, and YAGNI never justify omitting requested behavior, required error handling, compatibility, or meaningful tests.
 - Do not write or edit until exact full-file reads of the required packaged paths succeed; partial reads and same-named files do not count.
 - Do not bypass the gate with Bash, a subprocess, or another mutation tool.
 - Do not load language guides unrelated to files being changed.
@@ -38,8 +38,8 @@ Load this whole skill with `read`, without `offset` or `limit`, before the first
 
 1. Read this complete file from its packaged path before any mutation.
 2. Fully read the matching packaged language guide, if the target has a supported extension.
-3. Implement the smallest change that satisfies the current requirement.
-4. Review every changed unit against the loaded guide.
+3. Implement a focused change that satisfies all current requirements and preserves required existing behavior.
+4. Review the changes introduced by this run against the loaded guide; fix demonstrated violations caused by the change without refactoring unrelated code.
 5. Run the relevant formatter, linter, type checks, and tests before finishing.
 
 ## Do / Don't
@@ -50,9 +50,9 @@ Load this whole skill with `read`, without `offset` or `limit`, before the first
 | Early return on bad input | Pyramid `if/else` nesting |
 | Explicit error, fail now | Fallbacks that hide the real failure |
 | One responsibility per unit | Validate + transform + persist + notify together |
-| Extract when duplication repeats | Abstract before a second real use |
-| Simplest solution for the current problem | Layers, hooks, or config "just in case" |
-| Build only what is needed today | Fields or branches for a future case |
+| Extract for real duplication, a present responsibility, or testability | Abstract only for hypothetical future reuse |
+| Simplest design that satisfies the full requirements | Omit necessary structure to minimize code |
+| Implement current requirements and established contracts completely | Add capabilities only for hypothetical future cases |
 | Compose small focused units | Deep inheritance for unrelated behavior |
 | Talk only to immediate collaborators | Reach through another object's internals |
 | A function either does or returns, not both | Side effects inside a getter |
@@ -67,6 +67,8 @@ Load this whole skill with `read`, without `offset` or `limit`, before the first
 | Named const/enum/contract for domain literals | Magic strings |
 | Depend on ports where variation is real | Couple a use case to a concrete implementation |
 | Comments only for non-obvious intent | Narration, noise, or stale TODOs |
+
+For JavaScript and TypeScript, a function with 3 or more parameters uses one object destructured in the parameter list, unless an external or public compatibility contract fixes the signature. See the language guide for examples.
 
 ## Output Contract
 

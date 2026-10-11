@@ -128,11 +128,12 @@ These are not style preferences; a change that breaks one is rejected.
   `agent_settled`. It is skipped when the run did not complete or a user message
   is pending, it keeps the entries earlier handlers proposed, and its turn state
   resets only on input that arrives while the agent is idle.
-- `jev` only asks about project files in a supported language whose change added
-  lines, sends the project-relative path, and hands its findings to the
-  guidelines review on `sideroom:review-note` instead of the tool result. It
-  never blocks, never reaches the system prompt, and degrades instead of
-  trapping the agent when the service fails.
+- `jev` reviews added source lines, successful questionnaires and targeted task
+  completions with bounded, validated evidence. Source paths are project-relative;
+  question requests exclude user answers, and task requests exclude conversation
+  history, commands and logs. Findings reach the guidelines review through
+  `sideroom:review-note`, never the tool result or the system prompt. It never
+  blocks and degrades instead of trapping the agent when the service fails.
 
 ## Commit messages
 

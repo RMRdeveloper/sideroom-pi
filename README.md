@@ -58,6 +58,7 @@ Sideroom answers each one with a small, opinionated surface:
 | Style drift | A pre-edit gate + the on-demand `sideroom-guidelines` skill + an end-of-turn review steer |
 | Invisible monorepo skills | `monorepo-skills` — trusted child folders join Pi's available skill list |
 | Vague plans | `sideroom-grill` — an interview that settles the words before the work |
+| Costly growth and refactors | `sideroom-codebase-design` — evidenced improvements to module design, tests, and long-term scaling |
 | Unapplied guidelines | `sideroom_rules` — mechanical checks that block or flag the lines you add |
 | Unchecked judgment rules | `jev` — asks a decision model about guide rules with visible evidence |
 | Unclear answers | `sideroom_persona` — one voice: direct, plain, and free of unnecessary technical words |
@@ -158,6 +159,18 @@ one to interview at all, `sideroom-domain-scaffold` reads the central
 domain code as source of truth, builds or completes `CONTEXT.md` on its
 own, and grills the conflicting terms once, at the end.
 
+### Codebase design — improve how the code grows
+
+`sideroom-codebase-design` reviews existing code, identifies where changes or
+growth create friction, and designs improvements with small interfaces and
+clear responsibilities. It considers growing features, teams, traffic, and
+data, using known needs and evidence rather than hypothetical infrastructure.
+Each recommendation explains the problem, benefit, cost, confidence, migration,
+and verification in text. It produces no diagrams or HTML reports. A review
+stays a review; when implementation is requested, it follows the authorized
+scope and preserves behavior and compatibility. See
+[skill activation](docs/skills.md) for routing and examples.
+
 ### Guidelines — a gate, not a novel
 
 A short system-prompt contract points at the packaged
@@ -201,13 +214,18 @@ Reading the guide covers the mechanical rules. `jev` makes one optional call
 to TypeSafe's decision model about the changed file and, when available, up to
 four directly related source files. It checks guard clauses, fail fast,
 command/query separation, null handling, immutability, repeated validation,
-responsibility, dependency direction, and comments only when the supplied
+responsibility, dependency direction, comments, testability, redundant
+abstractions, consumer compatibility and test quality only when the supplied
 files support the question. An answer above the cutoff travels with the
 end-of-run guidelines review instead of interrupting each edit. READMEs, JSON,
 lockfiles, deletion-only edits, and files outside the project are never sent.
 
 It never blocks and never enters the system prompt. No conversation or session
-content leaves the machine. Related source excludes ignored, hidden, sensitive-
+history leaves the machine. Successful questionnaires also send their question
+wording and options, without user answers. Newly completed tasks may send their
+descriptions, up to four observed changed files and a check status, without
+commands or logs. These additional calls review explicit contradictions and
+ambiguous choices. Related source excludes ignored, hidden, sensitive-
 named and symlinked paths; a normal source file can still contain a secret.
 The footer counts the calls the session made, and `F10` shows the same count
 beside the key source. Without a key nothing is called, and when Jev runs out of
@@ -369,7 +387,12 @@ itself.
   prompt.
 - One request per successful `write`/`edit` of a project file in a supported
   language that added lines, with applicable `noul` questions on the complete
-  changed file and up to four directly related source files.
+  changed file and up to four directly related source files, prioritizing tests
+  and production consumers before imports.
+- One additional request per successful, non-cancelled questionnaire and per
+  eligible completion update. Only validated question wording or targeted
+  completion descriptions and bounded observed evidence travel; no answers,
+  conversation history or command output. All requests share the same limits.
 - The official 32k-token state-plus-longest-question and 64k-token request
   limits are observed conservatively using 32,000 and 64,000 UTF-8 bytes.
   Oversized neighbours are omitted whole; if the changed file cannot fit,
@@ -437,8 +460,9 @@ and zero ADRs is working as designed.
 
 ### Coexisting with other grilling skills
 
-Pi routes skills by description, not by name, so several grilling skills can
-be installed at once. `sideroom-grill` claims non-trivial plans before
+See [skill activation](docs/skills.md) for selection boundaries and discovery
+diagnostics. Pi routes skills by description, not by name, so several grilling
+skills can be installed at once. `sideroom-grill` claims non-trivial plans before
 implementation and states precedence over other grilling, interview, and spec
 skills. If a third-party skill still wins, remove it from routing by adding
 `disable-model-invocation: true` to its frontmatter, or exclude its path with

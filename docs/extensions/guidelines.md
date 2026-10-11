@@ -50,18 +50,22 @@ catalog lives in `extensions/guidelines/catalog.ts`.
 
 ## Review steer
 
-Reading the guide is not enough; the agent still has to apply it. After a run
-in which any `write`/`edit` succeeded, `review.ts` appends one hidden steer on
-`agent_before_settle` asking the agent to re-check every changed file against the
-loaded language guide and run the relevant formatter, linter, type checks, and
-tests. If the guide has drifted out of context, the steer tells the agent to
-re-read it in full first.
+After a successful `write`/`edit`, `review.ts` appends one hidden steer at a
+quiet `agent_before_settle` boundary. It asks the agent to finish any remaining
+requested implementation, then review only the changes introduced by this run
+against the loaded language guide. It fixes demonstrated violations caused by
+the change, preserves required behavior, and avoids unrelated refactors. The
+agent then runs the relevant formatter, linter, type checks, and tests. If the
+guide has left context, the steer asks for a fresh full read.
 
 - Fires at most once per turn: `steeredThisTurn` is set when the entry is
   appended, so the continuation the steer starts cannot re-trigger it.
-- Only successful mutations count; a failed `write`/`edit` does not arm it.
-- Skipped when the run was aborted (Escape) or errored, and when a user message
-  is pending; the review stays armed for the next boundary.
+- Successful mutations or semantic notes arm the review; a failed `write`/`edit`
+  alone does not. Notes without code changes use an evidence-based question/task
+  review, respect user answers, and require checks only if code changes.
+- Skipped when the run was aborted (Escape) or errored, any message is queued,
+  or an earlier handler requested continuation; the review and its notes stay
+  armed for the next quiet boundary.
 - Review state resets on `input` (`source: 'interactive'` or `'rpc'`) that
   arrives while the agent is idle, and on `session_start`. A message typed
   while the agent runs joins the current run as a steer or follow-up and does
@@ -77,9 +81,9 @@ re-read it in full first.
   appends another reminder.
 - `agent_settled` is not used: Pi documents it as notification-only, and a
   steer sent there opens a second run after the user saw the agent stop.
-- `explain` defers behind it: both handle `agent_before_settle`, and Pi runs
-  handlers in extension load order, so `explain` holds its offer back one
-  boundary and appends it after the review has run.
+- The shared settle guard gives review and semantic follow-ups priority over
+  checks and the walkthrough offer in every extension loading order. Each
+  boundary appends at most one Sideroom finish steer.
 
 ### Semantic notes from Jev
 
@@ -96,6 +100,21 @@ the review collects them for the current turn.
 - A follow-up that yields to an abort, an error, or a pending user message keeps
   its notes for the next boundary. An idle user prompt drops them with the rest
   of the turn state. Malformed payloads are ignored.
+
+## Scope and language conventions
+
+KISS, DRY, and YAGNI apply to demonstrated needs in the proposed change. They
+never justify dropping user requirements, established contracts, required error
+handling, compatibility, or meaningful tests. Extraction for a present
+responsibility or testability is valid with one caller. Unrelated code stays
+outside the review.
+
+JavaScript and TypeScript guides also require an object destructured in the
+parameter list when a function would take three or more parameters, including
+optional/defaulted parameters. External signatures and public compatibility
+contracts are preserved. These language conventions supplement the 19 canonical
+rules and are loaded by the same read gate; they are reviewed rather than
+mechanically blocked.
 
 ## Files
 

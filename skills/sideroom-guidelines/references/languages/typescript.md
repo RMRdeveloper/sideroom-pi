@@ -154,7 +154,7 @@ async function create(input: ValidatedUser): Promise<User> { const user = normal
 
 ### 12. DRY (real duplication only)
 
-RULE: Extract when at least 2 of 3 hold: (a) the logic appears 3+ times, (b) a future rule change would need to touch all occurrences at once, (c) the copies represent the same domain concept. Do not extract on the first or second occurrence, or extract look-alike code from different concepts.
+RULE: Extract when at least 2 of 3 hold: (a) the logic appears 3+ times, (b) a future rule change would need to touch all occurrences at once, (c) the copies represent the same domain concept. Do not extract solely to anticipate reuse on the first or second occurrence, or extract look-alike code from different concepts. Extraction for a present responsibility, clear contract, or testability is valid even with one caller.
 
 ```ts
 // bad — extracted after one use
@@ -165,7 +165,7 @@ const normalizeTicketStatus = (status: string): TicketStatus => parseTicketStatu
 
 ### 13. KISS
 
-RULE: Ship the simplest solution for the current, real requirement. No configurability, hooks, or layers added "just in case."
+RULE: Choose the simplest design that fully satisfies the current requirements and preserves required behavior. Avoid configurability, hooks, or layers without a demonstrated need; do not remove necessary structure just to reduce code size.
 
 ```ts
 // bad
@@ -176,7 +176,7 @@ function formatPrice(value: number): string { return `$${value.toFixed(2)}`; }
 
 ### 14. YAGNI
 
-RULE: Don't add fields, params, or branches for a use case that hasn't arrived. (KISS simplifies the chosen solution; YAGNI stops you building the unrequested one.)
+RULE: Avoid capabilities for hypothetical future use cases without evidence. User requirements, established project contracts, required error handling, compatibility, and meaningful tests are current needs, not speculation. Never use YAGNI to omit them or remove existing supported behavior. Apply it to the proposed change, not as a reason to refactor unrelated code.
 
 ```ts
 // bad
@@ -247,3 +247,27 @@ setInterval(checkPaymentStatus, 5_000);
 **When in doubt:** fail fast, keep it flat, keep it small.
 
 **Enforcement note:** rules 1–2 are mechanical and should be backed by TypeScript formatting or linting. Rules 3–10 are structural checks. Rules 11–19 require review judgment.
+
+## Language-specific conventions
+
+### Destructured function parameters
+
+When a function would take 3 or more parameters, accept one object and destructure its named properties in the parameter list. Count optional and defaulted parameters toward the threshold. Functions with 1 or 2 parameters may keep positional parameters. In TypeScript, type the object with a named type or interface.
+
+Keep signatures imposed by external APIs, framework callbacks, overrides, or public compatibility contracts; use a destructured internal helper when it makes the implementation clearer. When changing a signature you own, update its callers together. Do not rewrite unrelated functions only to satisfy this convention.
+
+```ts
+// bad
+function createInvoice(order: Order, currency: string, dueDate: Date): Invoice {
+  return { items: order.items, total: order.total, currency, dueDate };
+}
+
+// good
+type InvoiceInput = { order: Order; currency: string; dueDate: Date };
+
+function createInvoice({ order, currency, dueDate }: InvoiceInput): Invoice {
+  return { items: order.items, total: order.total, currency, dueDate };
+}
+
+createInvoice({ order, currency: 'USD', dueDate });
+```

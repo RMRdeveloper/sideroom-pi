@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 import test from 'node:test';
 import type {
   AgentBeforeSettleEventResult,
@@ -31,12 +32,17 @@ const CWD = '/work';
 
 function register(...extensions: readonly Register[]): Harness {
   const handlers = new Map<string, EventHandler[]>();
+  const bus = new EventEmitter();
   const api = {
     on(name: string, handler: EventHandler) {
       handlers.set(name, [...(handlers.get(name) ?? []), handler]);
     },
     getActiveTools: () => ['read', 'edit', 'write'],
-    events: { on() {} },
+    events: {
+      on: (name: string, handler: (payload: unknown) => void) =>
+        bus.on(name, handler),
+      emit: (name: string, payload: unknown) => bus.emit(name, payload),
+    },
   } as unknown as ExtensionAPI;
   for (const extension of extensions) {
     extension(api);
@@ -117,12 +123,9 @@ function offers(harness: Harness): readonly CustomMessageDraft[] {
   );
 }
 
-test('defers one boundary, then offers at the file threshold', () => {
+test('offers at the file threshold when no review or check is pending', () => {
   const harness = register(registerExplain);
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
-  settle(harness);
-  assert.equal(offers(harness).length, 0);
-
   settle(harness);
   assert.equal(offers(harness).length, 1);
   assert.match(offers(harness)[0]?.content ?? '', /sideroom_ask/);

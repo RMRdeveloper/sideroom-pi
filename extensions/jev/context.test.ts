@@ -27,7 +27,7 @@ function add(root: string, path: string, body: string): void {
   writeFileSync(file, body);
 }
 
-test('sends imported files first, then direct consumers, capped at four', () => {
+test('prioritizes direct consumers before imports, capped at four', () => {
   withProject((root) => {
     const body = [
       "import './a';",
@@ -47,10 +47,10 @@ test('sends imported files first, then direct consumers, capped at four', () => 
     assert.deepEqual(
       state?.context.files.map((file) => [file.path, file.relation]),
       [
+        ['src/consumer.ts', 'consumer'],
+        ['src/consumer2.ts', 'consumer'],
         ['src/a.ts', 'imported'],
         ['src/b.ts', 'imported'],
-        ['src/c.ts', 'imported'],
-        ['src/consumer.ts', 'consumer'],
       ],
     );
     assert.equal(state?.context.partial, true);
@@ -188,6 +188,66 @@ test('skips review if the complete changed file cannot fit', () => {
     assert.equal(
       buildContextualState(root, 'src/main.ts', body, 'write', []),
       undefined,
+    );
+  });
+});
+
+test('reserves relevant tests and consumers ahead of import-heavy context', () => {
+  withProject((root) => {
+    const body = Array.from(
+      { length: 5 },
+      (_, index) => `import './dependency${index}';`,
+    ).join('\n');
+    for (let index = 0; index < 5; index += 1) {
+      add(root, `src/dependency${index}.ts`, 'export const ready = true;');
+    }
+    add(
+      root,
+      'src/main.test.ts',
+      "import './main';\nassert.equal(main(), true);",
+    );
+    add(root, 'src/controller.ts', "import './main';");
+    const state = buildContextualState(root, 'src/main.ts', body, 'edit', [
+      { line: 1, text: 'export const main = () => false;' },
+    ]);
+    assert.deepEqual(
+      state?.context.files.slice(0, 2).map((file) => file.relation),
+      ['test', 'consumer'],
+    );
+    assert.equal(state?.context.files.length, 4);
+    assert.equal(state?.context.partial, true);
+    assert.ok(state && buildRequestBody(state).questions['test-quality']);
+    assert.ok(
+      state && buildRequestBody(state).questions['contract-compatibility'],
+    );
+  });
+});
+
+test('recognizes sibling convention tests without importing unrelated same-name files', () => {
+  withProject((root) => {
+    add(root, 'src/order_test.go', 'package order');
+    add(root, 'elsewhere/order_test.go', 'package order');
+    const source = buildContextualState(
+      root,
+      'src/order.go',
+      'package order',
+      'edit',
+      [{ line: 1, text: 'package order' }],
+    );
+    assert.deepEqual(
+      source?.context.files.map((file) => file.path),
+      ['src/order_test.go'],
+    );
+    add(root, 'src/order.go', 'package order');
+    const testState = buildContextualState(
+      root,
+      'src/order_test.go',
+      'package order',
+      'edit',
+      [{ line: 1, text: 'package order' }],
+    );
+    assert.ok(
+      testState && buildRequestBody(testState).questions['test-quality'],
     );
   });
 });
