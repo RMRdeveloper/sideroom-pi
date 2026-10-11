@@ -6,24 +6,10 @@ import {
   assistantMessageText,
   formatArtifactSteer,
   formatBlockReason,
-  formatPersonaDetail,
   formatSteer,
   personaStatusLabel,
   personaToolDetails,
 } from './model.ts';
-
-test('details every voice rule and prohibition with its enforcement', () => {
-  const detail = formatPersonaDetail();
-  for (const rule of VOICE_RULES) {
-    assert.equal(detail.includes(rule.instruction), true, rule.id);
-  }
-  for (const prohibition of PROHIBITIONS) {
-    assert.equal(detail.includes(prohibition.rule), true, prohibition.id);
-  }
-  assert.match(detail, /blocked on write and edit/);
-  assert.match(detail, /corrected with a steer/);
-  assert.match(detail, /no profiles or switching/);
-});
 
 test('reports the tool details as catalog ids', () => {
   const details = personaToolDetails();

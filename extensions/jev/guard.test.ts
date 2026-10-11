@@ -453,3 +453,174 @@ test('skips a file that is too large for the state budget', async () => {
     assert.deepEqual(harness.statuses, []);
   });
 });
+
+async function workflowResult(
+  harness: Harness,
+  {
+    toolName,
+    input: toolInput,
+    details,
+    isError = false,
+  }: {
+    toolName: string;
+    input: Record<string, unknown>;
+    details: unknown;
+    isError?: boolean;
+  },
+): Promise<unknown> {
+  return handlerOf(harness, 'tool_result')(
+    {
+      toolName,
+      toolCallId: 'workflow',
+      input: toolInput,
+      details,
+      isError,
+      content: [],
+    } as never,
+    harness.ctx as never,
+  );
+}
+
+const askInput = {
+  questions: [
+    {
+      id: 'scope',
+      prompt: 'Choose a scope',
+      options: [
+        { value: 'small', label: 'Small' },
+        { value: 'large', label: 'Large' },
+      ],
+      recommendationIndex: 0,
+    },
+  ],
+};
+const doneItems = [
+  { id: 'implementation', content: 'Implement behavior', status: 'completed' },
+];
+const boardInput = {
+  action: 'update',
+  patches: [{ id: 'implementation', status: 'completed' }],
+};
+
+test('reviews successful questionnaires without sending user answers or changing their result', async () => {
+  await withHarness(async (harness) => {
+    harness.transport = async () => ({
+      status: 200,
+      text: '{"answers":{"question-options":{"noul":0.95}}}',
+    });
+    const returned = await workflowResult(harness, {
+      toolName: 'sideroom_ask',
+      input: askInput,
+      details: { cancelled: false, answers: ['private response'] },
+    });
+    assert.equal(returned, undefined);
+    assert.equal(harness.requests.length, 1);
+    assert.equal(harness.guardState.calls, 1);
+    assert.match(harness.notes[0] ?? '', /question-options/);
+    assert.doesNotMatch(harness.requests[0]?.body ?? '', /private response/);
+    await workflowResult(harness, {
+      toolName: 'sideroom_ask',
+      input: askInput,
+      details: { cancelled: false },
+    });
+    assert.equal(harness.notes.length, 1);
+    await workflowResult(harness, {
+      toolName: 'sideroom_ask',
+      input: askInput,
+      details: { cancelled: true },
+    });
+    assert.equal(harness.requests.length, 2);
+  });
+});
+
+test('workflow reviews share the missing-key, cancellation and quota policies', async () => {
+  await withHarness(async (harness) => {
+    harness.apiKey = undefined;
+    await workflowResult(harness, {
+      toolName: 'sideroom_ask',
+      input: askInput,
+      details: { cancelled: false },
+    });
+    assert.equal(harness.requests.length, 0);
+    harness.apiKey = 'test-key';
+    harness.signal = AbortSignal.abort();
+    await workflowResult(harness, {
+      toolName: 'sideroom_ask',
+      input: askInput,
+      details: { cancelled: false },
+    });
+    assert.equal(harness.requests.length, 0);
+    harness.signal = undefined;
+    harness.transport = async () => ({ status: 402, text: '' });
+    await workflowResult(harness, {
+      toolName: 'sideroom_ask',
+      input: askInput,
+      details: { cancelled: false },
+    });
+    await writeFile(harness);
+    assert.equal(harness.requests.length, 1);
+    assert.equal(guardStatus(harness.guardState), JEV_STATUS.quota);
+  });
+});
+
+test('reviews completed tasks against bounded source and check status, excluding command output', async () => {
+  await withHarness(async (harness) => {
+    await writeFile(harness);
+    writeFileSync(
+      join(harness.cwd, 'package.json'),
+      '{"scripts":{"check":"node check.js"}}',
+    );
+    await workflowResult(harness, {
+      toolName: 'bash',
+      input: { command: 'npm run check' },
+      details: { output: 'private logs' },
+      isError: true,
+    });
+    harness.transport = async () => ({
+      status: 200,
+      text: '{"answers":{"board-completion":{"noul":0.95}}}',
+    });
+    await workflowResult(harness, {
+      toolName: 'sideroom_todo',
+      input: boardInput,
+      details: { items: doneItems },
+    });
+    assert.equal(harness.requests.length, 2);
+    const request = JSON.parse(harness.requests[1]?.body ?? '{}');
+    assert.equal(request.state.evidence.checks, 'failed');
+    assert.equal(request.state.evidence.files.length, 1);
+    assert.doesNotMatch(
+      harness.requests[1]?.body ?? '',
+      /private logs|npm run check/,
+    );
+    assert.match(harness.notes[0] ?? '', /board-completion/);
+    await workflowResult(harness, {
+      toolName: 'sideroom_todo',
+      input: boardInput,
+      details: { items: doneItems },
+    });
+    assert.equal(harness.requests.length, 2);
+    input(harness, 'interactive');
+    await workflowResult(harness, {
+      toolName: 'sideroom_todo',
+      input: boardInput,
+      details: { items: doneItems },
+    });
+    assert.equal(harness.requests.length, 2);
+  });
+});
+
+test('deletion-only edits invalidate cached file evidence and passed checks without a request', async () => {
+  await withHarness(async (harness) => {
+    await writeFile(harness);
+    harness.guardState.evidence.checks = 'passed';
+    callTool(harness, 'edit', 'remove', {
+      path: 'src/example.ts',
+      edits: [{ oldText: 'const removed = true;', newText: '' }],
+    });
+    await finishTool(harness, 'edit', 'remove', 'src/example.ts');
+    assert.equal(harness.guardState.evidence.files.size, 0);
+    assert.equal(harness.guardState.evidence.checks, 'stale');
+    assert.equal(harness.requests.length, 1);
+  });
+});

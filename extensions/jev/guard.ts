@@ -6,6 +6,7 @@ import {
   isWriteToolResult,
   type ToolCallEvent,
 } from '@earendil-works/pi-coding-agent';
+import { commandMatches, detectCheckCommand } from '../done/detect.ts';
 import {
   projectRelativePath,
   resolveFileToolPath,
@@ -14,7 +15,7 @@ import { readFileIfExists } from '../shared/read-file.ts';
 import { REVIEW_NOTE_EVENT, type ReviewNote } from '../shared/review-note.ts';
 import { startsUserTurn } from '../shared/settle.ts';
 import {
-  askJev,
+  askJevRequest,
   JEV_FAILURE,
   type JevFailure,
   type JevTransport,
@@ -24,11 +25,24 @@ import {
   type AddedLine,
   addedLinesForEdit,
   addedLinesForWrite,
+  buildRequestBody,
   findingKey,
   formatFindings,
   isReviewablePath,
   type JevFinding,
+  type JevRequestBody,
 } from './model.ts';
+
+import {
+  buildAskReview,
+  buildBoardReview,
+  completedItems,
+  completionIds,
+  createWorkflowEvidence,
+  recordFileEvidence,
+  resetWorkflowEvidence,
+  type WorkflowEvidence,
+} from './workflow.ts';
 
 export const JEV_TRANSIENT_FAILURE_LIMIT = 3;
 
@@ -64,6 +78,7 @@ export interface JevGuardState {
   rateLimitedThisTurn: boolean;
   lastModel: string | undefined;
   calls: number;
+  readonly evidence: WorkflowEvidence;
   readonly pending: Map<string, PendingMutation>;
   readonly notedThisTurn: Set<string>;
 }
@@ -81,6 +96,7 @@ export function createJevGuardState(): JevGuardState {
     rateLimitedThisTurn: false,
     lastModel: undefined,
     calls: 0,
+    evidence: createWorkflowEvidence(),
     pending: new Map(),
     notedThisTurn: new Set(),
   };
@@ -88,6 +104,7 @@ export function createJevGuardState(): JevGuardState {
 
 // The F10 screen calls this after the user stores a key or asks to retry.
 export function resetJevGuard(state: JevGuardState): void {
+  resetWorkflowEvidence(state.evidence);
   state.halted = undefined;
   state.transientFailures = 0;
   state.rateLimitedThisTurn = false;
@@ -96,6 +113,7 @@ export function resetJevGuard(state: JevGuardState): void {
 // Usage and per-turn memory belong to the active session: a new session starts
 // counting from zero. The breaker stays, because it tracks the key.
 export function resetJevSession(state: JevGuardState): void {
+  resetWorkflowEvidence(state.evidence);
   state.calls = 0;
   state.rateLimitedThisTurn = false;
   state.pending.clear();
@@ -131,6 +149,7 @@ export function registerJevGuard(
     if (!startsUserTurn(event)) {
       return;
     }
+    resetWorkflowEvidence(state.evidence);
     state.notedThisTurn.clear();
     state.rateLimitedThisTurn = false;
   });
@@ -145,7 +164,7 @@ export function registerJevGuard(
   // the previous content is gone. The body is read after, from disk.
   pi.on('tool_call', (event, ctx) => {
     const mutation = extractMutation(event, ctx.cwd);
-    if (mutation === undefined || !isWorthAsking(mutation)) {
+    if (mutation === undefined || !isReviewablePath(mutation.relativePath)) {
       return undefined;
     }
     state.pending.set(event.toolCallId, mutation);
@@ -155,48 +174,108 @@ export function registerJevGuard(
   pi.on('tool_result', async (event, ctx) => {
     const pending = state.pending.get(event.toolCallId);
     state.pending.delete(event.toolCallId);
-    if (pending === undefined || event.isError) {
-      return undefined;
-    }
-    if (!isWriteToolResult(event) && !isEditToolResult(event)) {
-      return undefined;
-    }
-
     const apiKey = dependencies.apiKey();
-    if (apiKey === undefined) {
-      dependencies.report(JEV_STATUS.noKey, ctx);
+    if (
+      apiKey === undefined ||
+      !shouldCallJev(state) ||
+      ctx.signal?.aborted === true
+    ) {
+      if (!event.isError && pending !== undefined && isWorthAsking(pending)) {
+        dependencies.report(
+          apiKey === undefined ? JEV_STATUS.noKey : guardStatus(state),
+          ctx,
+        );
+      }
       return undefined;
     }
-    if (!shouldCallJev(state)) {
-      dependencies.report(guardStatus(state), ctx);
+    if (event.isError) {
+      if (
+        event.toolName === 'bash' &&
+        typeof event.input.command === 'string'
+      ) {
+        const check = detectCheckCommand(ctx.cwd);
+        if (check !== undefined && commandMatches(event.input.command, check)) {
+          state.evidence.checks = 'failed';
+        }
+      }
       return undefined;
     }
-
-    const body = readFileIfExists(pending.absolutePath);
-    if (body === undefined) {
+    if (event.toolName === 'bash' && typeof event.input.command === 'string') {
+      const check = detectCheckCommand(ctx.cwd);
+      if (check !== undefined && commandMatches(event.input.command, check)) {
+        state.evidence.checks = 'passed';
+      }
       return undefined;
     }
-    if (ctx.signal?.aborted === true) {
-      return undefined;
+    let requestBody: JevRequestBody | undefined;
+    let subject: string;
+    if (event.toolName === 'sideroom_ask') {
+      if (
+        typeof event.details !== 'object' ||
+        event.details === null ||
+        !('cancelled' in event.details) ||
+        event.details.cancelled !== false
+      ) {
+        return undefined;
+      }
+      requestBody = buildAskReview(event.input);
+      subject = 'sideroom_ask';
+    } else if (event.toolName === 'sideroom_todo') {
+      const items = completedItems(event.details);
+      if (items === undefined) {
+        return undefined;
+      }
+      requestBody = buildBoardReview({
+        items,
+        evidence: state.evidence,
+        changedIds: completionIds(event.input),
+      });
+      subject = 'sideroom_todo';
+    } else {
+      if (
+        pending === undefined ||
+        (!isWriteToolResult(event) && !isEditToolResult(event))
+      ) {
+        return undefined;
+      }
+      subject = pending.relativePath;
+      state.evidence.checks = 'stale';
+      // Replace cached evidence even when this version no longer fits the budget.
+      state.evidence.files.delete(subject);
+      if (!isWorthAsking(pending)) {
+        state.evidence.partial = true;
+        return undefined;
+      }
+      const body = readFileIfExists(pending.absolutePath);
+      if (body === undefined) {
+        state.evidence.partial = true;
+        return undefined;
+      }
+      const fileState = buildContextualState(
+        ctx.cwd,
+        subject,
+        body,
+        pending.kind,
+        pending.lines,
+      );
+      if (fileState === undefined) {
+        state.evidence.partial = true;
+        return undefined;
+      }
+      recordFileEvidence(state.evidence, fileState);
+      requestBody = buildRequestBody(fileState);
     }
-    const fileState = buildContextualState(
-      ctx.cwd,
-      pending.relativePath,
-      body,
-      pending.kind,
-      pending.lines,
-    );
-    if (fileState === undefined) {
+    if (requestBody === undefined) {
       return undefined;
     }
 
     state.calls += 1;
-    const attempt = await askJev(
-      dependencies.transport,
+    const attempt = await askJevRequest({
+      transport: dependencies.transport,
       apiKey,
-      fileState,
-      ctx.signal,
-    );
+      requestBody,
+      signal: ctx.signal,
+    });
     if (attempt.failure !== undefined) {
       registerFailure(state, attempt.failure);
       dependencies.report(guardStatus(state), ctx);
@@ -211,14 +290,14 @@ export function registerJevGuard(
 
     const findings = attempt.findings ?? [];
     const fresh = findings.filter((finding) =>
-      isUnnoted(state, pending.relativePath, finding),
+      isUnnoted(state, subject, finding),
     );
     if (fresh.length === 0) {
       return undefined;
     }
-    markNoted(state, pending.relativePath, fresh);
+    markNoted(state, subject, fresh);
     const note: ReviewNote = {
-      text: formatFindings(pending.relativePath, fresh),
+      text: formatFindings(subject, fresh),
     };
     pi.events.emit(REVIEW_NOTE_EVENT, note);
     return undefined;

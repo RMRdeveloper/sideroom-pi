@@ -2,6 +2,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from '@earendil-works/pi-coding-agent';
+import { startsUserTurn } from '../shared/settle.ts';
 import {
   type CheckCommand,
   detectCheckCommand,
@@ -41,10 +42,10 @@ export default function registerDone(pi: ExtensionAPI): void {
     return hasTests;
   };
 
-  registerDoneGuard(pi, state, resolveCommand, resolveTestSetup);
+  registerDoneGuard({ pi, state, resolveCommand, resolveTestSetup });
 
   pi.on('input', (event) => {
-    if (event.source === 'interactive' || event.source === 'rpc') {
+    if (startsUserTurn(event)) {
       resetDoneRun(state);
     }
   });

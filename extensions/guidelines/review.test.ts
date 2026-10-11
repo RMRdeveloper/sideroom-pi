@@ -30,6 +30,7 @@ interface SettleOptions {
   readonly outcome?: string;
   readonly entries?: readonly unknown[];
   readonly pendingRoles?: readonly string[];
+  readonly continue?: boolean;
 }
 
 const EARLIER_ENTRY = {
@@ -44,6 +45,11 @@ function register(): Harness {
   const bus = new Map<string, BusHandler[]>();
   const api = {
     events: {
+      emit(channel: string, payload: unknown) {
+        for (const handler of bus.get(channel) ?? []) {
+          handler(payload);
+        }
+      },
       on(channel: string, handler: BusHandler) {
         bus.set(channel, [...(bus.get(channel) ?? []), handler]);
       },
@@ -103,7 +109,7 @@ function settle(harness: Harness, options: SettleOptions = {}): void {
       type: 'agent_before_settle',
       outcome: options.outcome ?? 'completed',
       entries: options.entries ?? [],
-      continue: false,
+      continue: options.continue ?? false,
       context: {
         pendingMessages: (options.pendingRoles ?? []).map((role) => ({
           role,
@@ -182,6 +188,8 @@ test('yields to a pending user message', () => {
   assert.deepEqual(harness.steers, []);
 
   settle(harness, { pendingRoles: ['custom'] });
+  assert.deepEqual(harness.steers, []);
+  settle(harness);
   assert.equal(harness.steers.length, 1);
 });
 
@@ -318,10 +326,13 @@ test('drops notes from the previous turn on an idle user prompt', () => {
   assert.equal(steerText(harness, 1), REVIEW_STEER);
 });
 
-test('a note alone does not start a review', () => {
+test('a workflow note alone starts one evidence-based review', () => {
   const state = createReviewState();
   state.notes.push('orphan note');
-  assert.equal(pendingReviewSteer(state), undefined);
+  assert.match(
+    pendingReviewSteer(state) ?? '',
+    /questionnaire or task contract/,
+  );
 
   state.mutated = true;
   assert.match(pendingReviewSteer(state) ?? '', /orphan note/);
@@ -344,4 +355,48 @@ test('shouldReview requires a mutation and an unarmed flag', () => {
   assert.equal(shouldReview(state), false);
   assert.equal(state.mutated, false);
   assert.equal(state.steeredThisTurn, false);
+});
+
+test('keeps the review armed when an earlier handler continues implementation', () => {
+  const harness = register();
+  mutate(harness);
+  settle(harness, { entries: [EARLIER_ENTRY], continue: true });
+  assert.deepEqual(harness.steers, []);
+  mutate(harness);
+  settle(harness);
+  assert.equal(harness.steers.length, 1);
+});
+
+test('keeps late notes while a non-user continuation is queued', () => {
+  const harness = register();
+  mutate(harness);
+  settle(harness);
+  emitNote(harness, { text: 'late note' });
+  settle(harness, { pendingRoles: ['custom'] });
+  assert.equal(harness.steers.length, 1);
+  settle(harness);
+  assert.match(steerText(harness, 1), /late note/);
+});
+
+test('delivers a questionnaire note at settle without requiring a code mutation', () => {
+  const harness = register();
+  emitNote(harness, { text: 'Question options visibly overlap' });
+  settle(harness);
+  assert.match(steerText(harness, 0), /questionnaire or task contract/);
+  assert.match(steerText(harness, 0), /Question options visibly overlap/);
+  settle(harness);
+  assert.equal(harness.steers.length, 1);
+});
+
+test('a late workflow note preserves the task-review contract without code changes', () => {
+  const state = createReviewState();
+  state.notes.push('Question options overlap');
+  markReviewSteered(state);
+  state.notes.push('Completion claim contradicts observed checks');
+  const steer = pendingReviewSteer(state) ?? '';
+  assert.match(steer, /questionnaire or task contract/);
+  assert.match(steer, /Run project checks only if code changes/);
+  markReviewSteered(state);
+  state.notes.push('Further advisory note');
+  assert.equal(pendingReviewSteer(state), undefined);
 });

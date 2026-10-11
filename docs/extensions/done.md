@@ -2,8 +2,8 @@
 
 Steers the agent back to the project's own check command when files changed and
 the checks have not passed. It never blocks and does nothing when no check
-command is detectable. When the project has tests, it also notes a run that
-changed code files without touching one.
+command is detectable. When the project has tests, it also asks whether existing
+tests cover a change that touched code but no test file.
 
 ## Check-command detection
 
@@ -19,76 +19,54 @@ Detected from `ctx.cwd`, in order, cached per working directory:
 
 ## Test-setup detection
 
-`hasTestSetup(cwd)` answers a narrower question than the check command: does
-this project have tests at all? True when `package.json` has a `test` script,
-or when `pyproject.toml`, `setup.py`, `go.mod`, or `Cargo.toml` exists. A
-project with only `npm run check`, or only `make check`, has a gate but no test
-setup, so the notice stays quiet.
+`hasTestSetup(cwd)` is true when `package.json` has a `test` script, or when
+`pyproject.toml`, `setup.py`, `go.mod`, or `Cargo.toml` exists. A project with
+only `npm run check` or `make check` has a gate but no detected test setup.
 
 ## State and steering
 
-```ts
-interface DoneState {
-  mutated: boolean;
-  checksGreen: boolean;
-  steeredThisTurn: boolean;
-  steerCount: number;
-  mutatedSource: boolean;
-  mutatedTest: boolean;
-  noticedMissingTest: boolean;
-}
-```
-
 - A successful `write`/`edit` sets `mutated` and clears `checksGreen`.
-- A bash command matching the detected check (by prefix on a command separator)
-  marks the call; a successful result sets `checksGreen`.
-- At `turn_end`, if checks are not green and the cap is not reached, one steer
-  is sent:
-
-  ```ts
-  pi.sendMessage(
-    { customType: 'sideroom-done-gate', content: 'Run `...` and make it pass before finishing.', display: false },
-    { triggerTurn: true, deliverAs: 'steer' },
-  );
-  ```
-
-- Steering is capped at `MAX_DONE_STEERS = 2` per run and once per turn.
-- State resets on a real user prompt and on `session_start`.
+- A bash command matching the detected check marks the call. Its result sets
+  `checksGreen` to whether it succeeded; a failed rerun clears a previous pass.
+- Checks and the coverage notice run only at `agent_before_settle`, after the
+  low-level tool loop, retries and compaction recovery. They never interrupt
+  implementation at `turn_end`.
+- The shared settle guard gives guidelines review and its late semantic notes
+  priority over `done`, and gives `done` priority over the walkthrough offer.
+  The order does not depend on extension loading order.
+- An aborted or errored run, any queued message, or an earlier handler's
+  continuation postpones the gate without spending its steering budget.
+- A steer is a hidden `custom_message` entry returned with `continue: true`,
+  preserving earlier entries and continuing the same run.
+- Checks and the coverage notice share `MAX_DONE_STEERS = 2` per user turn.
+- State resets on idle interactive/RPC input and `session_start`. Input queued
+  while the agent runs does not reset the cap or a green check.
 
 ## Missing-test notice
 
-A successful `write`/`edit` records whether its path is a supported source file
-and whether it looks like a test (`isSourcePath` by extension, `isTestPath` by
-name convention). Documentation, configuration, and other non-code files do not
-activate the notice. At `turn_end`, when the check gate did not fire, the
-project has tests, the run changed code files and never a test file, one notice
-is sent:
+A successful `write`/`edit` records source and test paths by convention. A run
+that changes code but no test file receives one coverage notice when checks are
+green and a test setup is detected. Existing tests may already cover the change;
+the notice asks the agent to inspect that coverage and add or update a meaningful
+test only when needed, then rerun the checks.
 
-```ts
-pi.sendMessage(
-  { customType: 'sideroom-missing-test-notice', content: 'This run changed code files and no test file. Add or update the test that covers the change before finishing.', display: false },
-  { triggerTurn: true, deliverAs: 'steer' },
-);
-```
-
-- It never blocks, and it never claims the right test exists: paths are
-  recognised by convention, not by reading the tests.
-- With checks red, the check gate wins the turn and the notice waits for a turn
-  where the checks are green.
-- It fires once per run and shares `steerCount` with the check gate, so the two
-  never exceed `MAX_DONE_STEERS` between them.
+Documentation and configuration alone do not activate the notice. With checks
+red, the check gate wins and the notice waits. Path recognition never proves
+that the right test exists. Both messages share the same two-steer cap.
 
 ## Files
 
 | File | Role |
 | --- | --- |
-| `extensions/done/index.ts` | Creates state, caches both detections per `cwd`, wires reset events. |
-| `extensions/done/detect.ts` | Per-ecosystem check-command detection, test-setup detection, and command matching. |
-| `extensions/done/guard.ts` | Watches mutations and bash results; sends the steer and the notice. |
-| `extensions/done/model.ts` | State shape, reset, decisions, test-path detection, and steer text. |
+| `extensions/done/index.ts` | Creates state, caches detections per `cwd`, wires reset events. |
+| `extensions/done/detect.ts` | Check-command detection, test-setup detection, and command matching. |
+| `extensions/done/guard.ts` | Watches mutations and bash results; appends the settle steer and notice. |
+| `extensions/done/model.ts` | State, reset, decisions, test-path detection, and steer text. |
+| `extensions/shared/settle.ts` | Quiet boundary checks and stage priority through Pi's event bus. |
 
 ## Tests
 
-`detect.test.ts` covers each ecosystem, the test setup, and command matching.
-`model.test.ts` covers test-path detection and the notice decision.
-`index.test.ts` covers green/red transitions, the notice, caps, and reset.
+`detect.test.ts` covers ecosystems, test setup, and command matching.
+`model.test.ts` covers path detection and the notice decision.
+`index.test.ts` covers green/red transitions, caps, reset, and postponed steers.
+`shared/settle.test.ts` covers all six extension loading orders and late notes.

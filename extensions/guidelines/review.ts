@@ -5,7 +5,8 @@ import {
 } from '@earendil-works/pi-coding-agent';
 import { isReviewNote, REVIEW_NOTE_EVENT } from '../shared/review-note.ts';
 import {
-  acceptsSettleSteer,
+  registerSettleGuard,
+  SETTLE_PRIORITY,
   startsUserTurn,
   withHiddenSteer,
 } from '../shared/settle.ts';
@@ -13,10 +14,13 @@ import {
 export const REVIEW_STEER_TYPE = 'sideroom-guidelines-review';
 
 export const REVIEW_STEER =
-  'Review every file this run changed against the loaded Sideroom language guide: fix any mechanical, structural, or architectural rule violations in those files, then run the relevant formatter, linter, type checks, and tests. If the guide is no longer in context, re-read it in full first.';
+  'Finish any remaining requested implementation before reviewing. Review the changes this run introduced against the loaded Sideroom language guide: fix only demonstrated violations caused by those changes, preserving all requested requirements and existing behavior. KISS and YAGNI do not justify removing required error handling, compatibility, or tests. Do not refactor unrelated code. Then run the relevant formatter, linter, type checks, and tests. If the guide is no longer in context, re-read it in full first.';
+
+export const WORKFLOW_REVIEW_STEER =
+  'Verify the semantic notes below against the visible evidence and the questionnaire or task contract. Correct only demonstrated ambiguity or contradictions; respect user answers and ask again only when clarification is necessary. Missing evidence is not proof of unfinished work. Do not create unrelated implementation work. Run project checks only if code changes.';
 
 export const REVIEW_NOTES_STEER =
-  'Files changed during the review drew the semantic notes below. Verify each against the loaded Sideroom language guide, fix only real violations, then rerun the relevant checks.';
+  'Additional semantic notes arrived after the review. Verify each against the loaded Sideroom language guide, fix only demonstrated violations introduced by this run without removing required behavior or refactoring unrelated code, then rerun the relevant checks.';
 
 export interface ReviewState {
   mutated: boolean;
@@ -42,21 +46,27 @@ export function resetReviewTurn(state: ReviewState): void {
 }
 
 export function shouldReview(state: ReviewState): boolean {
-  return state.mutated && !state.steeredThisTurn;
+  return (state.mutated || state.notes.length > 0) && !state.steeredThisTurn;
 }
 
 // Notes that arrive after the review fired get one follow-up per turn, so a
 // fix that draws new notes cannot keep the run going.
 export function pendingReviewSteer(state: ReviewState): string | undefined {
   if (shouldReview(state)) {
-    return withNotes(REVIEW_STEER, state.notes);
+    return withNotes(
+      state.mutated ? REVIEW_STEER : WORKFLOW_REVIEW_STEER,
+      state.notes,
+    );
   }
   if (
     state.steeredThisTurn &&
     !state.notesSteeredThisTurn &&
     state.notes.length > 0
   ) {
-    return withNotes(REVIEW_NOTES_STEER, state.notes);
+    return withNotes(
+      state.mutated ? REVIEW_NOTES_STEER : WORKFLOW_REVIEW_STEER,
+      state.notes,
+    );
   }
   return undefined;
 }
@@ -104,12 +114,20 @@ export function registerReviewGuard(
   // continuation stays inside the same run. agent_settled is notification-only:
   // a steer sent there starts a second run after the user already saw the
   // agent stop, and it fires even when the user pressed Escape.
-  pi.on('agent_before_settle', (event) => {
-    const steer = pendingReviewSteer(state);
-    if (steer === undefined || !acceptsSettleSteer(event)) {
-      return;
-    }
-    markReviewSteered(state);
-    return withHiddenSteer(event, REVIEW_STEER_TYPE, steer);
+  registerSettleGuard(pi, {
+    priority: SETTLE_PRIORITY.review,
+    pending: () => pendingReviewSteer(state) !== undefined,
+    handle: (event) => {
+      const steer = pendingReviewSteer(state);
+      if (steer === undefined) {
+        return;
+      }
+      markReviewSteered(state);
+      return withHiddenSteer({
+        event,
+        customType: REVIEW_STEER_TYPE,
+        content: steer,
+      });
+    },
   });
 }

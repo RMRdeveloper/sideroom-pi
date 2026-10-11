@@ -1,6 +1,6 @@
 # Jev review
 
-An optional semantic pass over the file a `write` or `edit` just changed. Jev is
+An optional semantic pass over changed code, successful questionnaires, and newly completed tasks. Jev is
 TypeSafe's decision model: you send a state and typed questions, and it returns
 probabilities, never prose. Sideroom asks it about the guide rules that no
 mechanical check can decide.
@@ -22,13 +22,15 @@ mechanical check can decide.
 - **State is the changed file, its added lines, and bounded related source.**
   `file` holds the project-relative path, language and complete body; `change`
   holds the kind and added lines. `context` holds up to four complete directly
-  related source files, with their relative paths and relation (`imported` or
-  `consumer`), plus a `partial` flag when discovery or selection was incomplete.
-  Imports take priority over consumers. Files outside the working directory,
+  related source files, with their relative paths and relation (`imported`, `consumer` or
+  `test`), plus a `partial` flag when discovery or selection was incomplete.
+  Relevant tests take priority, then production consumers, then imports. A sibling
+  test convention also counts as a direct relation, in either direction. Files outside the working directory,
   ignored files, hidden paths, symlinks, dependency/build folders and
   sensitive-named paths are excluded. These path checks do not detect a secret
   embedded in an otherwise ordinary source file. The conversation, session,
-  board, documentation, configuration, git history and environment never travel.
+  documentation, configuration, git history and environment never travel.
+  Workflow requests below send only the selected question or task wording.
 - **Trigger.** `tool_call` records the added lines, because after a `write` the
   previous content is already gone. `tool_result` reads the resulting body from
   disk and asks. A call another extension blocks never reaches `tool_result`,
@@ -52,7 +54,8 @@ mechanical check can decide.
   screen show it; the endpoint returns no token or cost figures, so calls are
   the only honest unit.
 - **Dedup.** The same rule on the same file is noted at most once per turn,
-  however the model spelled the path. The turn starts on `input` from
+  however the model spelled the path. Questionnaire and board rule notes are
+  also capped once per tool and rule per user turn. The turn starts on `input` from
   `interactive` or `rpc` that arrives while the agent is idle; a message typed
   during a run joins that run and does not clear the dedup set.
 - **Failures never reach the agent.** Quota (`402`) and a rejected key (`401`,
@@ -82,6 +85,56 @@ unchanged code as a new violation. The mechanical rules still cover their
 existing local cases. Rules requiring requirements or more distant files stay
 in the language guide for the agent's review.
 
+## Additional code judgments
+
+- `testability` (18): hardcoded clock, network or randomness in business code,
+  with an explicit exception for adapters and composition boundaries.
+- `unnecessary-abstraction` (12–14): demonstrably redundant layers or merged
+  distinct domain concepts. One caller or delegation alone is not a violation;
+  current responsibilities, compatibility and testability remain valid reasons.
+- `contract-compatibility`: a concrete mismatch between the changed contract
+  and a supplied non-test consumer. Omitted without such a consumer.
+- `test-quality`: assertions that cannot catch the changed behavior or an
+  explicit changed error branch left untested in the supplied relevant tests.
+  Requires both production and test bodies. Partial context is never proof that
+  repository coverage is absent; this does not measure coverage or run tests.
+
+Source-reference discovery still cannot resolve every alias or dynamic import.
+Sibling test names cover `.test`, `.spec`, `_test`, `test_` and `Test.java`;
+matching basenames elsewhere in the project are not enough.
+
+## Questionnaire and completion reviews
+
+A successful, non-cancelled `sideroom_ask` result makes one additional request
+with the validated question batch: prompts, options and recommendation indexes.
+It asks about overlapping single-choice options, bundled independent decisions,
+and visibly contradictory or unsupported factual recommendations. User answers
+and conversation history are excluded. This is an end-of-run advisory review,
+not a gate before the questionnaire appears. It never silently reverses an answer.
+
+A successful `sideroom_todo` result makes at most one additional request for
+newly completed or reworded completed items targeted by that call. It sends only
+those items and up to four most recently observed changed files with their
+complete bodies and added lines, without their neighbouring files. The evidence
+is in memory, bounded and reset on an idle user prompt, session start or manual
+rearm. Whole snapshots are omitted when the request budget is exceeded and
+`partial` is set. Deletion-only or oversized edits invalidate an older snapshot.
+There is no request without source evidence or an observed check result.
+
+Only the status of the detected project check travels: `passed`, `failed`,
+`unknown`, or `stale` after a later supported source mutation. Commands, logs,
+configuration and arbitrary shell output are excluded. Jev asks for an explicit
+contradiction between a completion claim and visible evidence; an omitted file,
+unknown checks or stale checks do not establish incomplete work. Arbitrary shell
+mutations are not tracked, so a status is evidence from Pi's observed tools, not
+a guarantee of the current filesystem.
+
+All request types share the key, timeout, abort signal, probability cutoff,
+session call counter, rate-limit pause and circuit breaker. Notes alone can arm
+one guidelines review even if no code changed; it verifies question/task
+contracts and runs checks only if code changes. Extra questions in the existing
+code request add no extra calls; workflow reviews do add calls.
+
 ## The key
 
 - `TYPESAFE_API_KEY` wins, so containers and CI need no file at all.
@@ -109,6 +162,7 @@ in the language guide for the agent's review.
 | `extensions/jev/index.ts` | Composition: resolves the key, wires the guard, the shortcut and the footer. |
 | `extensions/jev/client.ts` | The single HTTP call, status classification, and the injectable transport. |
 | `extensions/jev/model.ts` | Wire shapes, the applicable questions, the byte budget, the cutoff, the note text. Pure. |
+| `extensions/jev/workflow.ts` | Validated workflow requests, bounded changed-file evidence, completion transitions and budgets. |
 | `extensions/jev/context.ts` | Bounded ignore-aware source discovery and complete-file selection. |
 | `extensions/jev/key.ts` | Environment-first key resolution and the owner-only config file. |
 | `extensions/jev/guard.ts` | Events, filters, dedup, the circuit breaker, the rate-limit pause and the fail-open paths. |
@@ -132,3 +186,9 @@ pause, the transient and quota halts, dedup, input typed during a run, dropped
 recorded calls, the session reset and the budget skip. `index.test.ts` covers
 the footer states, the shortcut and the non-terminal path. No test touches the
 network.
+
+`workflow.test.ts` covers parsed-question privacy, completion targeting, whole-file
+budgets, evidence eviction, check invalidation and turn reset. Guard tests also
+exercise workflow calls, failure policies, cancelled questionnaires and exclusion
+of user answers and command output. These tests stub Jev; real-model false-positive
+rates have not been measured.

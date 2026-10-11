@@ -15,9 +15,10 @@ import { personaStatusLabel } from './model.ts';
 import { appendPersonaReminder } from './prompt.ts';
 
 export const PERSONA_DESCRIPTION =
-  "Read Sideroom's voice rules and hard prohibitions for user-facing answers.";
+  'Load the complete Sideroom writing guide before a substantial explanation, findings report, implementation summary, or user-facing documentation; also use when asked for clearer, shorter, or less technical wording. Reuse while in context.';
 
-export const PERSONA_PROMPT_SNIPPET = 'Read the active Sideroom persona.';
+export const PERSONA_PROMPT_SNIPPET =
+  'Load the complete writing guide before substantial user-facing prose.';
 
 // Pi loads extensions/*/index.ts through export default.
 export default function registerPersona(pi: ExtensionAPI): void {

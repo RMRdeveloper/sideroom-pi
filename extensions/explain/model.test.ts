@@ -31,11 +31,9 @@ function settle(state: ExplainState, mode = 'tui'): void {
   applyOfferDecision(state, decideOffer(state, mode));
 }
 
-test('defers the first settle and offers at the next one', () => {
+test('offers at the threshold and only once per user turn', () => {
   const state = createExplainState();
   mutate(state, '/work', EXPLAIN_FILE_THRESHOLD);
-  assert.equal(decideOffer(state, 'tui'), EXPLAIN_DECISION.defer);
-  settle(state);
   assert.equal(decideOffer(state, 'tui'), EXPLAIN_DECISION.send);
   settle(state);
   assert.equal(state.offeredThisTurn, true);
@@ -45,7 +43,7 @@ test('defers the first settle and offers at the next one', () => {
 test('offers after a review turn that crosses the threshold', () => {
   const state = createExplainState();
   mutate(state, '/work', EXPLAIN_FILE_THRESHOLD - 3);
-  assert.equal(decideOffer(state, 'tui'), EXPLAIN_DECISION.defer);
+  assert.equal(decideOffer(state, 'tui'), EXPLAIN_DECISION.none);
   settle(state);
 
   for (const path of ['src/late-a.ts', 'src/late-b.ts', 'src/late-c.ts']) {
@@ -75,8 +73,6 @@ test('re-arms on the next user prompt', () => {
 
   resetExplainTurn(state);
   assert.equal(state.mutatedFilesThisTurn.size, 0);
-  assert.equal(state.mutatedSinceSettle, false);
-  assert.equal(state.pendingOffer, false);
   assert.equal(state.offeredThisTurn, false);
   assert.equal(decideOffer(state, 'tui'), EXPLAIN_DECISION.none);
 });

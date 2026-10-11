@@ -56,8 +56,12 @@ package release changes the prefix. The tool deliberately has no
 `promptGuidelines`: they repeated the same rules in another system-prompt
 section without changing the result.
 
-`sideroom_persona` takes no arguments and returns the full detail: every voice
-rule and every prohibition with its enforcement mode. With one voice there is
+`sideroom_persona` takes no arguments and returns the complete packaged
+`SKILL.md`, including the Do/Don't examples and activation contract. It formerly
+returned only a catalog summary, leaving the examples unloaded. The reminder
+asks for this guide before the first substantial explanation or report, reuses
+it while in context, and asks for an internal wording check before sending
+prose. This is model guidance, not a tool-call gate. With one voice there is
 nothing to select, so the tool has no action parameter.
 
 ## Enforcement
@@ -95,8 +99,8 @@ nothing to select, so the tool has no action parameter.
 | `extensions/persona/index.ts` | Composes the extension, registers the tool and the footer status. |
 | `extensions/persona/catalog.ts` | Voice rules, prohibitions, scopes, and packaged paths. |
 | `extensions/persona/checks.ts` | Detectors and added-line extraction. |
-| `extensions/persona/model.ts` | Tool detail, block reason, steer, and message text. |
-| `extensions/persona/execute.ts` | Builds the tool result. |
+| `extensions/persona/model.ts` | Tool metadata, block reason, steer, and message text. |
+| `extensions/persona/execute.ts` | Loads the complete packaged guide into the tool result. |
 | `extensions/persona/guard.ts` | Artifact blocking, prose steering, and the circuit breaker. |
 | `extensions/shared/file-path.ts` | Pi-compatible path aliases and canonical file identity. |
 | `skills/sideroom-persona/SKILL.md` | Complete guide with Do/Don't examples. |
@@ -109,6 +113,7 @@ representative plain and jargon-heavy answers, and the reminder length budget.
 These text checks protect the shipped instructions; they do not score the
 clarity of a generated answer. The prose detector still checks only hard
 prohibitions, not whether a technical term was necessary. `model.test.ts`
-covers the formatters and message extraction. `index.test.ts` covers blocking,
-path aliases, degradation, the steer cap and its `triggerTurn` options, the
+covers the formatters and message extraction; `execute.test.ts` checks that
+the tool returns the entire packaged guide with its catalog ids. `index.test.ts`
+covers blocking, path aliases, degradation, the steer cap and its `triggerTurn` options, the
 per-run footer counts, and the status.

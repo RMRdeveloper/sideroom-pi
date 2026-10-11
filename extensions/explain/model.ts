@@ -13,7 +13,6 @@ export const EXPLAIN_OFFER =
 
 export const EXPLAIN_DECISION = {
   send: 'send',
-  defer: 'defer',
   none: 'none',
 } as const;
 
@@ -22,24 +21,18 @@ export type ExplainDecision =
 
 export interface ExplainState {
   mutatedFilesThisTurn: Set<string>;
-  mutatedSinceSettle: boolean;
-  pendingOffer: boolean;
   offeredThisTurn: boolean;
 }
 
 export function createExplainState(): ExplainState {
   return {
     mutatedFilesThisTurn: new Set(),
-    mutatedSinceSettle: false,
-    pendingOffer: false,
     offeredThisTurn: false,
   };
 }
 
 export function resetExplainTurn(state: ExplainState): void {
   state.mutatedFilesThisTurn.clear();
-  state.mutatedSinceSettle = false;
-  state.pendingOffer = false;
   state.offeredThisTurn = false;
 }
 
@@ -51,13 +44,9 @@ export function mutationPathKey(cwd: string, path: string): string | undefined {
 
 export function recordMutation(state: ExplainState, pathKey: string): void {
   state.mutatedFilesThisTurn.add(pathKey);
-  state.mutatedSinceSettle = true;
 }
 
-// The guidelines review steers at the first settle boundary after a mutation,
-// and both handlers run in an extension load order Sideroom does not control.
-// Explain holds its steer back one boundary so the review always runs first;
-// the review's continuation is what brings the next boundary.
+// The shared settle guard gives review and checks priority over the offer.
 export function decideOffer(
   state: ExplainState,
   mode: string,
@@ -66,14 +55,8 @@ export function decideOffer(
     mode === TUI_MODE &&
     !state.offeredThisTurn &&
     state.mutatedFilesThisTurn.size >= EXPLAIN_FILE_THRESHOLD;
-  if (state.pendingOffer && thresholdReached) {
+  if (thresholdReached) {
     return EXPLAIN_DECISION.send;
-  }
-  if (
-    thresholdReached ||
-    (mode === TUI_MODE && state.mutatedSinceSettle && !state.offeredThisTurn)
-  ) {
-    return EXPLAIN_DECISION.defer;
   }
   return EXPLAIN_DECISION.none;
 }
@@ -84,11 +67,5 @@ export function applyOfferDecision(
 ): void {
   if (decision === EXPLAIN_DECISION.send) {
     state.offeredThisTurn = true;
-    state.pendingOffer = false;
-  } else if (decision === EXPLAIN_DECISION.defer) {
-    state.pendingOffer = true;
-  } else {
-    state.pendingOffer = false;
   }
-  state.mutatedSinceSettle = false;
 }

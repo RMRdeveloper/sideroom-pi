@@ -22,7 +22,7 @@ test('asks only rules supported by the supplied evidence in one request', () => 
   const body = buildRequestBody(state);
 
   assert.equal(body.model, JEV_MODEL);
-  assert.equal(JEV_RULES.length, 9);
+  assert.equal(JEV_RULES.length, 13);
   assert.equal(body.questions['dependency-direction'], undefined);
   assert.equal(body.questions.comments, undefined);
   for (const question of Object.values(body.questions)) {
@@ -188,4 +188,57 @@ test('builds one dedup key per file and rule', () => {
   assert.equal(findingKey('a.ts', 'x'), findingKey('a.ts', 'x'));
   assert.notEqual(findingKey('a.ts', 'x'), findingKey('a.ts', 'y'));
   assert.notEqual(findingKey('a.ts', 'x'), findingKey('b.ts', 'x'));
+});
+
+test('requires visible consumers and both production and test code for new cross-file checks', () => {
+  const isolated = buildFileState(
+    'src/service.ts',
+    'export const active = true;',
+    'edit',
+    [],
+  );
+  const local = buildRequestBody(isolated).questions;
+  assert.ok(local.testability);
+  assert.ok(local['unnecessary-abstraction']);
+  assert.equal(local['contract-compatibility'], undefined);
+  assert.equal(local['test-quality'], undefined);
+  const related = buildFileState(
+    'src/service.ts',
+    isolated.file.body,
+    'edit',
+    [],
+    [
+      {
+        path: 'src/service.test.ts',
+        body: "import './service';",
+        relation: 'test',
+      },
+      {
+        path: 'src/controller.ts',
+        body: "import './service';",
+        relation: 'consumer',
+      },
+    ],
+  );
+  assert.ok(buildRequestBody(related).questions['test-quality']);
+  assert.ok(buildRequestBody(related).questions['contract-compatibility']);
+  const testOnly = buildFileState(
+    'src/service.test.ts',
+    'assert.ok(true)',
+    'edit',
+    [],
+  );
+  assert.equal(buildRequestBody(testOnly).questions['test-quality'], undefined);
+});
+
+test('rejects impossible probabilities and unasked workflow answers', () => {
+  const answers = {
+    testability: { noul: 1.5 },
+    'board-completion': { noul: 0.99 },
+  };
+  assert.deepEqual(readFindings({ model: undefined, answers }), []);
+  assert.deepEqual(
+    readFindings({ model: undefined, answers }, new Set(['board-completion'])),
+    [{ ruleId: 'board-completion', probability: 0.99 }],
+  );
 });
