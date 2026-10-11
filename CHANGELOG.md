@@ -1,5 +1,23 @@
 # Changelog
 
+## 8.12.0
+
+### Minor Changes
+
+- 3bfb12d: Add sideroom-codebase-design, combining evidence-based codebase reviews and module design with long-term growth assessment. It prioritizes maintainability, testability, known workload and team growth, and incremental migration; reports remain in text with no diagrams or HTML artifacts.
+- 3bfb12d: Extend Jev's advisory review to testability, redundant abstractions, visible consumer compatibility and relevant test quality. Prioritize tests and consumers within the existing source budget.
+  
+  Review successful questionnaires and targeted completed tasks using bounded wording and observed evidence, without sending user answers, conversation history or command output. Share cancellation, failure handling and call counting, and deliver workflow notes through the existing end-of-run review even when no code changed.
+
+### Patch Changes
+
+- 3bfb12d: Postpone finish steers until a quiet end-of-run boundary. Run guidelines review, checks, and the walkthrough offer in order regardless of extension loading order, preserving pending reviews and semantic notes while work continues. Check existing test coverage before asking for new tests.
+  
+  Keep KISS, DRY, and YAGNI focused on demonstrated needs without dropping requirements, error handling, compatibility, or meaningful tests. Review only violations introduced by the current changes. In JavaScript and TypeScript, use a destructured object for functions with three or more parameters while preserving externally fixed signatures.
+- 3bfb12d: Align skill descriptions with their activation contracts and distinguish open plans, unresolved architecture, domain naming, and repository glossary work. Match the guidelines description to its existing gate for all write/edit targets.
+  
+  Return the complete packaged guide from sideroom_persona instead of a catalog summary. Request it before substantial user-facing prose and check wording before sending; prioritize clarity and accuracy over brevity.
+
 ## 8.11.0
 
 ### Minor Changes
