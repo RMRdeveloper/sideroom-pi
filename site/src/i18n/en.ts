@@ -33,6 +33,7 @@ export const en = {
       faults: 'Failures',
       ask: 'Asking',
       board: 'Board',
+      browser: 'Browser',
       rules: 'Rules',
       session: 'Session',
       inside: 'Inside',
@@ -267,6 +268,54 @@ export const en = {
       'Ten seconds of a real session: the batch of four questions, then the board and the files it edited.',
   },
 
+  browser: {
+    title: 'Point to the element. Bring it into Pi.',
+    lead: 'Select an element in your browser and give Pi the page context and possible source files, without changing your application.',
+    videoAlt:
+      'Walkthrough of the extension: Alt+Shift+S starts the selector, two clicks prepare context, Escape returns to the page and F7 reviews it in Pi.',
+    videoCaption:
+      'Thirty seconds of the whole walkthrough: start selection, attach two elements, exit and send the instruction in Pi. No audio.',
+    rows: [
+      {
+        title: 'Select without opening the extension',
+        body: 'Alt+Shift+S starts or stops selection. Click several elements, then press Escape to return to normal browsing. Change the shortcut on your browser\u2019s shortcut page: chrome://extensions/shortcuts in Chrome, edge://extensions/shortcuts in Edge.',
+      },
+      {
+        title: 'Review before the agent starts',
+        body: 'F7 in Pi shows the pending elements and their source candidates. A click prepares context; only your next instruction starts the agent.',
+      },
+      {
+        title: 'Candidates, not a proven source mapping',
+        body: 'The search compares markup, classes, ids and visible text in local files. Ambiguous or dynamic elements can remain unresolved. Form values and editable text are excluded.',
+      },
+      {
+        title: 'Only active when you ask',
+        body: 'The inspector loads only for a requested selection and does not intercept clicks when inactive. Pair once with Pi over localhost; choose a destination when several sessions are open.',
+      },
+    ],
+    selectionAlt:
+      'Selection demo on this landing: an element is outlined and the inspector shows Escape or Alt+Shift+S to exit. Open the full-size image.',
+    selectionCaption:
+      'The bundled selector running on this landing in a browser demo. It outlines the element under the pointer and shows how to exit. Open the image to see it full size.',
+    popupAlt:
+      'Browser companion panel with a demo Pi session, the Select an element button and the assigned shortcut. Open the full-size image.',
+    popupCaption:
+      'Reproduction of the bundled panel with a demo destination. Pairing and session choice stay here; the shortcut starts selection without opening it.',
+    installTitle: 'Install without an extension store',
+    download: 'Download the browser extension ZIP',
+    downloadNote:
+      'From the latest GitHub Release. For Chromium-based browsers 116 or later, such as Chrome, Edge or Brave; Firefox is not supported.',
+    installSteps: [
+      'Extract the ZIP and keep the sideroom-browser-extension folder in a permanent location.',
+      'Open your browser\u2019s extensions page (chrome://extensions in Chrome, edge://extensions in Edge), enable developer mode and choose Load unpacked. Select the folder that contains manifest.json.',
+      'Start Pi with Sideroom, press F7 and choose to pair the browser. Paste its private pairing address into the extension and connect.',
+      'Choose the Pi session if necessary. On a normal web page, press Alt+Shift+S, select elements and review them in Pi with F7.',
+    ],
+    updateNote:
+      'Updates are manual: download the new ZIP, replace the files in the same folder and reload the extension. Managed browsers can prohibit developer mode.',
+    guide: 'Full installation and Windows/WSL guide',
+  },
+
   rules: {
     title: 'Your rules, checked on the lines you add.',
     lead: 'Every write and edit is checked. Only the added lines are read, so a rule can never complain about code the agent did not write.',
@@ -376,9 +425,13 @@ export const en = {
 
   inside: {
     title: 'What is in the box.',
-    lead: 'Ten tools, one folder each, and six skills read on demand.',
+    lead: 'Pi extensions, the optional browser companion, and skills read on demand.',
     toolsTitle: 'Tools',
     tools: [
+      {
+        name: 'visual-context',
+        does: 'Pairs the browser companion with Pi and carries pending page elements and local source candidates into your next instruction.',
+      },
       {
         name: 'ask',
         does: 'The questionnaire: one to four questions in one batch, each with a recommendation.',
@@ -504,7 +557,7 @@ export const en = {
     destinationTerm: 'Where it goes',
     aloneTitle: 'Sideroom never turns it on for you',
     aloneLead:
-      'No key, no request. Nothing in the package reaches the network on its own, and nothing switches Jev on behind your back.',
+      'Without a key, Jev makes no request to its service. The optional browser companion uses localhost and is authorized separately through F7. Nothing switches Jev on behind your back.',
     aloneBody: [
       'The key comes from TYPESAFE_API_KEY in your environment, or from one you type in the F10 screen. Sideroom stores a key only when you give it one, and clears it when you ask.',
       'The key is read on every use rather than remembered at start-up, so clearing it stops the requests immediately, without restarting Pi.',

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sideroom — Browser context</title>
+    <link rel="stylesheet" href="popup.css" />
+    <script src="popup.js" defer></script>
+  </head>
+  <body>
+    <header><img src="icons/icon-48.png" width="32" height="32" alt="Sideroom" /><h1>Point to the code.</h1></header>
+    <p class="intro">Select an element in this tab. Its source candidates appear in your Pi session.</p>
+    <details id="pairing-details" open><summary>Authorize Windows or WSL</summary><form id="pairing-form">
+      <label for="address">Pair once · address from Pi (F7)</label>
+      <input id="address" type="text" autocomplete="off" spellcheck="false" placeholder="ws://127.0.0.1:…" required />
+      <button id="connect" type="submit">Connect to Pi</button>
+    </form></details>
+    <p id="status" role="status" aria-live="polite">Checking connection…</p>
+    <label for="destination">Send selections to</label>
+    <select id="destination" disabled><option value="">Waiting for Pi…</option></select>
+    <button id="inspect" type="button" disabled>Select an element</button>
+    <p id="shortcut-hint">Escape exits selection. Change the shortcut in your browser's shortcuts page.</p>
+    <button id="disconnect" class="secondary" type="button" disabled>Disconnect</button>
+    <button id="forget" class="secondary" type="button" disabled>Forget authorizations</button>
+    <footer>Click attaches context. Send your instruction in Pi to begin.</footer>
+  </body>
+</html>

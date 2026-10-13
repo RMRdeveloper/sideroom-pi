@@ -10,6 +10,7 @@ Maintainable documentation for the Sideroom Pi package. Start here.
 | [extensions/ask.md](./extensions/ask.md) | `sideroom_ask` questionnaire contract and TUI. |
 | [extensions/todo.md](./extensions/todo.md) | `sideroom_todo` work board, capped widget, `F9` overlay, persistence, and skip prevention. |
 | [extensions/modified-files.md](./extensions/modified-files.md) | Session edited-file tracking, compact widget, and `F8` overlay. |
+| [extensions/visual-context.md](./extensions/visual-context.md) | Browser element selection, local source candidates, `F7` pairing and pending context. |
 | [extensions/guidelines.md](./extensions/guidelines.md) | Pre-edit read gate, the packaged coding skill, and the end-of-turn review steer. |
 | [skills.md](./skills.md) | Skill selection, activation boundaries, discovery diagnostics, and manual routing checks. |
 | [extensions/monorepo-skills.md](./extensions/monorepo-skills.md) | Trusted discovery of child-folder `.pi/skills` and `.agents/skills`. |
@@ -33,6 +34,7 @@ Hard choices that passed the ADR gates, kept under `docs/adr/`.
 - [adr/0008-keep-the-release-history-on-github.md](./adr/0008-keep-the-release-history-on-github.md) — the released changelog stays in the repository, and the site links to it.
 
 - [adr/0009-jev-workflow-and-test-review.md](./adr/0009-jev-workflow-and-test-review.md) — evidence-based tests, consumer compatibility and bounded workflow review.
+- [adr/0010-visual-context-inferred-origin.md](./adr/0010-visual-context-inferred-origin.md) — inferred source candidates, the installation identity and the click that never starts a run.
 
 ## Related top-level documents
 

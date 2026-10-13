@@ -87,6 +87,19 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
 - `extensions/shared/file-path.ts` owns file-tool path resolution shared by
   guards that must match Pi's built-in `write` and `edit` semantics;
   `extensions/shared/read-file.ts` owns the missing-file read those guards share.
+- `extensions/visual-context/index.ts` composes `F7` browser pairing, pending
+  element review, idle interactive input attachment, and session cleanup.
+  `bridge.ts` owns Pi registration, reconnection and broker takeover;
+  `broker.ts` owns authenticated local routing; `envelope.ts` owns the
+  websocket envelope both sides send and parse; `pairing.ts` owns atomic global
+  installation identity, outside the target repository. `model.ts` owns the
+  bounded DOM protocol and context text; `match.ts` owns candidate scoring and
+  source locations; `source.ts` owns the bounded, ignore-aware walk and hash
+  validation; `session.ts` owns branch snapshots and one-time consumption;
+  `ui.ts` owns the compact widget and companion path.
+  `assets/visual-context/browser/` is the bundled browser companion. It adds no
+  project config, framework runtime dependency or source instrumentation.
+  Source locations are inferred candidates, never proven DOM mappings.
 - `scripts/render-preview.mjs` is the entry that renders `media/preview.png`
   and `media/preview.mp4`, the gallery's `pi.image` and `pi.video`.
   `scripts/preview/` holds the pipeline: `ansi.mjs` turns SGR and OSC 8 into
@@ -96,6 +109,12 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   manifest contract that every run asserts. Pure modules carry `*.test.mjs`. It
   needs ffmpeg; it is a maintainer tool, not an extension and not a wrapper
   around Pi.
+- `scripts/package-browser.mjs` builds the browser ZIP and checksum in
+  `dist/browser/`; `scripts/browser-package/archive.mjs` owns the explicit file
+  list and reproducible archive, with `archive.test.mjs` checking its contents.
+  `.github/workflows/release.yml` attaches it after Changesets publishes;
+  `.github/workflows/browser-download.yml` retries assets from an existing tag
+  without publishing npm again.
 - `scripts/cache-report.mjs` prints how many prompt tokens each recorded session
   re-sent and how much of that followed a work-board update. `scripts/cache-report/parse.mjs`
   reads Pi's session JSONL, `report.mjs` formats the totals and the per-session

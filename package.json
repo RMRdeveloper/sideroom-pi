@@ -17,14 +17,15 @@
     "commitlint": "commitlint",
     "types": "tsc --noEmit",
     "test": "node --test 'extensions/**/*.test.ts' 'scripts/**/*.test.mjs'",
-    "lint": "biome lint extensions scripts commitlint.config.mjs",
-    "lint:fix": "biome lint --write extensions scripts commitlint.config.mjs",
-    "format": "biome format --write extensions scripts package.json biome.json commitlint.config.mjs .changeset/config.json",
-    "format:check": "biome format extensions scripts package.json biome.json commitlint.config.mjs .changeset/config.json",
+    "lint": "biome lint extensions assets/visual-context/browser scripts commitlint.config.mjs",
+    "lint:fix": "biome lint --write extensions assets/visual-context/browser scripts commitlint.config.mjs",
+    "format": "biome format --write extensions assets/visual-context/browser scripts package.json biome.json commitlint.config.mjs .changeset/config.json",
+    "format:check": "biome format extensions assets/visual-context/browser scripts package.json biome.json commitlint.config.mjs .changeset/config.json",
     "preview": "node scripts/render-preview.mjs",
     "cache:report": "node scripts/cache-report.mjs",
+    "package:browser": "node scripts/package-browser.mjs",
     "check:if-blocks": "node scripts/check-if-blocks.mjs",
-    "check": "npm run types && npm run check:if-blocks && biome check extensions scripts package.json biome.json commitlint.config.mjs .changeset/config.json && npm test"
+    "check": "npm run types && npm run check:if-blocks && biome check extensions assets/visual-context/browser scripts package.json biome.json commitlint.config.mjs .changeset/config.json && npm test"
   },
   "engines": {
     "node": ">=22.19.0"
@@ -92,10 +93,18 @@
     "@earendil-works/pi-coding-agent": "0.87.1",
     "@earendil-works/pi-tui": "0.87.1",
     "@types/node": "^22.20.1",
+    "@types/ws": "^8.18.2",
+    "fflate": "0.8.3",
     "typebox": "1.3.7",
     "typescript": "^5.6.0"
   },
   "dependencies": {
-    "ignore": "7.0.5"
+    "@astrojs/compiler": "^4.0.0",
+    "@babel/parser": "^7.29.9",
+    "@vue/compiler-dom": "^3.5.43",
+    "ignore": "7.0.5",
+    "parse5": "^8.0.1",
+    "svelte": "^5.57.2",
+    "ws": "^8.22.0"
   }
 }

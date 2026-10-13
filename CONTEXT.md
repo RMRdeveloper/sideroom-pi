@@ -54,6 +54,50 @@ The session-backed list of paths from successful Pi `write` and `edit` results. 
 
 _Avoid: changed files, Git changes._
 
+## Browser companion
+
+The browser extension the package ships under `assets/visual-context/browser/`: a
+popup that pairs with Pi and chooses a destination, and an in-page inspector
+that turns one click into a pending selection. It is not part of Pi and adds
+nothing to the inspected project.
+
+_Avoid: browser plugin, page addon._
+
+## Pending selection
+
+A page element the companion attached to the session and that no prompt has
+consumed yet. It carries DOM descriptors, ranked source candidates and at most
+one chosen candidate, and it follows the active session branch.
+
+_Avoid: captured element, picked element, visual note._
+
+## Source candidate
+
+One local range the search considers a possible origin of a pending selection,
+with its score, its reasons and a hash of the inspected file version. The link
+between that range and the rendered element is inferred, never proven, so the
+file is read before it is edited.
+
+_Avoid: match, mapping, exact location._
+
+## Destination
+
+The Pi session a browser companion sends its selections to, identified by
+session id and a revision that changes with the conversation branch. The broker
+routes a selection only to that session and rejects one that carries an older
+revision.
+
+_Avoid: target session, receiver, endpoint._
+
+## Installation identity
+
+The port and secret a Pi installation creates once under the agent directory
+and reuses in later trusted interactive sessions. It stays outside the
+inspected project, and the companion keeps its own pairing address per
+installation, so Windows and WSL are remembered separately.
+
+_Avoid: pairing key, browser credential, session token._
+
 ## Forked session
 
 A Pi session created from a point in an original session. It inherits the board visible at that point, then persists subsequent board changes independently from the original session.

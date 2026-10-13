@@ -4,6 +4,7 @@
     "includes": [
       "extensions/**/*.ts",
       "scripts/**/*.mjs",
+      "assets/visual-context/browser/**/*.js",
       "package.json",
       "biome.json"
     ],
