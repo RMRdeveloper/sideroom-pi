@@ -1,5 +1,35 @@
 # Changelog
 
+## 8.13.0
+
+### Minor Changes
+
+- fd35dfe: Add a configurable Alt+Shift+S browser shortcut to start or stop selecting page elements without opening the companion. Keep multi-element selection until Escape or the shortcut is pressed, show active selection on the toolbar icon, and remove the inspector on navigation without adding page-access permissions.
+- fd35dfe: Add an F7 browser-context workflow and a bundled browser companion. Select page
+  elements without configuring the project, review inferred local source
+  candidates, and attach them to the next Pi prompt. Pending selections follow
+  the session branch, stale source references are discarded, and browser clicks
+  never start an agent run.
+  
+  Authorize each Pi installation once. The companion remembers Windows and WSL
+  independently, reconnects automatically, and offers a destination selector for
+  concurrent sessions. A surviving Pi process takes over the stable local bridge
+  when its host closes. Use a white Archivo S on black for the companion icon.
+
+### Patch Changes
+
+- fd35dfe: Distribute the browser companion as a ZIP attached to Sideroom GitHub Releases, with manual installation and update instructions in English and Spanish. Add the browser selection workflow and its configurable shortcut to the landing page.
+- fd35dfe: Improve browser element source detection with dedicated JSX/TSX, Vue, Svelte and
+  Astro parsers alongside HTML parsing. Exclude script strings and comments,
+  recognize literal string expressions without executing source, verify original
+  ranges including Astro byte offsets, and preserve partial search results when a
+  component cannot be parsed.
+  
+  Rank candidates with bounded, deduplicated class evidence, reject conflicting
+  static ids, and explain ordered ancestor evidence. Match rendered text without
+  invented whitespace or erased expressions, decode HTML entities, exclude private
+  text, and distinguish truncated text prefixes from full static text.
+
 ## 8.12.0
 
 ### Minor Changes
