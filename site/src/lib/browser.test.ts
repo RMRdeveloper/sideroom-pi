@@ -23,11 +23,11 @@ for (const locale of LOCALES) {
     assert.match(browser.downloadNote, /Firefox/u);
   });
 
-  test(`${locale}: both browser images describe the demonstration rather than a real user session`, () => {
+  test(`${locale}: both browser images describe what they show`, () => {
     const browser = copyFor(locale).browser;
     assert.ok(browser.selectionAlt.length > 20);
     assert.ok(browser.popupAlt.length > 20);
-    assert.match(browser.selectionCaption, /demo/u);
-    assert.match(browser.popupCaption, /demo/u);
+    assert.match(browser.selectionCaption, /Escape/u);
+    assert.match(browser.popupCaption, /shortcut|atajo/u);
   });
 }

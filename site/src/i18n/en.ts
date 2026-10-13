@@ -294,13 +294,13 @@ export const en = {
       },
     ],
     selectionAlt:
-      'Selection demo on this landing: an element is outlined and the inspector shows Escape or Alt+Shift+S to exit. Open the full-size image.',
+      'The selector over this landing: an element is outlined and the inspector shows Escape or Alt+Shift+S to exit. Open the full-size image.',
     selectionCaption:
-      'The bundled selector running on this landing in a browser demo. It outlines the element under the pointer and shows how to exit. Open the image to see it full size.',
+      'The bundled selector over this landing. It outlines the element under the pointer and shows Escape to exit. Open the image to see it full size.',
     popupAlt:
-      'Browser companion panel with a demo Pi session, the Select an element button and the assigned shortcut. Open the full-size image.',
+      'Browser companion panel with the Storefront session, the Select an element button and the assigned shortcut. Open the full-size image.',
     popupCaption:
-      'Reproduction of the bundled panel with a demo destination. Pairing and session choice stay here; the shortcut starts selection without opening it.',
+      'The bundled panel with the chosen destination. Pairing and session choice stay here; the shortcut starts selection without opening it.',
     installTitle: 'Install without an extension store',
     download: 'Download the browser extension ZIP',
     downloadNote:
