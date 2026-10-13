@@ -187,6 +187,28 @@ Files outside the published set (`docs/`, `.github/`, `media/`, `SECURITY.md`,
 this file) need no changeset; `files` in `package.json` is the exact published
 list. Never edit `CHANGELOG.md` by hand — `npm run version-packages` owns it.
 
+## Browser companion downloads
+
+`npm run package:browser` produces `dist/browser/sideroom-browser-extension.zip`
+and its `.sha256` checksum from the bundled companion. It uses an explicit file
+list, includes the licence and bilingual installation instructions, and writes
+no credentials or project state. `scripts/browser-package/archive.test.mjs`
+checks the extracted files and reproducible archive bytes. The ZIP records the
+root package version in `release.json`; do not change versions manually.
+
+The Release workflow builds the ZIP before npm publication and attaches both
+files to the GitHub Release created by Changesets. Generated archives stay out
+of Git. If asset upload fails after npm publication, run **Browser download**
+from Actions with the existing release tag, for example `v8.13.0`. That workflow
+checks out the tag, validates its version, runs the checks, and replaces the two
+assets without publishing npm again. Never upload a working-tree ZIP to an
+older release.
+
+`media/browser-selection.png` uses the bundled inspector on the landing;
+`media/browser-popup.png` reproduces the bundled popup with a demo destination.
+Their captions name the demo, not a real user's pairing or session. Review both
+languages and mobile layout when changing these captures.
+
 ## Adding an extension
 
 1. Create `extensions/<name>/index.ts` and `export default` the extension.

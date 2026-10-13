@@ -18,6 +18,7 @@ import registerPersona from '../persona/index.ts';
 import registerRules from '../rules/index.ts';
 import registerTodo from '../todo/index.ts';
 import type { TodoItem, TodoParams } from '../todo/model.ts';
+import registerVisualContext from '../visual-context/index.ts';
 
 const BASE_SYSTEM_PROMPT = 'base system prompt';
 
@@ -37,6 +38,7 @@ const EXTENSIONS: readonly ExtensionEntry[] = [
   ['persona', registerPersona],
   ['rules', registerRules],
   ['todo', registerTodo],
+  ['visual-context', registerVisualContext],
 ];
 
 const initialItems: readonly TodoItem[] = [

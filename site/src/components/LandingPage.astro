@@ -1,7 +1,14 @@
 ---
 import { Icon } from 'astro-icon/components';
+import type { ImageMetadata } from 'astro';
 import previewClip from '../../../media/preview.mp4';
 import previewStill from '../../../media/preview.png';
+import browserSelection from '../../../media/browser-selection.png';
+import browserPopup from '../../../media/browser-popup.png';
+import browserVideoPosterEn from '../../../media/browser-video-en.jpg';
+import browserVideoPosterEs from '../../../media/browser-video-es.jpg';
+import browserVideoEn from '../../../media/browser-video-en.mp4';
+import browserVideoEs from '../../../media/browser-video-es.mp4';
 import { copyFor, type Locale } from '../i18n';
 import {
   BOARD_STATUS,
@@ -11,7 +18,7 @@ import {
   selectVisibleBoardRows,
 } from '../lib/board.ts';
 import { SUPPORTED_LANGUAGES } from '../lib/languages.ts';
-import { NPM_URL, withBase } from '../lib/urls.ts';
+import { BROWSER_DOWNLOAD_URL, BROWSER_GUIDE_URL, NPM_URL, withBase } from '../lib/urls.ts';
 import Board from './Board.astro';
 import Command from './Command.astro';
 import QuestionBatch from './QuestionBatch.astro';
@@ -51,6 +58,14 @@ const widgetRows = visibleRows.indexes.flatMap((index) => {
 });
 
 const preview = { width: 1600, height: 1000 };
+
+// The same walkthrough cut twice: one narration set per language, so the poster
+// and the clip have to move together.
+const browserVideoByLocale = {
+  en: { clip: browserVideoEn, poster: browserVideoPosterEn },
+  es: { clip: browserVideoEs, poster: browserVideoPosterEs },
+} satisfies Record<Locale, { clip: string; poster: ImageMetadata }>;
+const browserVideo = browserVideoByLocale[locale];
 ---
 
 <section class="sheet hero" id="top">
@@ -161,6 +176,72 @@ const preview = { width: 1600, height: 1000 };
         </div>
         <figcaption class="capture__caption">{t.board.videoCaption}</figcaption>
       </figure>
+    </div>
+  </div>
+</section>
+
+<section class="sheet section">
+  <SectionHead id="browser" title={t.browser.title} lead={t.browser.lead} />
+
+  <div class="section__body column-stack">
+    <figure class="capture">
+      <div class="capture__frame">
+        <video
+          class="capture__media"
+          controls
+          muted
+          loop
+          playsinline
+          preload="auto"
+          poster={browserVideo.poster.src}
+          width={browserVideo.poster.width}
+          height={browserVideo.poster.height}
+          aria-label={t.browser.videoAlt}
+        >
+          <source src={browserVideo.clip} type="video/mp4" />
+        </video>
+      </div>
+      <figcaption class="capture__caption">{t.browser.videoCaption}</figcaption>
+    </figure>
+    <div class="split browser-gallery">
+      <figure class="capture">
+        <div class="capture__frame">
+          <a href={browserSelection.src}>
+            <img class="capture__media" src={browserSelection.src} width={browserSelection.width} height={browserSelection.height} alt={t.browser.selectionAlt} loading="lazy" />
+          </a>
+        </div>
+        <figcaption class="capture__caption">{t.browser.selectionCaption}</figcaption>
+      </figure>
+      <figure class="capture">
+        <div class="capture__frame">
+          <a href={browserPopup.src}>
+            <img class="capture__media" src={browserPopup.src} width={browserPopup.width} height={browserPopup.height} alt={t.browser.popupAlt} loading="lazy" />
+          </a>
+        </div>
+        <figcaption class="capture__caption">{t.browser.popupCaption}</figcaption>
+      </figure>
+    </div>
+    <div class="split">
+    <div class="rows">
+      {
+        t.browser.rows.map((row) => (
+          <div class="row">
+            <p class="row__title">{row.title}</p>
+            <p class="row__body">{row.body}</p>
+          </div>
+        ))
+      }
+    </div>
+    <div class="prose">
+      <h3>{t.browser.installTitle}</h3>
+      <p><a href={BROWSER_DOWNLOAD_URL}>{t.browser.download}</a></p>
+      <p class="row__body">{t.browser.downloadNote}</p>
+      <ol class="browser-steps">
+        {t.browser.installSteps.map((step) => <li>{step}</li>)}
+      </ol>
+      <p class="row__body">{t.browser.updateNote}</p>
+      <p class="link-line"><a href={BROWSER_GUIDE_URL}>{t.browser.guide}</a></p>
+    </div>
     </div>
   </div>
 </section>

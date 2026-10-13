@@ -1,0 +1,19 @@
+:root { color-scheme: dark; font-family: "Helvetica Neue", Arial, sans-serif; color: #f2ede3; background: #131211; }
+* { box-sizing: border-box; }
+body { width: 360px; margin: 0; padding: 24px; }
+header { border-top: 2px solid #f2ede3; padding-top: 16px; }
+header img { display: block; }
+details { margin: 16px 0; }
+summary { cursor: pointer; color: #a49d8f; font-size: 13px; }
+h1 { font-size: 30px; line-height: 1.05; letter-spacing: -.035em; margin: 14px 0 18px; }
+.intro, footer { color: #a49d8f; font-size: 13px; line-height: 1.6; }
+label { display: block; margin: 22px 0 8px; font: 11px ui-monospace, monospace; }
+input, select { width: 100%; background: #0b0a09; border: 1px solid #514b42; border-radius: 0; padding: 11px; color: #f2ede3; font: 12px ui-monospace, monospace; }
+button { display: block; width: 100%; border: 1px solid #f2ede3; border-radius: 0; padding: 12px; margin-top: 10px; background: #f2ede3; color: #131211; font: 600 13px "Helvetica Neue", Arial, sans-serif; cursor: pointer; }
+button:hover { background: #fff; }
+button:disabled { opacity: .4; cursor: default; }
+.secondary { background: transparent; border-color: #514b42; color: #a49d8f; }
+.secondary:hover { background: #1b1917; }
+:focus-visible { outline: 2px solid #ffb340; outline-offset: 3px; }
+#status { min-height: 40px; margin: 18px 0; font: 12px/1.6 ui-monospace, monospace; color: #ffb340; overflow-wrap: anywhere; }
+footer { border-top: 1px solid #514b42; margin-top: 22px; padding-top: 14px; font-size: 11px; }

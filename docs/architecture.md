@@ -31,6 +31,7 @@ extensions/
   ask/            sideroom_ask
   todo/           sideroom_todo
   modified-files/ edited-file tracking
+  visual-context/ F7 browser pairing, local source candidates and pending input context
   guidelines/     pre-edit read gate and review steer
   monorepo-skills/ trusted child-folder skill discovery
   rules/          added-line rule checks
@@ -115,12 +116,28 @@ which is why `todo` re-injects its block before every turn.
 Extensions never call `buildContextEntries()`/`getEntries()` and never write
 state files into the target project.
 
+`visual-context` also persists pending DOM selections and inferred local source
+candidates on the active branch. Its authenticated loopback server starts only
+from the initial `F7` authorization. Its global installation identity is
+reused by later trusted interactive sessions. Pi processes share a stable local
+broker, with takeover on host shutdown. Conversation and tree changes publish
+a new destination revision; old selections are rejected without requiring
+another browser authorization. Windows and WSL identities are remembered
+independently by the companion, which merges their destination lists.
+Source hashes are checked before attachment. The next idle interactive `input`
+is transformed to include bounded, explicitly untrusted browser context;
+images and user text are preserved and the system prompt stays unchanged.
+See [browser context](extensions/visual-context.md) for the browser companion,
+WSL networking, matching limits and the distinction between a real source range
+and an inferred DOM origin.
+
 **Snapshot keys**
 
 | Extension | `customType` / widget key |
 | --- | --- |
 | todo | `sideroom-todo` |
 | modified-files | `sideroom-modified-files` |
+| visual-context | `sideroom-visual-context` |
 | todo steer types | `sideroom-todo-nudge`, `sideroom-todo-watchdog` |
 | done steer type | `sideroom-done-gate` |
 | persona steer type and status key | `sideroom-persona-steer`, `sideroom-persona` |

@@ -31,6 +31,7 @@ export const es: typeof en = {
       faults: 'Fallos',
       ask: 'Preguntas',
       board: 'Tablero',
+      browser: 'Navegador',
       rules: 'Reglas',
       session: 'Sesión',
       inside: 'Contenido',
@@ -267,6 +268,54 @@ export const es: typeof en = {
       'Diez segundos de una sesión real: la tanda de cuatro preguntas, después el tablero y los archivos que editó.',
   },
 
+  browser: {
+    title: 'Señala el elemento. Llévalo a Pi.',
+    lead: 'Selecciona un elemento en tu navegador y dale a Pi el contexto de la página y los posibles archivos de origen, sin modificar tu aplicación.',
+    videoAlt:
+      'Recorrido de la extensión: Alt+Shift+S activa el selector, dos clics preparan el contexto, Escape vuelve a la página y F7 lo revisa en Pi.',
+    videoCaption:
+      'Treinta segundos del recorrido completo: activar la selección, adjuntar dos elementos, salir y enviar la instrucción en Pi. Sin audio.',
+    rows: [
+      {
+        title: 'Selecciona sin abrir la extensión',
+        body: 'Alt+Shift+S activa o desactiva la selección. Haz clic en varios elementos y pulsa Escape para volver a navegar normalmente. Cambia el atajo en la página de atajos de tu navegador: chrome://extensions/shortcuts en Chrome, edge://extensions/shortcuts en Edge.',
+      },
+      {
+        title: 'Revisa antes de que el agente empiece',
+        body: 'F7 en Pi muestra los elementos pendientes y sus candidatos de origen. Un clic prepara el contexto; solo tu siguiente instrucción inicia el agente.',
+      },
+      {
+        title: 'Candidatos, no un origen demostrado',
+        body: 'La búsqueda compara etiquetas, clases, identificadores y texto visible en archivos locales. Los elementos ambiguos o dinámicos pueden quedar sin resolver. No se capturan valores de formularios ni texto editable.',
+      },
+      {
+        title: 'Solo interviene cuando lo pides',
+        body: 'El selector se carga al solicitar una selección y no intercepta clics cuando está inactivo. Autoriza una vez la conexión local con Pi; elige el destino si hay varias sesiones abiertas.',
+      },
+    ],
+    selectionAlt:
+      'Demostración sobre esta página: un elemento aparece resaltado y el selector indica Escape o Alt+Shift+S para salir. Abrir la imagen completa.',
+    selectionCaption:
+      'El selector incluido funcionando sobre esta página en una demostración del navegador. Resalta el elemento bajo el puntero e indica cómo salir. Abre la imagen para verla completa.',
+    popupAlt:
+      'Panel de la extensión con una sesión de Pi de demostración, el botón Select an element y el atajo asignado. Abrir la imagen completa.',
+    popupCaption:
+      'Reproducción del panel incluido con un destino de demostración. Aquí autorizas la conexión y eliges la sesión; el atajo activa la selección sin abrirlo.',
+    installTitle: 'Instala sin una tienda de extensiones',
+    download: 'Descargar el ZIP de la extensión del navegador',
+    downloadNote:
+      'Desde la última versión en GitHub Releases. Para navegadores basados en Chromium 116 o posterior, como Chrome, Edge o Brave; Firefox no está soportado.',
+    installSteps: [
+      'Descomprime el ZIP y guarda la carpeta sideroom-browser-extension en una ubicación permanente.',
+      'Abre la página de extensiones de tu navegador (chrome://extensions en Chrome, edge://extensions en Edge), activa el modo desarrollador y elige Cargar desempaquetada. Selecciona la carpeta que contiene manifest.json.',
+      'Inicia Pi con Sideroom, pulsa F7 y elige emparejar el navegador. Pega su dirección privada de emparejamiento en la extensión y conecta.',
+      'Elige la sesión de Pi si hace falta. En una página web normal, pulsa Alt+Shift+S, selecciona elementos y revísalos en Pi con F7.',
+    ],
+    updateNote:
+      'Las actualizaciones son manuales: descarga el nuevo ZIP, reemplaza los archivos en la misma carpeta y recarga la extensión. Un navegador administrado puede prohibir el modo desarrollador.',
+    guide: 'Guía completa de instalación y Windows/WSL',
+  },
+
   rules: {
     title: 'Tus reglas, revisadas en las líneas que se añaden.',
     lead: 'Cada escritura y cada edición se revisan. Sólo se leen las líneas añadidas, así que una regla nunca puede quejarse de código que el agente no escribió.',
@@ -376,9 +425,13 @@ export const es: typeof en = {
 
   inside: {
     title: 'Qué hay dentro.',
-    lead: 'Diez herramientas, una carpeta cada una, y seis habilidades que se leen cuando hacen falta.',
+    lead: 'Extensiones de Pi, la extensión opcional del navegador y habilidades que se leen cuando hacen falta.',
     toolsTitle: 'Herramientas',
     tools: [
+      {
+        name: 'visual-context',
+        does: 'Conecta la extensión del navegador con Pi y lleva los elementos pendientes y sus candidatos de origen locales a tu siguiente instrucción.',
+      },
       {
         name: 'ask',
         does: 'El cuestionario: de una a cuatro preguntas en una tanda, cada una con una recomendación.',
@@ -504,7 +557,7 @@ export const es: typeof en = {
     destinationTerm: 'A dónde va',
     aloneTitle: 'Sideroom no lo enciende por ti',
     aloneLead:
-      'Sin clave no hay petición. Nada del paquete sale a la red por su cuenta, y nada enciende Jev a tus espaldas.',
+      'Sin clave, Jev no envía ninguna petición a su servicio. La extensión opcional del navegador usa una conexión local y se autoriza aparte con F7. Nada enciende Jev a tus espaldas.',
     aloneBody: [
       'La clave sale de TYPESAFE_API_KEY en tu entorno, o de una que escribas en la pantalla F10. Sideroom sólo guarda una clave cuando se la das, y la borra cuando se lo pides.',
       'La clave se lee en cada uso en vez de recordarse al arrancar, así que borrarla detiene las peticiones al momento, sin reiniciar Pi.',

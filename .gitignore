@@ -41,6 +41,10 @@ Thumbs.db
 .sideroom/
 /RPIV_GAP_ANALYSIS.md
 
+# The HyperFrames project that produced media/browser-video-*.mp4 stays local:
+# only the rendered video and its poster belong in the repository.
+/videos/
+
 # Local Pi / tool runtime state
 .atl/
 .pi/
