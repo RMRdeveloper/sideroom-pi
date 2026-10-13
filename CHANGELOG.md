@@ -1,5 +1,11 @@
 # Changelog
 
+## 8.14.0
+
+### Minor Changes
+
+- 007fb9b: Add clear design vocabulary to the sideroom-codebase-design skill.
+
 ## 8.13.0
 
 ### Minor Changes
