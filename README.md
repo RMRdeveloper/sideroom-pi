@@ -141,6 +141,22 @@ session. The compact view shows at most five recent paths below an active
 board; the extended `F8` view scrolls through everything. Paths outside the
 project are labelled `external`. A new session starts clean.
 
+### Browser context — point to the element
+
+Press `F7` to authorize the bundled browser companion once per Pi installation.
+It reconnects automatically and remembers Windows and WSL independently; choose
+a destination if several Pi sessions are open. Press `Alt+Shift+S` to select
+several elements without opening the popup; Escape or the shortcut exits.
+Review their local source candidates in Pi and send your
+instruction. The click prepares context; it never starts the agent. No project
+configuration or framework plugin is needed. Source ranges are real, but the
+DOM-to-source relationship is inferred and stays labelled as a candidate.
+Download [the companion ZIP](https://github.com/RMRdeveloper/sideroom-pi/releases/latest/download/sideroom-browser-extension.zip)
+from GitHub Releases, extract it, and load its folder in your browser's developer mode.
+No extension store is required; installation and updates are manual. The same
+companion ships in the npm package. See [browser context](docs/extensions/visual-context.md)
+for installation, Windows/WSL pairing and supported source searches.
+
 ### Grill — settle the words first
 
 An on-demand skill for fuzzy plans. It interviews you in `sideroom_ask`

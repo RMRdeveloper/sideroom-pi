@@ -75,12 +75,15 @@ jobs:
           npm --version
       - run: npm ci
       - run: npm run check
+      - name: Build browser companion download
+        run: npm run package:browser
       - id: pack
         name: Pack release artifacts
         uses: changesets/action/pack@22ccf9aa43179fe9e27dc62e575971d28cce197c # v2.0.0
         with:
           publish-plan-artifact-id: ${{ needs.select.outputs.publish-plan-artifact-id }}
-      - name: Publish, tag, and create GitHub releases
+      - id: publish
+        name: Publish, tag, and create GitHub releases
         uses: changesets/action/publish@22ccf9aa43179fe9e27dc62e575971d28cce197c # v2.0.0
         with:
           pack-dir-artifact-id: ${{ steps.pack.outputs.pack-dir-artifact-id }}
@@ -88,3 +91,11 @@ jobs:
           push-git-tags: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Attach browser companion and checksum to the release
+        if: steps.publish.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          gh release upload "v${version}" dist/browser/sideroom-browser-extension.zip dist/browser/sideroom-browser-extension.zip.sha256 --clobber

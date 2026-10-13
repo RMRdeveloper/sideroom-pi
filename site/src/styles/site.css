@@ -824,6 +824,16 @@ p + .rows {
   color: var(--ink-mute);
 }
 
+.browser-steps {
+  padding-left: var(--s5);
+  font-size: var(--fs-small);
+  color: var(--ink-dim);
+}
+
+.browser-steps > li + li {
+  margin-top: var(--s3);
+}
+
 /* Captures. */
 
 .capture {
@@ -860,6 +870,14 @@ p + .rows {
 
 .split--top {
   gap: var(--s7);
+}
+
+.browser-gallery {
+  grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr);
+}
+
+.browser-gallery .capture:last-child {
+  max-width: 22.5rem;
 }
 
 .column-stack > * + * {

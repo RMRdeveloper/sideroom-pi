@@ -31,6 +31,8 @@ export const REPO_URL = 'https://github.com/RMRdeveloper/sideroom-pi';
 export const NPM_URL =
   'https://www.npmjs.com/package/@rmrdeveloper/sideroom-pi';
 export const CHANGELOG_URL = `${REPO_URL}/blob/main/CHANGELOG.md`;
+export const BROWSER_DOWNLOAD_URL = `${REPO_URL}/releases/latest/download/sideroom-browser-extension.zip`;
+export const BROWSER_GUIDE_URL = `${REPO_URL}/blob/main/docs/extensions/visual-context.md`;
 export const LICENSE_URL = `${REPO_URL}/blob/main/LICENSE`;
 export const ISSUES_URL = `${REPO_URL}/issues`;
 export const SECURITY_URL = `${REPO_URL}/blob/main/SECURITY.md`;
