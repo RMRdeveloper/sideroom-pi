@@ -294,13 +294,13 @@ export const es: typeof en = {
       },
     ],
     selectionAlt:
-      'Demostración sobre esta página: un elemento aparece resaltado y el selector indica Escape o Alt+Shift+S para salir. Abrir la imagen completa.',
+      'El selector sobre esta página: un elemento queda resaltado y el selector indica Escape o Alt+Shift+S para salir. Abrir la imagen completa.',
     selectionCaption:
-      'El selector incluido funcionando sobre esta página en una demostración del navegador. Resalta el elemento bajo el puntero e indica cómo salir. Abre la imagen para verla completa.',
+      'El selector incluido sobre esta página. Resalta el elemento bajo el puntero e indica Escape para salir. Abre la imagen para verla completa.',
     popupAlt:
-      'Panel de la extensión con una sesión de Pi de demostración, el botón Select an element y el atajo asignado. Abrir la imagen completa.',
+      'Panel de la extensión con la sesión Storefront, el botón Select an element y el atajo asignado. Abrir la imagen completa.',
     popupCaption:
-      'Reproducción del panel incluido con un destino de demostración. Aquí autorizas la conexión y eliges la sesión; el atajo activa la selección sin abrirlo.',
+      'El panel incluido con la sesión elegida como destino. Aquí autorizas la conexión y eliges la sesión; el atajo activa la selección sin abrirlo.',
     installTitle: 'Instala sin una tienda de extensiones',
     download: 'Descargar el ZIP de la extensión del navegador',
     downloadNote:
