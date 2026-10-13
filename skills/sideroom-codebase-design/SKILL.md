@@ -4,7 +4,7 @@ description: "Improve an existing codebase for long-term maintainability and sca
 license: MIT
 metadata:
   author: RMRdeveloper
-  version: "1.0"
+  version: "1.1"
 ---
 
 # Sideroom codebase design
@@ -33,6 +33,29 @@ A review request does not authorize a rewrite. An implementation request does
 not require pausing after every recommendation. Ask only about consequential
 choices or missing facts that the user and repository have not settled.
 
+## Vocabulary (use these terms exactly)
+
+Use these terms consistently in all recommendations and designs. Do not substitute "component", "service", "API", "boundary", "unit" or similar loose words. Consistent language is the point.
+
+| Term | Meaning | Avoid |
+|------|---------|-------|
+| **Module** | Anything with an interface and an implementation. Scale-agnostic: a function, class, package, or tier-spanning slice. | unit, component, service |
+| **Interface** | Everything a caller must know to use the module correctly: the type signature, plus invariants, ordering constraints, error modes, required configuration, and relevant performance or resource behaviour. | API, signature |
+| **Implementation** | The code inside the module. Distinct from Adapter. | — |
+| **Depth** | Leverage at the interface: the amount of useful behaviour a caller (or test) can exercise per unit of interface they have to learn. A module is **deep** when a large amount of behaviour sits behind a small interface, **shallow** when the interface is nearly as complex as the implementation. | — |
+| **Seam** | A place where you can alter behaviour without editing in that place (Michael Feathers). It is the *location* at which a module's interface lives. Where to put the seam is its own design decision, distinct from what goes behind it. | boundary |
+| **Adapter** | A concrete thing that satisfies an interface at a seam. Describes *role* (what slot it fills), not substance. | — |
+| **Leverage** | What callers get from depth: more capability per unit of interface they learn. One implementation pays back across many call sites and tests. | — |
+| **Locality** | What maintainers get from depth: change, bugs, knowledge, and verification concentrate in one place rather than spreading across callers. | — |
+
+**Principles that follow from the vocabulary:**
+- Depth is a property of the **interface**, not of the implementation size. A deep module can be internally composed of small, mockable, swappable parts; they just aren't part of the interface.
+- The **deletion test**: imagine deleting the module. If complexity vanishes, it was a pass-through. If complexity reappears across callers, it was earning its keep.
+- The interface is the test surface. Callers and tests cross the same seam. If you want to test past the interface, the module is probably the wrong shape.
+- One adapter means a hypothetical seam. Two adapters (e.g. production + test stand-in) means a real one. Don't introduce a seam unless something actually varies across it.
+
+When writing recommendations, use these terms. Explain any necessary design term once if the user is unfamiliar, then stick to them. Respect the project's existing domain vocabulary (`CONTEXT.md` or equivalent) for business concepts — do not replace established domain names just to impose this design glossary.
+
 ## Inspect before recommending
 
 1. Read project instructions, existing domain vocabulary (`CONTEXT.md`, or the
@@ -54,6 +77,8 @@ choices or missing facts that the user and repository have not settled.
    are a limitation, not permission to invent capacity claims.
 
 ## Design principles
+
+Apply the vocabulary above. In particular:
 
 - A **module** presents an **interface** and hides an implementation. Its
   interface includes everything callers must understand: inputs, outputs,
@@ -140,6 +165,8 @@ next step. A design contains the proposed contract, trade-offs, migration,
 verification, and unresolved facts. After implementation, report changes,
 checks, and remaining limitations. Keep review results in the conversation
 unless the user requests a document. No graphic or HTML artifact is produced.
+
+**Use the design vocabulary (module, interface, depth, seam, adapter, leverage, locality) consistently** in all recommendations and designs.
 
 ## Attribution
 
