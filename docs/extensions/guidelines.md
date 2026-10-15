@@ -4,6 +4,25 @@ A short, always-on system-prompt reminder plus a hard gate: `write` and `edit`
 are blocked until the agent has fully read the packaged coding skill and, for a
 supported target, the matching complete language guide.
 
+## Tool
+
+`extensions/guidelines/index.ts` registers `sideroom_guidelines`. Call it with
+`{ "path": "src/example.ts" }` before editing. The target file need not exist;
+only its extension selects a guide. `execute.ts` reads the complete packaged
+skill and matching guide using `catalog.ts`; unsupported extensions return only
+the general skill. It never reads or writes the target file.
+
+The tool requires Pi 1.2.0 or later and uses `model-only` exposure: nested
+callers cannot load documents and discard them before the agent sees them.
+The guard records a load only on a successful `tool_execution_end` whose text
+exactly matches every document returned by that execution, after all
+`tool_result` handlers finish. Failed, cancelled, changed,
+or partial results do not authorize any document from that call. An in-memory
+receipt is consumed on delivery and discarded on reset; no state is written to
+the target repository. Full packaged `read` calls remain supported and can be
+combined with tool loads. Reuse loaded guides in the same run, loading any
+additional language as needed. Reload after a new run or compaction.
+
 ## Reminder
 
 On every `before_agent_start`, `guidelines` appends `GUIDELINES_REMINDER` to the
@@ -29,14 +48,17 @@ into the prompt.
   only the packaged files satisfy the gate.
 - On `tool_call` for `edit`/`write`, `mutationBlockReason()` returns a block
   reason listing the required paths until they have been read.
-- If the `read` tool is inactive, the gate cannot be satisfied and says so.
-- Read state resets on `before_agent_start` and on `session_compact` (a summary
-  may drop the guides from context mid-run).
+- Either `sideroom_guidelines` or `read` can satisfy the gate. If both are
+  inactive, the block asks the agent to enable one.
+- Loaded documents and pending tool receipts reset on `session_start`,
+  `before_agent_start`, and `session_compact` (a summary may drop the guides
+  from context mid-run).
 
 ## Language map
 
 | Target extension | Guide |
 | --- | --- |
+| `.js`, `.jsx`, `.mjs`, `.cjs` | `javascript.md` |
 | `.java` | `java.md` |
 | `.php` | `php-laravel.md` |
 | `.ts`, `.tsx` | `typescript.md` |
@@ -45,7 +67,7 @@ into the prompt.
 | `.rs` | `rust.md` |
 | anything else | shared skill table only |
 
-Each guide mirrors all 19 rules from the seed with idiomatic examples. The
+Each guide mirrors all 20 rules from the seed with idiomatic examples. The
 catalog lives in `extensions/guidelines/catalog.ts`.
 
 ## Review steer
@@ -57,6 +79,14 @@ against the loaded language guide. It fixes demonstrated violations caused by
 the change, preserves required behavior, and avoids unrelated refactors. The
 agent then runs the relevant formatter, linter, type checks, and tests. If the
 guide has left context, the steer asks for a fresh full read.
+
+The steer explicitly includes rule 20, Decomposition by intent (structural):
+extract coherent operations when names and contracts make the caller's flow
+understandable without the implementation, even with one caller. It rejects
+splits made only to shorten functions and keeps tightly coupled steps together
+when separation would need shared mutable state, excessive parameters, or
+reading both functions. Length is a review signal, never a limit or blocking
+check. This criterion applies only to changes introduced by the run.
 
 - Fires at most once per turn: `steeredThisTurn` is set when the entry is
   appended, so the continuation the steer starts cannot re-trigger it.
@@ -112,7 +142,7 @@ outside the review.
 JavaScript and TypeScript guides also require an object destructured in the
 parameter list when a function would take three or more parameters, including
 optional/defaulted parameters. External signatures and public compatibility
-contracts are preserved. These language conventions supplement the 19 canonical
+contracts are preserved. These language conventions supplement the 20 canonical
 rules and are loaded by the same read gate; they are reviewed rather than
 mechanically blocked.
 
@@ -120,16 +150,21 @@ mechanically blocked.
 
 | File | Role |
 | --- | --- |
-| `extensions/guidelines/index.ts` | Registers the guard, the reminder injection/reset events, and the review guard. |
-| `extensions/guidelines/guard.ts` | Tracks reads, canonicalizes paths, and blocks mutations. |
-| `extensions/guidelines/catalog.ts` | Package-rooted skill and language-guide paths. |
+| `extensions/guidelines/index.ts` | Registers the tool, guard, reminder injection/reset events, and review guard. |
+| `extensions/guidelines/execute.ts` | Loads complete packaged documents without changing guard state. |
+| `extensions/guidelines/guard.ts` | Tracks reads and complete tool deliveries, canonicalizes paths, and blocks mutations. |
+| `extensions/guidelines/catalog.ts` | Package-rooted skill and language-guide paths and shared language selection. |
 | `extensions/guidelines/prompt.ts` | Builds and idempotently appends the reminder. |
 | `extensions/guidelines/review.ts` | Arms the review steer on successful mutations, fires it once per turn, and carries Jev's notes. |
 
 ## Tests
 
 `index.test.ts` covers blocking, accepted reads, truncation, compaction reset,
-and the inactive-read-tool case. `prompt.test.ts` covers idempotent appending.
+and the inactive-read-tool case. `execute.test.ts` checks exact full contents,
+every supported extension, unsupported targets, and document-loading failures.
+`tool.test.ts` exercises the registered tool through delivery, partial or failed
+results, cancellation, mixed `read` and tool loads, reuse, and all state resets.
+`prompt.test.ts` covers idempotent appending.
 `review.test.ts` covers the one-shot arm/fire cycle, the failed-mutation case,
 abort and error outcomes, a pending user message, kept entries from earlier
 handlers, input typed during a run, interactive vs. extension input resets,

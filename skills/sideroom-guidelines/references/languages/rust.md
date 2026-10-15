@@ -25,6 +25,7 @@ Rules every Rust change must follow.
 | 17 | [Dependency direction](#17-dependency-direction) | architectural |
 | 18 | [Testability](#18-testability-as-a-design-constraint) | architectural |
 | 19 | [Comments](#19-comments) | architectural |
+| 20 | [Decomposition by intent](#20-decomposition-by-intent) | structural |
 
 ---
 
@@ -244,8 +245,40 @@ counter += 1;
 schedule_poll(Duration::from_secs(5));
 ```
 
+### 20. Decomposition by intent
+
+RULE: Extract a block into a named function when it represents a coherent operation and its name and contract let the caller understand the flow without reading its implementation. Keep orchestration separate from implementation details. Do not split solely to reduce line count; keep tightly coupled steps together when separating them would introduce shared mutable state, excessive parameters, or require reading both functions to understand either.
+WHY: Good decomposition reduces how much a reader must understand at once. Function length is a review signal; extraction must improve comprehension rather than merely move code elsewhere.
+
+```rust
+// bad
+fn create_packing_slip(items: &[PackingItem], destination: String) -> PackingSlip {
+    let mut unit_count = 0;
+    let mut weight_grams = 0;
+    for item in items {
+        unit_count += item.quantity;
+        weight_grams += item.quantity * item.unit_weight_grams;
+    }
+    PackingSlip { destination, totals: PackingTotals { unit_count, weight_grams } }
+}
+// good
+fn create_packing_slip(items: &[PackingItem], destination: String) -> PackingSlip {
+    PackingSlip { destination, totals: calculate_packing_totals(items) }
+}
+
+fn calculate_packing_totals(items: &[PackingItem]) -> PackingTotals {
+    let mut unit_count = 0;
+    let mut weight_grams = 0;
+    for item in items {
+        unit_count += item.quantity;
+        weight_grams += item.quantity * item.unit_weight_grams;
+    }
+    PackingTotals { unit_count, weight_grams }
+}
+```
+
 ---
 
 **When in doubt:** fail fast, keep it flat, keep it small.
 
-**Enforcement note:** rules 1–2 are mechanical and should be backed by Rust formatting or linting. Rules 3–10 are structural checks. Rules 11–19 require review judgment.
+**Enforcement note:** rules 1–2 are mechanical and should be backed by Rust formatting or linting. Rules 3–10 and 20 are structural; rules 11–19 are architectural. Rule 20 requires semantic review, not a line-count limit or mechanical length detector. Rules 11–20 require review judgment.

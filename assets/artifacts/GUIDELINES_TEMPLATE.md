@@ -1,6 +1,6 @@
 # Coding Guidelines
 
-Rules every change in this repo must follow. Ordered by how often they're violated and how cheap they are to check — mechanical rules first, judgment calls last.
+Rules every change in this repo must follow. The index identifies mechanical checks and rules that need review judgment.
 
 **Adapting this template to a new language:** keep `RULE` and `WHY` text as-is unless the language genuinely doesn't support the concept (e.g. Python has no braces — see rule 1). Swap the code fence language tag and rewrite the bad/good snippet idiomatically. Do not add prose. Do not merge two rules into one section.
 
@@ -27,6 +27,7 @@ Rules every change in this repo must follow. Ordered by how often they're violat
 | 17 | [Dependency direction](#17-dependency-direction) | architectural |
 | 18 | [Testability](#18-testability-as-a-design-constraint) | architectural |
 | 19 | [Comments](#19-comments) | architectural |
+| 20 | [Decomposition by intent](#20-decomposition-by-intent) | structural |
 
 ---
 
@@ -265,8 +266,38 @@ counter++;
 setInterval(checkPaymentStatus, 5000);
 ```
 
+### 20. Decomposition by intent
+RULE: Extract a block into a named function when it represents a coherent operation and its name and contract let the caller understand the flow without reading its implementation. Keep orchestration separate from implementation details. Do not split solely to reduce line count; keep tightly coupled steps together when separating them would introduce shared mutable state, excessive parameters, or require reading both functions to understand either.
+WHY: Good decomposition reduces how much a reader must understand at once. Function length is a review signal; extraction must improve comprehension rather than merely move code elsewhere.
+```js
+// bad
+function createPackingSlip(items, destination) {
+  let unitCount = 0;
+  let weightGrams = 0;
+  for (const item of items) {
+    unitCount += item.quantity;
+    weightGrams += item.quantity * item.unitWeightGrams;
+  }
+  return { destination, totals: { unitCount, weightGrams } };
+}
+// good
+function createPackingSlip(items, destination) {
+  return { destination, totals: calculatePackingTotals(items) };
+}
+
+function calculatePackingTotals(items) {
+  let unitCount = 0;
+  let weightGrams = 0;
+  for (const item of items) {
+    unitCount += item.quantity;
+    weightGrams += item.quantity * item.unitWeightGrams;
+  }
+  return { unitCount, weightGrams };
+}
+```
+
 ---
 
 **When in doubt:** fail fast, keep it flat, keep it small.
 
-**Enforcement note:** rules 1–2 (mechanical) should be backed by a linter/formatter in the target language, not left to this document alone — text-only compliance from an agent caps out well below what a lint rule enforces. Rules 3–10 (structural) are catchable by targeted lint rules or code review checklists in most languages. Rules 11–19 (architectural) require judgment and stay as review guidance.
+**Enforcement note:** rules 1–2 (mechanical) should be backed by a linter/formatter in the target language, not left to this document alone — text-only compliance from an agent caps out well below what a lint rule enforces. Rules 3–10 and 20 are structural; rules 11–19 are architectural. Rule 20 requires semantic review, not a line-count limit or mechanical length detector. Rules 11–20 require judgment and stay as review guidance.

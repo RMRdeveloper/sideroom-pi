@@ -10,7 +10,7 @@ import {
   GUIDELINE_SKILL_PATH,
   mutationBlockReason,
 } from './guard.ts';
-import registerGuidelines from './index.ts';
+import registerGuidelinesExtension from './index.ts';
 import { GUIDELINES_REMINDER_HEADING } from './prompt.ts';
 
 test('injects the guidelines reminder once per system prompt', () => {
@@ -339,6 +339,10 @@ test('maps every catalog extension to its language guide', () => {
     }
   }
 });
+
+function registerGuidelines(pi: ExtensionAPI): void {
+  registerGuidelinesExtension({ ...pi, registerTool() {} });
+}
 
 type EventHandler = (event: never, ctx?: never) => unknown;
 type GuardResult = { block?: boolean; reason?: string } | undefined;

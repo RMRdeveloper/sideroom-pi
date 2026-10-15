@@ -7,6 +7,8 @@ const LANGUAGE_GUIDE_DIRECTORY = join(
   'skills/sideroom-guidelines/references/languages',
 );
 
+export const GUIDELINES_TOOL_NAME = 'sideroom_guidelines';
+
 export const GUIDELINE_SKILL_PATH = join(
   PACKAGE_ROOT,
   'skills/sideroom-guidelines/SKILL.md',
@@ -35,6 +37,13 @@ export const LANGUAGE_GUIDE_FILES: readonly string[] = LANGUAGE_GUIDES.map(
 export const LANGUAGE_TARGET_LABELS: readonly string[] = LANGUAGE_GUIDES.map(
   ({ extensions }) => extensions.join('/'),
 );
+
+export function languageGuideFor(path: string): string | undefined {
+  const normalizedPath = path.replaceAll('\\', '/').toLowerCase();
+  return LANGUAGE_GUIDES.find(({ extensions }) =>
+    extensions.some((extension) => normalizedPath.endsWith(extension)),
+  )?.path;
+}
 
 function languageGuide(
   fileName: string,

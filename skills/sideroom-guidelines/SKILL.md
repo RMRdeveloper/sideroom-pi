@@ -1,6 +1,6 @@
 ---
 name: sideroom-guidelines
-description: "Follow the mandatory coding workflow before any write or edit, including bug fixes, features, refactors, tests, configuration, and documentation edits. Read the complete skill first; also read the exact language guide for Java, PHP/Laravel, JavaScript/JSX, TypeScript/TSX, Python, Go, or Rust targets. Discussion or read-only investigation alone does not require loading it."
+description: "Follow the mandatory coding workflow before any write or edit, including bug fixes, features, refactors, tests, configuration, and documentation edits. Load the complete skill and exact language guide through sideroom_guidelines or full read calls for Java, PHP/Laravel, JavaScript/JSX, TypeScript/TSX, Python, Go, or Rust targets. Discussion or read-only investigation alone does not require loading it."
 license: MIT
 metadata:
   author: RMRdeveloper
@@ -11,12 +11,14 @@ metadata:
 
 ## Activation Contract
 
-Load this whole skill with `read`, without `offset` or `limit`, before the first `write` or `edit` in each agent run. Use the absolute skill path shown in Available Skills. For each supported target language, also fully load its exact guide from `references/languages/`.
+Before `write` or `edit`, call `sideroom_guidelines` with the target file's `path`. It returns this whole skill and the matching complete language guide, or only this skill for unsupported languages. Reuse loaded guides during the same agent run; load any additional target language before editing it. Reload after compaction or a new run.
+
+Alternatively, load this whole skill with `read`, without `offset` or `limit`, using the absolute packaged path shown in Available Skills. For each supported target language, also fully load its exact guide from `references/languages/`. Both routes satisfy the same gate only on successful, complete delivery.
 
 ## Hard Rules
 
 - Apply the loaded guide to changed code in the context of the full user requirements and established project contracts. Architectural rules require demonstrated evidence; KISS, DRY, and YAGNI never justify omitting requested behavior, required error handling, compatibility, or meaningful tests.
-- Do not write or edit until exact full-file reads of the required packaged paths succeed; partial reads and same-named files do not count.
+- Do not write or edit until the required packaged documents are fully loaded through `sideroom_guidelines` or exact full-file `read` calls; failed or partial loads and same-named files do not count.
 - Do not bypass the gate with Bash, a subprocess, or another mutation tool.
 - Do not load language guides unrelated to files being changed.
 - Fail fast, keep control flow flat, and validate once at the boundary.
@@ -36,8 +38,8 @@ Load this whole skill with `read`, without `offset` or `limit`, before the first
 
 ## Execution Steps
 
-1. Read this complete file from its packaged path before any mutation.
-2. Fully read the matching packaged language guide, if the target has a supported extension.
+1. Load this complete skill through `sideroom_guidelines` with the target path, or a full `read` of its packaged path, before any mutation.
+2. Ensure the matching complete language guide is loaded for supported extensions. The tool includes it automatically; with `read`, load it separately.
 3. Implement a focused change that satisfies all current requirements and preserves required existing behavior.
 4. Review the changes introduced by this run against the loaded guide; fix demonstrated violations caused by the change without refactoring unrelated code.
 5. Run the relevant formatter, linter, type checks, and tests before finishing.
@@ -51,6 +53,7 @@ Load this whole skill with `read`, without `offset` or `limit`, before the first
 | Explicit error, fail now | Fallbacks that hide the real failure |
 | One responsibility per unit | Validate + transform + persist + notify together |
 | Extract for real duplication, a present responsibility, or testability | Abstract only for hypothetical future reuse |
+| Decomposition by intent (rule 20): name a coherent operation so its caller reads the flow without implementation details, even with one caller | Split only to shorten functions, or separate coupled steps into shared mutable state, excessive parameters, or functions that must be read together |
 | Simplest design that satisfies the full requirements | Omit necessary structure to minimize code |
 | Implement current requirements and established contracts completely | Add capabilities only for hypothetical future cases |
 | Compose small focused units | Deep inheritance for unrelated behavior |

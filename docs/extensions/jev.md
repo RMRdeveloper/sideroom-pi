@@ -91,7 +91,17 @@ in the language guide for the agent's review.
   with an explicit exception for adapters and composition boundaries.
 - `unnecessary-abstraction` (12–14): demonstrably redundant layers or merged
   distinct domain concepts. One caller or delegation alone is not a violation;
-  current responsibilities, compatibility and testability remain valid reasons.
+  current responsibilities, compatibility, testability and decomposition by intent
+  remain valid reasons.
+- `decomposition-by-intent` (20, structural): coherent implementation details
+  that obscure orchestration, or a new split that makes tightly coupled steps
+  harder to understand. Requires visible bodies for the operation and its
+  surrounding orchestration or helper caller in the changed file or supplied
+  related source. A named operation with a clear contract is useful even with
+  one caller. Length alone is never a violation; shared mutable state, excessive
+  parameters or needing to read both functions are reasons to keep steps
+  together. Insufficient evidence is not a finding. This question joins the same
+  bounded request; it adds no call, length detector or blocking rule.
 - `contract-compatibility`: a concrete mismatch between the changed contract
   and a supplied non-test consumer. Omitted without such a consumer.
 - `test-quality`: assertions that cannot catch the changed behavior or an

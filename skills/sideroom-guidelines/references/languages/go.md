@@ -25,6 +25,7 @@ Rules every Go change must follow.
 | 17 | [Dependency direction](#17-dependency-direction) | architectural |
 | 18 | [Testability](#18-testability-as-a-design-constraint) | architectural |
 | 19 | [Comments](#19-comments) | architectural |
+| 20 | [Decomposition by intent](#20-decomposition-by-intent) | structural |
 
 ---
 
@@ -370,8 +371,41 @@ counter++
 ticker := time.NewTicker(5 * time.Second)
 ```
 
+### 20. Decomposition by intent
+
+RULE: Extract a block into a named function when it represents a coherent operation and its name and contract let the caller understand the flow without reading its implementation. Keep orchestration separate from implementation details. Do not split solely to reduce line count; keep tightly coupled steps together when separating them would introduce shared mutable state, excessive parameters, or require reading both functions to understand either.
+WHY: Good decomposition reduces how much a reader must understand at once. Function length is a review signal; extraction must improve comprehension rather than merely move code elsewhere.
+
+```go
+// bad
+func createPackingSlip(items []PackingItem, destination string) PackingSlip {
+	unitCount := 0
+	weightGrams := 0
+	for _, item := range items {
+		unitCount += item.Quantity
+		weightGrams += item.Quantity * item.UnitWeightGrams
+	}
+	return PackingSlip{Destination: destination, Totals: PackingTotals{UnitCount: unitCount, WeightGrams: weightGrams}}
+}
+
+// good
+func createPackingSlip(items []PackingItem, destination string) PackingSlip {
+	return PackingSlip{Destination: destination, Totals: calculatePackingTotals(items)}
+}
+
+func calculatePackingTotals(items []PackingItem) PackingTotals {
+	unitCount := 0
+	weightGrams := 0
+	for _, item := range items {
+		unitCount += item.Quantity
+		weightGrams += item.Quantity * item.UnitWeightGrams
+	}
+	return PackingTotals{UnitCount: unitCount, WeightGrams: weightGrams}
+}
+```
+
 ---
 
 **When in doubt:** fail fast, keep it flat, keep it small.
 
-**Enforcement note:** rules 1–2 are mechanical and should be backed by Go formatting or linting. Rules 3–10 are structural checks. Rules 11–19 require review judgment.
+**Enforcement note:** rules 1–2 are mechanical and should be backed by Go formatting or linting. Rules 3–10 and 20 are structural; rules 11–19 are architectural. Rule 20 requires semantic review, not a line-count limit or mechanical length detector. Rules 11–20 require review judgment.

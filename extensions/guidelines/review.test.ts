@@ -67,6 +67,7 @@ function register(): Harness {
         return handler(event, ctx);
       }) as EventHandler);
     },
+    registerTool() {},
     getActiveTools: () => ['read', 'edit', 'write'],
   } as unknown as ExtensionAPI;
   registerGuidelines(api);
@@ -149,6 +150,24 @@ test('appends one hidden review and continues after a mutation settles', () => {
       continue: true,
     },
   ]);
+});
+
+test('reviews intent and coupling, not function length, only in changes from this run', () => {
+  const harness = register();
+  mutate(harness);
+  settle(harness);
+
+  const steer = steerText(harness, 0);
+  assert.match(steer, /changes this run introduced/);
+  assert.match(steer, /rule 20, Decomposition by intent/);
+  assert.match(steer, /names and contracts/);
+  assert.match(steer, /orchestration/);
+  assert.match(steer, /even with one caller/);
+  assert.match(steer, /Do not split solely for line count/);
+  assert.match(steer, /shared mutable state/);
+  assert.match(steer, /excessive parameters/);
+  assert.match(steer, /functions that must be read together/);
+  assert.match(steer, /Do not refactor unrelated code/);
 });
 
 test('keeps the entries earlier handlers proposed', () => {
