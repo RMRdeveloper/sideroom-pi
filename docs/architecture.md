@@ -32,7 +32,7 @@ extensions/
   todo/           sideroom_todo
   modified-files/ edited-file tracking
   visual-context/ F7 browser pairing, local source candidates and pending input context
-  guidelines/     pre-edit read gate and review steer
+  guidelines/     sideroom_guidelines, pre-edit gate and review steer
   monorepo-skills/ trusted child-folder skill discovery
   rules/          added-line rule checks
   done/           green-before-finish steer
@@ -65,8 +65,11 @@ guards without a tool. `persona` persists no profile state, so it ships
 `catalog.ts`, `checks.ts`, and `guard.ts` instead of `session.ts` or `ui.ts`.
 `monorepo-skills` has no tool or state: `scan.ts` owns discovery, `flags.ts`
 owns the CLI disable check, and `prompt.ts` owns its static prompt note.
-`guidelines` pairs `guard.ts` (the read gate) with `review.ts` (the one-shot
-review steer). `jev` has no tool and no persisted state: `client.ts` owns the
+`guidelines` registers `sideroom_guidelines`: `execute.ts` loads complete
+packaged documents selected by `catalog.ts`. `guard.ts` accepts successful
+complete tool deliveries or full `read` calls, and `review.ts` owns the one-shot
+review steer. Pending tool receipts and loaded-document state stay in memory
+and reset on session start, a new run, or compaction. `jev` has no tool and no persisted state: `client.ts` owns the
 single HTTP call, `workflow.ts` bounded questionnaire/completion requests and
 observed evidence, `key.ts` the owner-only key file, and `ui.ts` the masked `F10`
 screen.
@@ -116,15 +119,24 @@ which is why `todo` re-injects its block before every turn.
 Extensions never call `buildContextEntries()`/`getEntries()` and never write
 state files into the target project.
 
-`visual-context` also persists pending DOM selections and inferred local source
-candidates on the active branch. Its authenticated loopback server starts only
+`visual-context` also persists pending DOM selections, local source candidates
+and page-origin-to-project associations on the active branch. Compiler metadata
+is validated against native markup positions; selections without metadata use
+inferred matching. `sideroom_visual_setup` discovers children and prepares opt-in
+development compiler edits and installation commands; the parent applies them
+through ordinary Pi tools so all mutation guards still run. Its authenticated loopback server starts only
 from the initial `F7` authorization. Its global installation identity is
 reused by later trusted interactive sessions. Pi processes share a stable local
 broker, with takeover on host shutdown. Conversation and tree changes publish
 a new destination revision; old selections are rejected without requiring
 another browser authorization. Windows and WSL identities are remembered
 independently by the companion, which merges their destination lists.
-Source hashes are checked before attachment. The next idle interactive `input`
+Source hashes are checked before attachment, once per distinct file in each
+restore or attachment operation. Source search keeps only the best eight
+candidates and shares ignore rules only within that synchronous search; there
+is no validation cache between operations. `dialogs.ts` owns F7 menus without
+changing session state, and the browser's `destinations.js` owns destination
+choice independently of connection handling. The next idle interactive `input`
 is transformed to include bounded, explicitly untrusted browser context;
 images and user text are preserved and the system prompt stays unchanged.
 See [browser context](extensions/visual-context.md) for the browser companion,
@@ -138,6 +150,7 @@ and an inferred DOM origin.
 | todo | `sideroom-todo` |
 | modified-files | `sideroom-modified-files` |
 | visual-context | `sideroom-visual-context` |
+| visual project associations | `sideroom-visual-projects` |
 | todo steer types | `sideroom-todo-nudge`, `sideroom-todo-watchdog` |
 | done steer type | `sideroom-done-gate` |
 | persona steer type and status key | `sideroom-persona-steer`, `sideroom-persona` |
@@ -248,18 +261,20 @@ locally.
 ## Skills
 
 Skills are on-demand instructions under `skills/`, not extensions. `guidelines`
-gates mutations on reading `skills/sideroom-guidelines/SKILL.md` and the matching
-language guide; those files are also part of the published package.
+gates mutations on loading `skills/sideroom-guidelines/SKILL.md` and the matching
+language guide through `sideroom_guidelines` or full `read` calls; those files
+are also part of the published package.
 
 | Skill | Role |
 | --- | --- |
-| `sideroom-guidelines` | The 19-rule contract and per-language guides. |
+| `sideroom-guidelines` | The 20-rule contract and per-language guides. |
 | `sideroom-persona` | The single voice contract: Do/Don't table, plain-language bar, and enforcement boundaries. |
 | `sideroom-grill` | Interviews a fuzzy plan in `sideroom_ask` rounds. |
 | `sideroom-architecture` | Surfaces the architectural decisions a change forces so they are asked, not assumed. |
 | `sideroom-codebase-design` | Surveys codebase friction, designs module improvements, and plans growth and migration in text. |
 | `sideroom-domain-modeling` | Resolves language conflicts; writes `CONTEXT.md` and offers ADRs. |
 | `sideroom-domain-scaffold` | Code-first repository scan that builds or completes `CONTEXT.md`. |
+| `sideroom-visual-setup` | Configure and verify compiler locations using setup plans, including Docker paths. |
 
 The canonical rule seed is `assets/artifacts/GUIDELINES_TEMPLATE.md`. It seeds
 the skill and guides; it is never pasted into the system prompt.
