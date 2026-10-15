@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { runInNewContext } from 'node:vm';
+import { createContext, runInContext } from 'node:vm';
+import {
+  MAX_MESSAGE_BYTES,
+  PROTOCOL_VERSION,
+  parseSelection,
+} from './model.ts';
 
 const id = 'a'.repeat(32);
 const address = `ws://127.0.0.1:1234/sideroom-visual-context#${'b'.repeat(64)}`;
@@ -34,8 +39,9 @@ function loadCompanion(stored: Record<string, unknown> = {}) {
     ),
     'utf8',
   );
-  const sockets: { sent: Record<string, unknown>[]; close(): void }[] = [];
+  const sockets: FakeSocket[] = [];
   const notices: unknown[] = [];
+  const tabMessages: { tabId: number; message: unknown }[] = [];
   const injections: unknown[] = [];
   const badges = new Map<number | undefined, string>();
   const titles = new Map<number | undefined, string>();
@@ -56,7 +62,7 @@ function loadCompanion(stored: Record<string, unknown> = {}) {
     readonly endpoint: string;
     onopen?: () => void;
     onclose?: () => void;
-    onmessage?: (event: { data: string }) => void;
+    onmessage?: (event: { data: string }) => Promise<void> | void;
     constructor(endpoint: string) {
       this.endpoint = endpoint;
       sockets.push(this);
@@ -70,7 +76,7 @@ function loadCompanion(stored: Record<string, unknown> = {}) {
           this.onmessage?.({
             data: JSON.stringify({
               type: 'ready',
-              version: 2,
+              version: PROTOCOL_VERSION,
               sessions: installations.get(this.endpoint) ?? available,
             }),
           }),
@@ -115,7 +121,8 @@ function loadCompanion(stored: Record<string, unknown> = {}) {
         },
       },
       query: async () => [pageSender.tab],
-      sendMessage: async (_tab: number, message: unknown) => {
+      sendMessage: async (tabId: number, message: unknown) => {
+        tabMessages.push({ tabId, message });
         notices.push(message);
       },
     },
@@ -153,27 +160,43 @@ function loadCompanion(stored: Record<string, unknown> = {}) {
       },
     },
   };
-  const companion = runInNewContext(
-    `${script}\n({ parsePairingAddress, handleMessage, updateSessions, initialized, reconnectAll: () => Promise.all([...connections.values()].map(reconnect)) })`,
-    {
-      chrome,
-      console,
-      URL,
-      Set,
-      Map,
-      WebSocket: FakeSocket,
-      queueMicrotask,
-      setTimeout: () => 1,
-      clearTimeout() {},
-      setInterval: () => 1,
-      clearInterval() {},
+  const context = createContext({
+    chrome,
+    console,
+    URL,
+    TextEncoder,
+    Set,
+    Map,
+    WebSocket: FakeSocket,
+    queueMicrotask,
+    setTimeout: () => 1,
+    clearTimeout() {},
+    setInterval: () => 1,
+    clearInterval() {},
+    importScripts: (file: string) => {
+      assert.equal(file, 'destinations.js');
+      runInContext(
+        readFileSync(
+          new URL(
+            `../../assets/visual-context/browser/${file}`,
+            import.meta.url,
+          ),
+          'utf8',
+        ),
+        context,
+      );
     },
+  });
+  const companion = runInContext(
+    `${script}\n({ parsePairingAddress, handleMessage, updateSessions, initialized, reconnectAll: () => Promise.all([...connections.values()].map(reconnect)) })`,
+    context,
   );
   return {
     companion,
     chrome,
     sockets,
     notices,
+    tabMessages,
     injections,
     badges,
     titles,
@@ -193,6 +216,228 @@ function loadCompanion(stored: Record<string, unknown> = {}) {
     alarm: () => alarm?.({ name: 'sideroom-reconnect' }),
   };
 }
+
+test('identified errors notify only their tab and leave other acknowledgements deliverable', async () => {
+  const setup = loadCompanion();
+  await setup.companion.handleMessage({ action: 'connect', address }, popup);
+  await setup.command();
+  const otherSender = {
+    ...pageSender,
+    tab: { id: 5, url: 'http://localhost/other' },
+  };
+  await setup.command('toggle-inspector', otherSender.tab);
+  for (const [selectionId, sender] of [
+    ['first-click', pageSender],
+    ['second-click', otherSender],
+  ] as const) {
+    await setup.companion.handleMessage(
+      { action: 'selection', selection: { id: selectionId } },
+      sender,
+    );
+  }
+  const socket = setup.sockets[0];
+  assert.ok(socket);
+  await socket.onmessage?.({
+    data: JSON.stringify({
+      type: 'error',
+      id: 'first-click',
+      message: 'Source changed',
+    }),
+  });
+  await socket.onmessage?.({
+    data: JSON.stringify({ type: 'error', id: 'unknown', message: 'Unknown' }),
+  });
+  const receipts = () =>
+    setup.tabMessages.filter(
+      ({ message }) => (message as { action: string }).action === 'receipt',
+    );
+  assert.deepEqual(
+    receipts().map(({ tabId }) => tabId),
+    [4],
+  );
+  await socket.onmessage?.({
+    data: JSON.stringify({
+      type: 'received',
+      id: 'second-click',
+      candidates: 2,
+    }),
+  });
+  assert.deepEqual(
+    receipts().map(({ tabId }) => tabId),
+    [4, 5],
+  );
+  for (const [selectionId, sender] of [
+    ['legacy-one', pageSender],
+    ['legacy-two', otherSender],
+  ] as const) {
+    await setup.companion.handleMessage(
+      { action: 'selection', selection: { id: selectionId } },
+      sender,
+    );
+  }
+  await socket.onmessage?.({
+    data: JSON.stringify({
+      type: 'error',
+      message: 'Legacy installation error',
+    }),
+  });
+  assert.deepEqual(
+    receipts().map(({ tabId }) => tabId),
+    [4, 5, 4, 5],
+  );
+});
+
+test('a reply from another installation cannot consume the selected installation receipt', async () => {
+  const setup = loadCompanion();
+  const windowsAddress = address.replace(':1234/', ':1235/');
+  setup.setInstallation('ws://127.0.0.1:1235/sideroom-visual-context', [
+    second,
+  ]);
+  await setup.companion.handleMessage({ action: 'connect', address }, popup);
+  await setup.companion.handleMessage(
+    { action: 'connect', address: windowsAddress },
+    popup,
+  );
+  await setup.companion.handleMessage(
+    { action: 'choose', id: second.id },
+    popup,
+  );
+  await setup.command();
+  await setup.companion.handleMessage(
+    { action: 'selection', selection: { id: 'windows-click' } },
+    pageSender,
+  );
+  for (const type of ['received', 'error']) {
+    await setup.sockets[0]?.onmessage?.({
+      data: JSON.stringify({
+        type,
+        id: 'windows-click',
+        candidates: 1,
+        message: 'Wrong installation',
+      }),
+    });
+  }
+  const receipts = () =>
+    setup.tabMessages.filter(
+      ({ message }) => (message as { action: string }).action === 'receipt',
+    );
+  assert.equal(receipts().length, 0);
+  await setup.sockets[1]?.onmessage?.({
+    data: JSON.stringify({
+      type: 'received',
+      id: 'windows-click',
+      candidates: 3,
+    }),
+  });
+  assert.equal(receipts().length, 1);
+  const delivered = receipts()[0];
+  assert.ok(delivered);
+  assert.match(
+    (delivered.message as { message: string }).message,
+    /3 source candidates/u,
+  );
+});
+
+test('checks complete UTF-8 frames at the byte limit before creating receipts or sending', async () => {
+  const setup = loadCompanion();
+  await setup.companion.handleMessage({ action: 'connect', address }, popup);
+  await setup.command();
+  const socket = setup.sockets[0];
+  assert.ok(socket);
+  function sizedCapture(bytes: number, text: string) {
+    const capture = {
+      id: 'size',
+      page: 'http://localhost/account',
+      text,
+      element: {
+        tag: 'button',
+        elementId: '',
+        classes: Array.from({ length: 32 }, () => ''),
+      },
+      ancestors: [
+        {
+          tag: 'div',
+          elementId: '',
+          classes: Array.from({ length: 32 }, () => ''),
+        },
+      ],
+    };
+    let remaining =
+      bytes -
+      Buffer.byteLength(
+        JSON.stringify({
+          type: 'selection',
+          selection: capture,
+          target: first,
+        }),
+      );
+    for (const element of [capture.element, ...capture.ancestors]) {
+      for (let index = 0; index < element.classes.length; index += 1) {
+        const length = Math.min(160, remaining);
+        element.classes[index] = 'a'.repeat(length);
+        remaining -= length;
+      }
+    }
+    assert.equal(remaining, 0);
+    return parseSelection(capture);
+  }
+  const accepted = sizedCapture(MAX_MESSAGE_BYTES, 'é'.repeat(160));
+  await setup.companion.handleMessage(
+    { action: 'selection', selection: accepted },
+    pageSender,
+  );
+  assert.equal(
+    Buffer.byteLength(JSON.stringify(socket.sent.at(-1))),
+    MAX_MESSAGE_BYTES,
+  );
+  const sent = socket.sent.length;
+  const oversized = sizedCapture(MAX_MESSAGE_BYTES + 1, 'é'.repeat(160));
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    await assert.rejects(
+      setup.companion.handleMessage(
+        { action: 'selection', selection: { ...oversized, id: 'huge' } },
+        pageSender,
+      ),
+      /exceeds the message limit/u,
+    );
+  }
+  assert.equal(socket.sent.length, sent);
+  assert.equal(socket.readyState, 1);
+  await setup.companion.handleMessage(
+    { action: 'selection', selection: { id: 'small' } },
+    pageSender,
+  );
+  assert.equal(socket.sent.length, sent + 1);
+});
+
+test('failed sends remove only their receipt so later captures can recover', async () => {
+  const setup = loadCompanion();
+  await setup.companion.handleMessage({ action: 'connect', address }, popup);
+  await setup.command();
+  const socket = setup.sockets[0];
+  assert.ok(socket);
+  const send = socket.send;
+  socket.send = () => {
+    throw new Error('Transport failed');
+  };
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    await assert.rejects(
+      setup.companion.handleMessage(
+        { action: 'selection', selection: { id: `failed-${String(attempt)}` } },
+        pageSender,
+      ),
+      /Cannot send the selected element/u,
+    );
+  }
+  socket.send = send;
+  await setup.companion.handleMessage(
+    { action: 'selection', selection: { id: 'recovered' } },
+    pageSender,
+  );
+  const recovered = socket.sent.at(-1);
+  assert.ok(recovered);
+  assert.equal((recovered.selection as { id: string }).id, 'recovered');
+});
 
 test('browser pairing rejects non-local destinations and credentials in the network URL', () => {
   const { companion } = loadCompanion();

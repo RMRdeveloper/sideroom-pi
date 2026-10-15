@@ -6,40 +6,30 @@ import {
 } from '@earendil-works/pi-coding-agent';
 import { connectSession, type VisualBridge } from './bridge.ts';
 import {
-  candidateLabel,
+  chooseProject,
+  chooseSourceAction,
+  chooseVisualAction,
+} from './dialogs.ts';
+import {
   cleanLabel,
-  elementLabel,
   type PendingSelection,
   type SessionDescriptor,
   VISUAL_SHORTCUT,
   VISUAL_WIDGET,
 } from './model.ts';
 import { ensurePairing, pairingAddress, readPairing } from './pairing.ts';
+import { discoverProjects } from './projects.ts';
 import {
+  bindProject,
   commitPending,
   createVisualStore,
   prepareContext,
   receiveSelection,
   restorePending,
 } from './session.ts';
+import { registerVisualSetup } from './setup.ts';
 import { candidateIsCurrent } from './source.ts';
 import { BROWSER_EXTENSION_DIRECTORY, refreshVisualWidget } from './ui.ts';
-
-const CONTROL = {
-  pair: 'Pair browser',
-  stop: 'Disconnect browser',
-  clear: 'Remove all pending elements',
-} as const;
-
-type VisualDialogOption =
-  | { readonly label: string; readonly action: 'pair' }
-  | { readonly label: string; readonly action: 'stop' }
-  | { readonly label: string; readonly action: 'clear' }
-  | {
-      readonly label: string;
-      readonly action: 'review';
-      readonly entry: PendingSelection;
-    };
 
 function notifyRestoreFailure(ctx: ExtensionContext, cause: unknown): void {
   ctx.ui.notify(`Cannot restore browser context: ${String(cause)}`, 'error');
@@ -50,6 +40,12 @@ export default function registerVisualContext(
   agentDirectory = getAgentDir(),
 ): void {
   const store = createVisualStore();
+  registerVisualSetup(pi, ({ project, page, cwd }) => {
+    bindProject({ store, pi, cwd, project, page });
+    if (activeContext) {
+      refreshVisualWidget(store.pending, activeContext);
+    }
+  });
   let bridge: VisualBridge | undefined;
   let activeContext: ExtensionContext | undefined;
   let opening = false;
@@ -200,7 +196,11 @@ export default function registerVisualContext(
   pi.on('before_agent_start', (event, ctx) => {
     const attachment = preparedContext;
     preparedContext = undefined;
-    if (!attachment || !event.prompt.includes(attachment.text)) {
+    if (
+      !attachment ||
+      event.messageType === 'custom' ||
+      !event.prompt.includes(attachment.text)
+    ) {
       return;
     }
     savePending(
@@ -229,30 +229,12 @@ export default function registerVisualContext(
           await activate(ctx);
         }
         const dialogGeneration = generation;
-        const stopOptions: readonly VisualDialogOption[] = bridge
-          ? [{ label: CONTROL.stop, action: 'stop' }]
-          : [];
-        const options: readonly VisualDialogOption[] = [
-          { label: CONTROL.pair, action: 'pair' },
-          ...store.pending.map(
-            (entry): VisualDialogOption => ({
-              label: `Review ${elementLabel(entry.selection)} [${entry.selection.id}]`,
-              action: 'review',
-              entry,
-            }),
-          ),
-          { label: CONTROL.clear, action: 'clear' },
-          ...stopOptions,
-        ];
-        const choice = await ctx.ui.select(
-          'Browser context',
-          options.map((option) => option.label),
-        );
-        if (!dialogIsCurrent(ctx, dialogGeneration)) {
-          return;
-        }
-        const picked = options.find((option) => option.label === choice);
-        if (!picked) {
+        const picked = await chooseVisualAction({
+          ui: ctx.ui,
+          pending: store.pending,
+          connected: bridge !== undefined,
+        });
+        if (!dialogIsCurrent(ctx, dialogGeneration) || !picked) {
           return;
         }
         if (picked.action === 'pair') {
@@ -286,22 +268,32 @@ export default function registerVisualContext(
           return;
         }
         const entry = picked.entry;
-        const labels = entry.resolution.candidates.map(
-          (candidate) =>
-            `${candidateLabel(candidate)} · ${candidate.reasons.join(', ')}`,
-        );
-        const remove = 'Remove this element';
-        const selected = await ctx.ui.select(
-          'Choose a source candidate — origin is inferred',
-          [...labels, remove],
-        );
-        if (!dialogIsCurrent(ctx, dialogGeneration)) {
+        const selected = await chooseSourceAction(ctx.ui, entry);
+        if (!dialogIsCurrent(ctx, dialogGeneration) || !selected) {
           return;
         }
-        if (selected === undefined) {
+        if (selected.action === 'associate') {
+          const project = await chooseProject(
+            ctx.ui,
+            discoverProjects(ctx.cwd),
+          );
+          if (!dialogIsCurrent(ctx, dialogGeneration)) {
+            return;
+          }
+          if (project) {
+            bindProject({
+              store,
+              pi,
+              cwd: ctx.cwd,
+              project: project.path,
+              page: entry.selection.page,
+            });
+            refresh(ctx);
+          }
           return;
         }
-        const candidate = entry.resolution.candidates[labels.indexOf(selected)];
+        const candidate =
+          selected.action === 'choose' ? selected.candidate : undefined;
         if (candidate && !candidateIsCurrent(ctx.cwd, candidate)) {
           ctx.ui.notify(
             'The source changed. Select the element again in your browser.',
@@ -310,7 +302,7 @@ export default function registerVisualContext(
           return;
         }
         const pending =
-          selected === remove
+          selected.action === 'remove'
             ? store.pending.filter(
                 (item) => item.selection.id !== entry.selection.id,
               )

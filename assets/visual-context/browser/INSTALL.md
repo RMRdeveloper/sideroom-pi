@@ -29,7 +29,11 @@ replace the files in the same folder, and reload the extension from the browser'
 extensions page. Do not remove and reinstall it unless you want to pair again.
 The extension connects only to authorized local Pi installations; it captures
 DOM descriptions, not form values or editable text. Source locations are inferred
-candidates, never proven mappings.
+candidates by default. Ask Pi to enable compiler context in a selected project
+for locations checked against local markup. Pi can run in a parent folder;
+F7 can associate a page with a child project. After setup, restart the development
+server and refresh the page. This companion requires visual protocol version 3;
+upgrade/reload Pi and the companion together without changing the pairing address.
 
 ## Español
 
@@ -63,7 +67,12 @@ extensión desde la página de extensiones del navegador. No la elimines y
 reinstales salvo que quieras volver a emparejarla.
 La extensión solo se conecta a instalaciones locales de Pi que hayas autorizado;
 recoge descripciones de los elementos, no valores de formularios ni texto editable.
-Los archivos de origen son candidatos inferidos, no correspondencias demostradas.
+Por defecto, los archivos de origen son candidatos inferidos. Pide a Pi que active
+el contexto del compilador en un proyecto elegido para obtener ubicaciones
+comprobadas contra el código local. Pi puede estar en la carpeta padre; F7 permite
+asociar una página con un proyecto hijo. Tras configurarlo, reinicia el servidor
+de desarrollo y actualiza la página. Esta versión requiere el protocolo visual 3:
+actualiza y recarga Pi y la extensión juntos, conservando el emparejamiento.
 
 Full guide / Guía completa:
 https://github.com/RMRdeveloper/sideroom-pi/blob/main/docs/extensions/visual-context.md

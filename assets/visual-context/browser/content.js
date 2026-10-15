@@ -6,6 +6,8 @@
   const MAX_TEXT = 160;
   const MAX_CLASSES = 32;
   const MAX_ANCESTORS = 4;
+  const SOURCE_ATTRIBUTE = 'data-insp-path';
+  const MAX_SOURCE_PATH = 2_048;
   const BORDER = '#ffb340';
   let active = false;
   let root;
@@ -33,6 +35,41 @@
       elementId: clean(element.id ?? ''),
       classes: [...element.classList].slice(0, MAX_CLASSES).map(clean),
     };
+  }
+
+  function sourceLocation(element) {
+    const marker = element.getAttribute(SOURCE_ATTRIBUTE);
+    if (!marker) {
+      return undefined;
+    }
+    const parts = marker.match(/^(.*):(\d+):(\d+):([^:]+)$/u);
+    if (
+      !parts?.[1] ||
+      parts[1].length > MAX_SOURCE_PATH ||
+      [...parts[1]].some(
+        (character) =>
+          character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
+      )
+    ) {
+      throw new Error(
+        'Invalid compiler location. Refresh the development page.',
+      );
+    }
+    const line = Number(parts[2]);
+    const column = Number(parts[3]);
+    if (
+      !Number.isSafeInteger(line) ||
+      !Number.isSafeInteger(column) ||
+      line < 1 ||
+      column < 1 ||
+      line > 1_000_000 ||
+      column > 1_000_000
+    ) {
+      throw new Error(
+        'Invalid compiler position. Refresh the development page.',
+      );
+    }
+    return { path: parts[1], line, column };
   }
 
   function visibleText(element) {
@@ -91,15 +128,16 @@
       ancestors.push(describe(parent));
       parent = parent.parentElement;
     }
-    const selection = {
-      id: crypto.randomUUID(),
-      page: `${location.origin}${location.pathname}`,
-      element: describe(element),
-      text: visibleText(element),
-      ancestors,
-    };
     caption.textContent = 'Sending selection to Pi…';
     try {
+      const selection = {
+        id: crypto.randomUUID(),
+        page: `${location.origin}${location.pathname}`,
+        element: describe(element),
+        text: visibleText(element),
+        ancestors,
+        source: sourceLocation(element),
+      };
       const response = await chrome.runtime.sendMessage({
         action: 'selection',
         selection,

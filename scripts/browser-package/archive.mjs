@@ -6,6 +6,7 @@ export const BROWSER_FILES = Object.freeze([
   'INSTALL.md',
   'background.js',
   'content.js',
+  'destinations.js',
   'icons/icon-16.png',
   'icons/icon-32.png',
   'icons/icon-48.png',

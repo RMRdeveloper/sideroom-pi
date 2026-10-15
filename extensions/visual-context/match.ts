@@ -14,6 +14,7 @@ import type {
   VisualElement,
   VisualSelection,
 } from './model.ts';
+import { SOURCE_METHOD } from './model.ts';
 import { parseAstro } from './parse-astro.ts';
 import { parseHtml } from './parse-html.ts';
 import { parseJsx } from './parse-jsx.ts';
@@ -39,8 +40,12 @@ export function sourceFingerprint(source: string): string {
 function parseSource(path: string, source: string): ParsedMarkup {
   switch (extname(path).toLowerCase()) {
     case '.jsx':
+    case '.js':
+    case '.mjs':
       return parseJsx(source, false);
     case '.tsx':
+    case '.ts':
+    case '.mts':
       return parseJsx(source, true);
     case '.vue':
       return parseVue(source);
@@ -56,20 +61,29 @@ function parseSource(path: string, source: string): ParsedMarkup {
   }
 }
 
-export function matchSource({
-  path,
-  source,
-  selection,
-}: {
+interface MatchSourceInput {
   readonly path: string;
   readonly source: string;
   readonly selection: VisualSelection;
-}): readonly SourceCandidate[] {
+  readonly location?: { readonly line: number; readonly column: number };
+}
+
+export function matchSource(
+  input: MatchSourceInput,
+): readonly SourceCandidate[] {
+  return [...sourceMatches(input)];
+}
+
+export function* sourceMatches({
+  path,
+  source,
+  selection,
+  location,
+}: MatchSourceInput): Generator<SourceCandidate> {
   const document = parseSource(path, source);
   if (document.incomplete) {
     throw new InvalidMarkup(`Cannot verify all markup locations in ${path}`);
   }
-  const candidates: SourceCandidate[] = [];
   const fingerprint = sourceFingerprint(source);
   const lineOffsets = [0];
   for (let index = 0; index < source.length; index += 1) {
@@ -94,13 +108,16 @@ export function matchSource({
     }
     return low;
   }
-  function visit(node: SourceNode, ancestors: readonly SourceElement[]): void {
+  function* visit(
+    node: SourceNode,
+    ancestors: readonly SourceElement[],
+  ): Generator<SourceCandidate> {
     if (node.kind === 'text') {
       return;
     }
     if (node.kind !== 'element') {
       for (const child of node.children) {
-        visit(child, ancestors);
+        yield* visit(child, ancestors);
       }
       return;
     }
@@ -109,29 +126,44 @@ export function matchSource({
       node.tag.toLowerCase() === selection.element.tag.toLowerCase()
     ) {
       const match = scoreElement(node, selection);
-      if (match.score >= MIN_SCORE) {
+      const atLocation =
+        location !== undefined &&
+        lineAt(node.start) === location.line &&
+        node.start - (lineOffsets[location.line - 1] ?? -1) + 1 ===
+          location.column;
+      const contradictoryId =
+        selection.element.elementId &&
+        node.attributes.id !== undefined &&
+        node.attributes.id !== selection.element.elementId;
+      if (
+        location ? atLocation && !contradictoryId : match.score >= MIN_SCORE
+      ) {
         const parentReasons = ancestorReasons(ancestors, selection.ancestors);
-        candidates.push({
+        yield {
           path,
           startLine: lineAt(node.start),
           endLine: lineAt(node.end - 1),
           fingerprint,
           score: match.score + parentReasons.length * WEIGHTS.ancestor,
-          reasons: [...match.reasons, ...parentReasons],
-        });
+          reasons: location
+            ? ['compiler location checked against local markup']
+            : [...match.reasons, ...parentReasons],
+          ...(location
+            ? { method: SOURCE_METHOD.compiler, startColumn: location.column }
+            : {}),
+        };
       }
     }
     const parents = node.rendered
       ? [...ancestors.slice(-(MAX_ANCESTORS - 1)), node]
       : ancestors;
     for (const child of node.children) {
-      visit(child, parents);
+      yield* visit(child, parents);
     }
   }
   for (const node of document.nodes) {
-    visit(node, []);
+    yield* visit(node, []);
   }
-  return candidates;
 }
 
 function ancestorReasons(
