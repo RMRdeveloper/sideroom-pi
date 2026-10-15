@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { RULE_SEVERITY } from '../rules/catalog.ts';
 import {
   addedLinesForEdit,
   addedLinesForWrite,
@@ -22,7 +23,7 @@ test('asks only rules supported by the supplied evidence in one request', () => 
   const body = buildRequestBody(state);
 
   assert.equal(body.model, JEV_MODEL);
-  assert.equal(JEV_RULES.length, 13);
+  assert.equal(JEV_RULES.length, 14);
   assert.equal(body.questions['dependency-direction'], undefined);
   assert.equal(body.questions.comments, undefined);
   for (const question of Object.values(body.questions)) {
@@ -38,6 +39,72 @@ test('command-query question distinguishes local accumulation from visible side 
   assert.match(question?.instructions ?? '', /local collections/);
   assert.match(question?.criteria.true ?? '', /caller-visible state/);
   assert.match(question?.criteria.false ?? '', /read-only file access/);
+});
+
+test('reviews decomposition from local bodies without requiring multiple callers', () => {
+  const source = [
+    'function createPackingSlip(items, destination) {',
+    '  return { destination, totals: calculatePackingTotals(items) };',
+    '}',
+    'function calculatePackingTotals(items) {',
+    '  let unitCount = 0;',
+    '  let weightGrams = 0;',
+    '  for (const item of items) {',
+    '    unitCount += item.quantity;',
+    '    weightGrams += item.quantity * item.unitWeightGrams;',
+    '  }',
+    '  return { unitCount, weightGrams };',
+    '}',
+  ].join('\n');
+  const state = buildFileState(
+    'src/packing.ts',
+    source,
+    'write',
+    addedLinesForWrite(undefined, source),
+    [],
+    true,
+  );
+  const request = buildRequestBody(state);
+  const question = request.questions['decomposition-by-intent'];
+  assert.ok(question);
+  assert.equal(question.type, 'noul');
+  assert.match(question.instructions, /change\.addedLines/);
+  assert.match(question.instructions, /file\.body.*context\.files/);
+  assert.match(question.instructions, /do not infer unseen bodies/);
+  assert.match(question.instructions, /One caller is sufficient/);
+  assert.match(question.instructions, /Never flag function length alone/);
+  assert.match(question.instructions, /shared mutable state/);
+  assert.match(question.instructions, /excessive parameters/);
+  assert.match(question.instructions, /functions that must be read together/);
+  assert.match(question.criteria.true, /clear independent contract/);
+  assert.match(question.criteria.true, /new split demonstrably harms/);
+  assert.match(question.criteria.false, /coupled steps belong together/);
+  assert.match(question.criteria.false, /evidence is insufficient/);
+  assert.deepEqual(request.state, state);
+  assert.equal(Object.hasOwn(RULE_SEVERITY, 'decomposition-by-intent'), false);
+});
+
+test('applies the existing cutoff and asked-question filter to decomposition notes', () => {
+  const envelope = {
+    model: undefined,
+    answers: { 'decomposition-by-intent': { noul: VIOLATION_PROBABILITY } },
+  };
+  assert.deepEqual(readFindings(envelope), [
+    {
+      ruleId: 'decomposition-by-intent',
+      probability: VIOLATION_PROBABILITY,
+    },
+  ]);
+  assert.deepEqual(readFindings(envelope, new Set(['guard-clauses'])), []);
+  assert.deepEqual(
+    readFindings({
+      model: undefined,
+      answers: {
+        'decomposition-by-intent': { noul: VIOLATION_PROBABILITY - 0.01 },
+      },
+    }),
+    [],
+  );
 });
 
 test('carries only the file and the change, never the conversation', () => {

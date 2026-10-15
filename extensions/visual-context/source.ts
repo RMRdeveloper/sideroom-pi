@@ -1,10 +1,15 @@
 import { readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
-import { extname, join, relative, sep } from 'node:path';
-import ignore from 'ignore';
+import { extname, isAbsolute, join, relative, sep } from 'node:path';
 import { projectRelativePath } from '../shared/file-path.ts';
 import { isMissingFile } from '../shared/read-file.ts';
+import {
+  allowedPath,
+  createPathPolicy,
+  MAX_FILE_BYTES,
+  type VisualPathPolicy,
+} from './files.ts';
 import { InvalidMarkup } from './markup.ts';
-import { matchSource, sourceFingerprint } from './match.ts';
+import { matchSource, sourceFingerprint, sourceMatches } from './match.ts';
 import {
   MAX_CANDIDATES,
   type SourceCandidate,
@@ -21,45 +26,42 @@ const SOURCE_EXTENSIONS = new Set([
   '.jsx',
   '.tsx',
 ]);
-const SKIP_DIRECTORIES = new Set([
-  'node_modules',
-  'dist',
-  'build',
-  'coverage',
-  'vendor',
-]);
-const IGNORE_FILES = ['.gitignore', '.ignore', '.fdignore'];
 const MAX_ENTRIES = 4_096;
-const MAX_FILE_BYTES = 262_144;
 const MAX_SOURCE_BYTES = 8_388_608;
 const MAX_DEPTH = 16;
-const SENSITIVE_NAME =
-  /secret|credential|password|private.?key|(?:^|[._-])env(?:[._-]|$)/iu;
 
 export function resolveSelection(
   cwd: string,
   selection: VisualSelection,
 ): SourceResolution {
+  if (selection.source) {
+    return resolveCompilerLocation({ cwd, selection });
+  }
+  return scanSource({ cwd, selection, paths: createPathPolicy(cwd) });
+}
+
+interface SourceScanInput {
+  readonly cwd: string;
+  readonly selection: VisualSelection;
+  readonly paths: VisualPathPolicy;
+}
+
+function scanSource({
+  cwd,
+  selection,
+  paths,
+}: SourceScanInput): SourceResolution {
   const root = realpathSync(cwd);
   const candidates: SourceCandidate[] = [];
   let entriesRead = 0;
   let sourceBytes = 0;
   let truncated = false;
-  function walk({
-    directory,
-    patterns,
-    depth,
-  }: {
-    readonly directory: string;
-    readonly patterns: readonly string[];
-    readonly depth: number;
-  }): void {
+  let capped = false;
+  function walk(directory: string, depth: number): void {
     if (depth > MAX_DEPTH) {
       truncated = true;
       return;
     }
-    const localPatterns = [...patterns, ...ignorePatterns(directory, root)];
-    const matcher = ignore().add(localPatterns);
     for (const entry of readdirSync(directory, { withFileTypes: true }).sort(
       (left, right) => left.name.localeCompare(right.name),
     )) {
@@ -68,30 +70,13 @@ export function resolveSelection(
         truncated = true;
         return;
       }
-      if (
-        entry.name.startsWith('.') ||
-        [...entry.name].some(
-          (character) =>
-            character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
-        ) ||
-        SENSITIVE_NAME.test(entry.name) ||
-        entry.isSymbolicLink()
-      ) {
+      const absolutePath = paths.allowedPath(join(directory, entry.name));
+      if (!absolutePath) {
         continue;
       }
-      const absolutePath = join(directory, entry.name);
       const path = relative(root, absolutePath).split(sep).join('/');
-      if (matcher.ignores(entry.isDirectory() ? `${path}/` : path)) {
-        continue;
-      }
       if (entry.isDirectory()) {
-        if (!SKIP_DIRECTORIES.has(entry.name)) {
-          walk({
-            directory: absolutePath,
-            patterns: localPatterns,
-            depth: depth + 1,
-          });
-        }
+        walk(absolutePath, depth + 1);
         continue;
       }
       if (
@@ -108,7 +93,14 @@ export function resolveSelection(
       sourceBytes += size;
       const source = readFileSync(absolutePath, 'utf8');
       try {
-        candidates.push(...matchSource({ path, source, selection }));
+        for (const candidate of sourceMatches({ path, source, selection })) {
+          candidates.push(candidate);
+          candidates.sort(compareCandidates);
+          if (candidates.length > MAX_CANDIDATES) {
+            capped = true;
+            candidates.pop();
+          }
+        }
       } catch (cause) {
         if (cause instanceof InvalidMarkup) {
           truncated = true;
@@ -118,73 +110,184 @@ export function resolveSelection(
       }
     }
   }
-  walk({ directory: root, patterns: [], depth: 0 });
-  candidates.sort(
-    (left, right) =>
-      right.score - left.score ||
-      left.path.localeCompare(right.path) ||
-      left.startLine - right.startLine,
-  );
-  return {
-    candidates: candidates.slice(0, MAX_CANDIDATES),
-    truncated,
-    capped: candidates.length > MAX_CANDIDATES,
-  };
+  walk(root, 0);
+  return { candidates, truncated, capped };
 }
 
-function ignorePatterns(directory: string, root: string): readonly string[] {
-  const prefix = relative(root, directory).split(sep).join('/');
-  const patterns: string[] = [];
-  for (const file of IGNORE_FILES) {
-    let source: string;
-    try {
-      source = readFileSync(join(directory, file), 'utf8');
-    } catch (cause) {
-      if (isMissingFile(cause)) {
-        continue;
-      }
-      throw new Error(`Cannot read ignore file ${file}`, { cause });
-    }
-    for (const line of source.split(/\r?\n/u)) {
-      if (!line || line.startsWith('#')) {
-        continue;
-      }
-      const negated = line.startsWith('!');
-      const pattern = negated ? line.slice(1) : line;
-      const nested = prefix
-        ? `${prefix}/${pattern.startsWith('/') ? pattern.slice(1) : pattern.includes('/') ? pattern : `**/${pattern}`}`
-        : pattern;
-      patterns.push(`${negated ? '!' : ''}${nested}`);
-    }
+function compareCandidates(
+  left: SourceCandidate,
+  right: SourceCandidate,
+): number {
+  return (
+    right.score - left.score ||
+    left.path.localeCompare(right.path) ||
+    left.startLine - right.startLine
+  );
+}
+
+interface CompilerLocationInput {
+  readonly cwd: string;
+  readonly selection: VisualSelection;
+  readonly project?: string;
+}
+
+export function resolveCompilerLocation({
+  cwd,
+  selection,
+  project,
+}: CompilerLocationInput): SourceResolution {
+  const location = selection.source;
+  if (!location) {
+    throw new Error('A compiler source location is required.');
   }
-  return patterns;
+  const unresolved = (issue: string): SourceResolution => ({
+    candidates: [],
+    truncated: false,
+    capped: false,
+    issue,
+  });
+  if (!isAbsolute(location.path) && project === undefined) {
+    return unresolved(
+      'Associate this page with a project in F7 before resolving a relative compiler path.',
+    );
+  }
+  const projectRoot = project === undefined ? cwd : allowedPath(cwd, project);
+  if (!projectRoot || !statSync(projectRoot).isDirectory()) {
+    return unresolved('The associated project is missing or excluded.');
+  }
+  const absolute = allowedPath(projectRoot, location.path);
+  if (
+    !absolute ||
+    !allowedPath(cwd, absolute) ||
+    !statSync(absolute).isFile() ||
+    statSync(absolute).size > MAX_FILE_BYTES
+  ) {
+    return unresolved(
+      'The compiler path is missing, excluded, outside the project, or too large.',
+    );
+  }
+  const path = relative(realpathSync(cwd), absolute).split(sep).join('/');
+  if (
+    ![...SOURCE_EXTENSIONS, '.js', '.mjs', '.ts', '.mts'].includes(
+      extname(path).toLowerCase(),
+    )
+  ) {
+    return unresolved('The compiler path has an unsupported source format.');
+  }
+  try {
+    const candidates = matchSource({
+      path,
+      source: readFileSync(absolute, 'utf8'),
+      selection,
+      location,
+    });
+    if (candidates.length !== 1) {
+      return unresolved(
+        'The compiler location does not match the selected tag in current local markup. Restart or refresh the development page.',
+      );
+    }
+    return { candidates, truncated: false, capped: false };
+  } catch (cause) {
+    if (cause instanceof InvalidMarkup) {
+      return unresolved(
+        'The compiler source could not be parsed; its location was not accepted.',
+      );
+    }
+    throw new Error(`Cannot verify compiler source ${path}`, { cause });
+  }
+}
+
+export function resolveProjectSelection({
+  cwd,
+  selection,
+  project,
+}: CompilerLocationInput): SourceResolution {
+  if (selection.source) {
+    return resolveCompilerLocation({ cwd, selection, project });
+  }
+  if (project === undefined) {
+    return resolveSelection(cwd, selection);
+  }
+  const workspaceRoot = realpathSync(cwd);
+  const paths = createPathPolicy(workspaceRoot);
+  const root = paths.allowedPath(project);
+  if (!root || !statSync(root).isDirectory()) {
+    return {
+      candidates: [],
+      truncated: false,
+      capped: false,
+      issue: 'The associated project is missing or excluded.',
+    };
+  }
+  const resolution = scanSource({ cwd: root, selection, paths });
+  return {
+    ...resolution,
+    candidates: resolution.candidates
+      .filter((candidate) => paths.allowedPath(join(root, candidate.path)))
+      .map((candidate) => ({
+        ...candidate,
+        path: relative(workspaceRoot, join(root, candidate.path))
+          .split(sep)
+          .join('/'),
+      })),
+  };
 }
 
 export function candidateIsCurrent(
   cwd: string,
   candidate: SourceCandidate,
 ): boolean {
-  try {
-    const absolutePath = realpathSync(join(cwd, candidate.path));
-    if (
-      projectRelativePath(cwd, absolutePath) === undefined ||
-      statSync(absolutePath).size > MAX_FILE_BYTES
-    ) {
-      return false;
+  return currentCandidates(cwd, [candidate]).length === 1;
+}
+
+// Each call owns its file versions; no validation survives into another prompt.
+export function currentCandidates(
+  cwd: string,
+  candidates: readonly SourceCandidate[],
+): readonly SourceCandidate[] {
+  let paths: VisualPathPolicy | undefined;
+  const versions = new Map<
+    string,
+    { readonly fingerprint: string; readonly lines: number } | undefined
+  >();
+  return candidates.filter((candidate) => {
+    try {
+      paths ??= createPathPolicy(cwd);
+      const absolutePath = paths.allowedPath(candidate.path);
+      if (!absolutePath) {
+        return false;
+      }
+      if (!versions.has(absolutePath)) {
+        let version:
+          | { readonly fingerprint: string; readonly lines: number }
+          | undefined;
+        if (
+          projectRelativePath(cwd, absolutePath) !== undefined &&
+          statSync(absolutePath).size <= MAX_FILE_BYTES
+        ) {
+          const source = readFileSync(absolutePath, 'utf8');
+          version = {
+            fingerprint: sourceFingerprint(source),
+            lines: source.split('\n').length,
+          };
+        }
+        versions.set(absolutePath, version);
+      }
+      const version = versions.get(absolutePath);
+      return (
+        version !== undefined &&
+        version.fingerprint === candidate.fingerprint &&
+        candidate.endLine <= version.lines
+      );
+    } catch (cause) {
+      if (isGone(cause)) {
+        return false;
+      }
+      throw new Error(`Cannot verify selected source ${candidate.path}`, {
+        cause,
+      });
     }
-    const source = readFileSync(absolutePath, 'utf8');
-    return (
-      sourceFingerprint(source) === candidate.fingerprint &&
-      candidate.endLine <= source.split('\n').length
-    );
-  } catch (cause) {
-    if (isGone(cause)) {
-      return false;
-    }
-    throw new Error(`Cannot verify selected source ${candidate.path}`, {
-      cause,
-    });
-  }
+  });
 }
 
 // A path that turned into a file on the way reports ENOTDIR, which means the

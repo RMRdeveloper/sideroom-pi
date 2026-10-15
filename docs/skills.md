@@ -18,8 +18,9 @@ does not need to name a skill for automatic selection.
 | Improve an existing codebase, redesign modules, or prepare for long-term growth | `sideroom-codebase-design` | Survey and design together, or focus directly on a chosen module. Text reports only. Review does not authorize implementation; known growth needs guide changes. |
 | Ambiguous business terms, names, statuses, or relationships | `sideroom-domain-modeling` | A few terms, including conflicts found during implementation. Mechanical symbol renames need no modeling. |
 | Derive or complete domain vocabulary across existing business code | `sideroom-domain-scaffold` | Code-first glossary work. Generic README or API documentation does not automatically need it. |
-| Any `write` or `edit` | `sideroom-guidelines` | The existing gate requires the complete skill for all targets, plus a guide for supported languages. Read-only investigation needs neither. |
+| Any `write` or `edit` | `sideroom-guidelines` | Load the complete skill and matching language guide with `sideroom_guidelines` (`path` is the target file) or full packaged `read` calls. Reuse in the same run; reload after compaction or a new run. Unsupported languages need only the general skill. Read-only investigation needs neither. |
 | Substantial explanations, reports, implementation summaries, or user-facing documentation | `sideroom-persona` | Load the complete guide through the tool or `read`, then reuse it while in context. Brief acknowledgments use the reminder. |
+| Enable, review, or troubleshoot precise browser source locations | `sideroom-visual-setup` | Reuses the setup tool; checks project choice and runtime paths, including Docker. Ordinary UI edits do not require setup. |
 
 Skills can compose: grill may load architecture for a decision and domain
 modeling for vocabulary; guidelines governs resulting edits and persona
@@ -72,11 +73,12 @@ prove improved selection or prose quality.
 | “Corrige este typo con este texto exacto.” | Guidelines for the edit; no grill or architectural interview. |
 | “Explícame los hallazgos sin tanta jerga.” | Load persona's complete guide if absent; outcome first, necessary terms explained, no repeated explanation. |
 | “Actualiza el comando de instalación del README.” | Guidelines for the edit; no domain scaffold unless glossary work was requested. |
+| “Activa el contexto visual preciso en apps/web; Vite corre en Docker.” | Visual setup: use the tool's plan, verify the runtime working directory and portable markers, bind the page to the app, and distinguish configuration from a validated browser selection. |
 | “Revisa el codebase y prioriza mejoras para crecer en tráfico y equipo.” | Codebase design: inspect real flows, separate measured limits from assumptions, and report prioritized changes and growth triggers in text. No implementation or graphic files. |
 | “Refactoriza este módulo para simplificar sus callers sin cambiar el contrato.” | Codebase design focused on the module, its callers and tests; implement within the authorized scope without a whole-repo scan or a forced interview. |
 | “Prepara este servicio para escalar, aunque no tenemos métricas todavía.” | Codebase design: identify code-level risks, label missing capacity evidence, and propose measurements before infrastructure changes. |
 
 The automated catalog test uses Pi's real loader to verify visibility, valid
-frontmatter, and automatic invocation for all seven packaged skills. The persona
+frontmatter, and automatic invocation for all eight packaged skills. The persona
 tool test checks that its result contains the entire packaged guide. These
 checks protect discovery and loading, not a model's adherence to the voice.

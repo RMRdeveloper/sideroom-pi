@@ -35,9 +35,13 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   session restoration, and the `F8` view.
 - `extensions/modified-files/session.ts` owns snapshots and widget refreshes;
   `extensions/modified-files/ui.ts` owns the compact and extended displays.
-- `extensions/guidelines/index.ts` composes the reminder, the read gate, and
-  the review steer; it appends a short write/edit reminder and resets both read
-  and review state on `session_start`.
+- `extensions/guidelines/index.ts` registers `sideroom_guidelines` and composes
+  the reminder, read gate, and review steer; it appends a short write/edit
+  reminder and resets both read and review state on `session_start`.
+- `extensions/guidelines/execute.ts` loads complete packaged documents;
+  `catalog.ts` owns their paths and shared language selection; `guard.ts`
+  accepts complete final tool deliveries or full reads and blocks missing
+  documents. The tool is `model-only`, requiring Pi 1.2.0 or later.
 - `extensions/guidelines/prompt.ts` owns the reminder text and idempotent append.
 - `extensions/guidelines/review.ts` owns the end-of-turn review steer: arms on a
   successful `write`/`edit`, fires once on `agent_before_settle`, and resets on
@@ -95,11 +99,26 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   installation identity, outside the target repository. `model.ts` owns the
   bounded DOM protocol and context text; `match.ts` owns candidate scoring and
   source locations; `source.ts` owns the bounded, ignore-aware walk and hash
-  validation; `session.ts` owns branch snapshots and one-time consumption;
-  `ui.ts` owns the compact widget and companion path.
-  `assets/visual-context/browser/` is the bundled browser companion. It adds no
-  project config, framework runtime dependency or source instrumentation.
-  Source locations are inferred candidates, never proven DOM mappings.
+  validation in operation-local batches; `session.ts` owns branch snapshots
+  and one-time consumption; `dialogs.ts` owns F7 option rendering and answer
+  decoding without changing session state; `ui.ts` owns the compact widget and
+  companion path.
+  `setup.ts` registers `sideroom_visual_setup` and prepares configuration edits;
+  `projects.ts` owns bounded child-project discovery and package-manager detection;
+  `configure.ts` owns conservative configuration patches; `compiler-config.ts`
+  owns framework and compiler package contracts and renders development-only
+  metadata integrations; `files.ts` owns the shared path and ignore policy,
+  reused only within one synchronous operation. The parent applies requested setup through
+  normal Pi read/edit/bash tools so mutation guards and checks still apply.
+  `assets/visual-context/browser/` is the bundled browser companion;
+  `destinations.js` owns destination choice without browser dependencies,
+  `background.js` owns connections and per-selection receipts, and `content.js`
+  owns capture and inspector cleanup. New browser modules must also enter the
+  explicit list in `scripts/browser-package/archive.mjs`. Basic matching
+  requires no project changes. Explicitly requested compiler setup may add a
+  development dependency and build configuration, never Sideroom state or a local
+  harness. Compiler locations are checked against local markup; inferred locations
+  remain candidates and browser metadata never proves a matching build revision.
 - `scripts/render-preview.mjs` is the entry that renders `media/preview.png`
   and `media/preview.mp4`, the gallery's `pi.image` and `pi.video`.
   `scripts/preview/` holds the pipeline: `ansi.mjs` turns SGR and OSC 8 into
@@ -127,6 +146,9 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
 - `extensions/persona/execute.ts` returns that complete packaged guide;
   `extensions/shared/skills.test.ts` checks packaged discovery with Pi's loader.
 - `docs/skills.md` owns skill selection boundaries and manual behavior checks.
+- `skills/sideroom-visual-setup/SKILL.md` owns the requested compiler-context setup
+  workflow, portable runtime paths, and browser verification. It reuses the
+  configuration plan from `sideroom_visual_setup` without duplicating compiler code.
 - `skills/sideroom-codebase-design/SKILL.md` owns codebase improvement reviews,
   module design, and incremental migration; `references/growth.md` assesses
   behavior, team, and workload growth without graphic reports.
@@ -201,6 +223,10 @@ Biome requires braces around every `if` body. Do not disable
   English. TUI chrome stays English.
 - Non-TUI calls fail with an explicit UI-not-available error.
 - The tool must not write Sideroom state into the target repository.
+- Visual compiler setup is opt-in for one explicitly selected project. Prepare
+  returns edits and installation commands without applying them; the parent agent
+  uses normal file and shell tools. Origin-to-project associations live only on
+  the Pi session branch, including when Pi runs in a parent folder.
 - No extension may make the system prompt depend on per-turn session state.
   Per-turn context travels as a session message, so the composed system prompt
   stays byte-identical while a session runs and the provider's cached prefix
@@ -221,8 +247,11 @@ Biome requires braces around every `if` body. Do not disable
 - `modified-files` tracks only successful Pi `write` and `edit` results in the
   current session. Its compact widget shows at most five paths and must
   reapply after `sideroom:todo-widget-refreshed` so it remains below the board.
-- `guidelines` injects a short reminder and blocks `write`/`edit` until exact
-  full-file reads load the packaged skill body and one complete language guide. After any successful
+- `guidelines` injects a short reminder and blocks `write`/`edit` until
+  `sideroom_guidelines` or exact full-file reads load the packaged skill body
+  and, for supported targets, the complete language guide. Only successful,
+  complete tool delivery counts; loaded documents and pending receipts reset
+  on `session_start`, `before_agent_start`, and `session_compact`. After any successful
   mutation it appends one hidden review steer on `agent_before_settle`, at most
   once per turn, asking the agent to review only changes introduced by the run against the
   loaded guide without omitting requirements or refactoring unrelated code and run the project checks. Do not add a slash command or a
@@ -232,7 +261,7 @@ Biome requires braces around every `if` body. Do not disable
   degrades a repeatedly firing block. It writes no files and reads no project
   config; the catalog ships with the package.
 - `jev` is an optional semantic review using `fetch` and the existing `ignore`
-  dependency. It asks one decision model about guide rules 3, 4, 7–14, and 17–19, plus visible test quality and
+  dependency. It asks one decision model about guide rules 3, 4, 7–14, and 17–20, plus visible test quality and
   consumer compatibility when supported by visible evidence, and emits each finding on
   `sideroom:review-note` for the guidelines review to carry in its end-of-run
   steer, never on the tool result. It never blocks or reaches the system prompt,
@@ -269,7 +298,8 @@ Biome requires braces around every `if` body. Do not disable
   when the outcome is not `completed`, any message is pending, or an earlier
   handler already requested continuation; leave postponed state armed, keep the
   entries earlier handlers proposed, and reset turn state only on `input` that
-  arrives while the agent is idle. This needs Pi 0.87.0 or later.
+  arrives while the agent is idle. The package requires Pi 1.2.0 or later,
+  including `model-only` tool exposure for guidelines.
 - `sideroom_done` steers only at `agent_before_settle` after pending review,
   never at `turn_end`; it never blocks, and does nothing when no check command
   is detected. It clears green after any later successful mutation, asks once

@@ -37,6 +37,7 @@ function register(...extensions: readonly Register[]): Harness {
     on(name: string, handler: EventHandler) {
       handlers.set(name, [...(handlers.get(name) ?? []), handler]);
     },
+    registerTool() {},
     getActiveTools: () => ['read', 'edit', 'write'],
     events: {
       on: (name: string, handler: (payload: unknown) => void) =>

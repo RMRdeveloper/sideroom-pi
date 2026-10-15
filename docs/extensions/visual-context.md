@@ -1,8 +1,9 @@
 # Browser context
 
 Select a page element in your browser and carry local source candidates into your next
-Pi prompt. No project plugin, source attributes, development-server changes or
-project configuration are needed. The browser companion ships in
+Pi prompt. Basic inferred matching needs no project configuration. Optional
+development compiler metadata provides locations checked against the local source.
+The browser companion ships in
 `assets/visual-context/browser/` with the Pi package.
 
 ## Download without a store
@@ -83,6 +84,79 @@ browser pages and other pages that prohibit injection cannot be selected.
 
 ## Source accuracy
 
+### Development compiler setup
+
+Ask Pi to enable precise visual context for a specific project. The packaged
+[`sideroom-visual-setup` skill](../../skills/sideroom-visual-setup/SKILL.md) owns the
+setup workflow and runtime-path checks, including Docker. Pi can run in
+the project itself or in a parent folder holding several projects. The
+`sideroom_visual_setup` tool has three actions:
+
+- `discover`: list projects up to three child-folder levels deep, respecting
+  ignore files, symlinks, generated folders and a 4,096-entry / 64-project budget.
+  Discovery reports limits and per-project failures instead of configuring anything.
+- `prepare`, with `project`: return a configuration edit, pinned development
+  dependency installation command and available check scripts for that project.
+  The parent agent reads the guides, applies the edit with Pi's normal file tools,
+  installs using the detected package manager, and runs the project's checks.
+- `bind`, with `project` and `page`: associate that page origin with a project
+  on the active Pi session branch and resolve its pending elements again. F7 also
+  offers **Associate this page with a project** when reviewing an element.
+
+For example, from a folder containing `shop/` and `admin/`, ask Pi to configure
+`shop/`. Only that project's configuration and development dependency change.
+An origin association applies to all routes on that origin; apps sharing an
+origin need separate origins or an explicit reassociation. Another port has a
+different origin. Associations survive compaction and restore only from the
+active branch; they are never written into project files or the system prompt.
+
+Automatic patches support static Vite, Astro, Nuxt, Webpack and Rspack configs,
+plus Next.js 16+ configs without existing custom bundler hooks. Existing settings
+are preserved. Custom exports, multiple exports, executable configuration
+mutations, spreads, computed keys and existing inspector integrations need a
+targeted edit by the parent agent; prepare leaves
+them unchanged and explains the limitation. Missing build configs also need a
+normal agent edit before prepare can proceed. Workspace package managers are
+inherited from ancestor workspace manifests or pnpm workspace files when the
+child does not declare its own manager or lockfile.
+
+The generated integration uses the Code Inspector compiler package, not its
+browser UI: Vite uses `@code-inspector/core`, Webpack/Rspack and Next use the
+metadata loader in `@code-inspector/webpack`. Both are pinned to 2.0.9 in the
+installation plan. The metadata hook runs before framework transforms and only
+in development; it adds no extra browser client, editor-launch service or Pi
+wrapper. This avoids source-position shifts caused by injecting a second UI
+before instrumenting markup. Vite skips component-wrapper markers so their
+props cannot replace native-element locations. No source maps or framework
+runtime internals are required for this mode.
+
+Restart the development server after applying setup. Upgrade/reload both Pi and
+the browser companion, then refresh already inspected pages: protocol version 3
+carries the additional location fields. Old companions must be reloaded; the
+persistent pairing address is retained.
+
+The companion reads only the selected node's `data-insp-path`, never a parent
+marker. Absolute paths identify files beneath the Pi working folder, including
+children; relative paths require a page association. Paths from another machine
+or container need a matching local project/path arrangement and remain unresolved
+until it exists. Pi checks exclusions, project boundaries, format, line, column
+and native tag against parsed local markup. A single validated compiler location
+is selected automatically and labelled **compiler location checked**. Its context
+includes the column and source range. Missing, excluded or mismatched metadata
+produces an explicit unresolved reason, without quietly substituting a weaker
+candidate. A selection with no marker still uses inferred matching, scoped to the
+associated project when there is one.
+
+A compiler marker identifies a declaration, not every instance or component use
+site. Component wrappers, forwarded markers, generated nodes and unsupported
+markup can remain unresolved. The page is untrusted and a matching local tag is
+not proof that its running build matches the local revision. The captured source
+hash prevents attaching a reference after subsequent local edits. Verification
+requires an actual selection with a locally validated marker; dependency
+installation alone is not a verified setup.
+
+### Inferred matching
+
 The browser knows the rendered element; it does not generally know the file
 that generated it. With no application instrumentation, this extension searches
 the local source for matching static classes, ids and text. Classes are counted
@@ -97,7 +171,7 @@ file blocks are excluded when a template is present. Hidden, editable and form
 text is excluded, HTML entities are decoded, and a text prefix at the companion's
 160-character capture limit is weaker evidence than full static text.
 
-Every returned range exists in the source version inspected. The relationship
+Every inferred range exists in the source version inspected. The relationship
 between that range and the rendered element remains **inferred**, even after
 you choose a candidate. It is never labelled exact. Repeated markup stays
 ambiguous, and a tag name alone is insufficient evidence. Dynamic classes,
@@ -112,6 +186,7 @@ frontmatter are not markup candidates. Component wrappers do not establish
 which native DOM node a component renders. These are compiler dependencies in
 Sideroom, not plugins or runtime dependencies added to the inspected app.
 No framework runtime internals are read, and inspected code is never executed.
+Compiler locations additionally support JSX in `.js`, `.mjs`, `.ts` and `.mts`.
 
 Ranges are checked against the original source. Astro's byte positions are
 converted to string positions, including Unicode before the element. When its
@@ -175,8 +250,13 @@ The first authorization starts from `F7`; later trusted interactive sessions
 join automatically. The bridge accepts extension origins for browser clients
 and an authenticated internal Pi origin for destination registration. It
 authenticates before processing a selection, limits incoming frames to 8 KiB
-and limits selection frequency.
-The browser provides DOM descriptions, never arbitrary file paths or ranges.
+and limits selection frequency. The companion checks the complete outgoing
+UTF-8 frame before creating a receipt or sending it. Oversized captures receive
+a local error without closing the connection. Identified replies settle only
+the matching selection on the matching installation; ID-less errors retain the
+installation-wide handling used by older brokers.
+The browser provides bounded DOM descriptions and optional untrusted compiler
+coordinates; no browser path authorizes a file read outside the allowed project.
 Unknown origins, wrong credentials and invalid payloads are rejected.
 
 ## State and lifecycle
@@ -194,7 +274,10 @@ shared between Pi instances.
 
 Before attaching context or accepting a chosen candidate, source hashes and
 project boundaries are checked again. Changed, removed or moved-outside-project
-files lose their source reference. A pending selection is a description of the
+files lose their source reference. Each restore or attachment reads and hashes
+each distinct referenced file once, preserving candidate identity and order.
+These versions are discarded after the operation; the next operation checks
+the filesystem again. A pending selection is a description of the
 page at click time; it does not assert that the live DOM is still unchanged.
 
 The next idle interactive prompt receives the context through Pi's `input`
@@ -211,8 +294,14 @@ search respects ignore files, excludes hidden and sensitive-named files,
 symlinks and generated/dependency directories, and reads at most 4,096 entries,
 16 directory levels, 256 KiB per file and 8 MiB of source. A search cut short
 by a limit or an omitted unparseable file is labelled truncated, and a candidate
-list shortened by the eight-candidate cap is labelled capped. Nothing is written into the inspected
-repository.
+list shortened by the eight-candidate cap is labelled capped. The search retains
+only the eight best candidates while walking, with the same score, path and
+line ordering. Ignore rules are shared within each synchronous search, not
+between searches, and path metadata is still checked against symlink changes.
+Selection and
+association write only Pi session entries. Explicit compiler setup changes only
+the selected project's build configuration and development dependencies through
+normal parent-agent tools.
 
 The first version selects the main document and exposed DOM elements. It does
 not claim selection inside cross-origin iframes, closed shadow roots or canvas.
@@ -225,7 +314,8 @@ smoke test in addition to automated Linux Chromium checks.
 
 | File | Responsibility |
 | --- | --- |
-| `extensions/visual-context/index.ts` | Pi events, `F7` controls and lifecycle cleanup. |
+| `extensions/visual-context/index.ts` | Pi events, `F7` action coordination, session-generation checks and cleanup. |
+| `dialogs.ts` | F7 menus and answer decoding without changing session state. |
 | `model.ts` | Bounded DOM contract, pending selections and context formatting. |
 | `bridge.ts` | Pi registration, destination revisions and automatic broker takeover. |
 | `broker.ts` | Authenticated local routing between browser clients and Pi processes. |
@@ -235,15 +325,30 @@ smoke test in addition to automated Linux Chromium checks.
 | `markup.ts` | Shared static-element representation, text and range verification. |
 | `parse-*.ts` | HTML, JSX/TSX, Vue, Svelte and Astro syntax extraction. |
 | `literal.ts` | Literal string extraction without evaluating inspected code. |
-| `source.ts` | Bounded, ignore-aware walk and stale-reference checks. |
+| `source.ts` | Bounded candidate ranking, compiler resolution and batched stale-reference checks. |
+| `files.ts` | Shared exclusions, directory-relative ignore rules and operation-local safe path policies. |
+| `projects.ts` | Bounded child-project discovery and package managers. |
+| `configure.ts` | Conservative AST-based configuration patches. |
+| `compiler-config.ts` | Framework and compiler package contracts, development-only hooks and loaders. |
+| `setup.ts` | Setup tool and configuration/installation plans. |
 | `session.ts` | Branch snapshots, reception and one-time context consumption. |
 | `ui.ts` | Compact widget and companion installation location. |
-| `assets/visual-context/browser/` | Packaged browser companion, popup and inspector. |
+| `assets/visual-context/browser/background.js` | Browser connections, authorizations and per-selection receipts. |
+| `assets/visual-context/browser/destinations.js` | Explicit and automatic destination choice, independent of browser APIs. |
+| `assets/visual-context/browser/content.js` | DOM capture, highlighting and inspector cleanup. |
 
 `match.test.ts` covers each dialect's real markup, literal attributes, script
 and comment decoys, entities, Unicode, original ranges, dynamic expressions,
 component wrappers, class deduplication, id conflicts, ordered ancestors,
 truncated text and partial results after parse failures.
+
+`source-policy.test.ts` checks nested ignore precedence, symlink replacement,
+ranking equivalence, fresh operations and one file read for forty pending
+candidate references. `dialogs.test.ts` checks menus, cancellation and unchanged
+session state; `destinations.test.ts` checks explicit and automatic choices,
+destination revisions and independent instances. Worker tests check individual
+receipt errors, wrong-installation replies, UTF-8 frame limits and recovery after
+failed sends. F7 integration tests retain stale-session and stale-source guards.
 
 `node:test` covers real socket authentication and rejection, multiline source
 locations, ignored files, symlinks, ambiguity, source changes, branch snapshots,
@@ -256,7 +361,18 @@ cover keyboard activation and cancellation, rapid repeated shortcuts, multiple
 selections, per-tab indicators, missing or ambiguous destinations, paused
 connections, unsupported pages, injection failures and navigation cleanup.
 `extensions/shared/prompt-cache.test.ts` includes this extension in its
-combined system-prompt checks. Browser verification used a local Vue
+combined system-prompt checks. `metadata.test.ts`, `setup.test.ts` and inspector
+tests cover original coordinates, sibling projects, origin association, restore,
+stale references, invalid metadata, setup trust, configuration preservation and
+development-only behavior. Compiler verification also exercised the generated
+Vite config against the real Code Inspector compiler package and checked original
+React/JSX, Vue, Svelte and Astro positions. The compiler-mode Chromium
+smoke test loaded generated configs for React, Vue and Astro child projects,
+selected reused buttons with the actual companion inspector, verified their
+original declaration coordinates and project paths, checked click suppression
+and Escape cleanup, and confirmed that a React production build contains no
+compiler markers. These temporary smoke fixtures live outside the repository.
+The earlier inferred-mode verification used a local Vue
 development server without changing its configuration. The Linux Chromium
 smoke test loads a temporary copy of the companion with a localhost-only host
 grant to simulate the toolbar's `activeTab` grant in headless automation; that

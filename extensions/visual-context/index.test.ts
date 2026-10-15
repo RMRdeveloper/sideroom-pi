@@ -35,11 +35,14 @@ function createHarness(root: string) {
   const widgets = new Map<string, unknown>();
   let shortcut: ((ctx: ExtensionContext) => Promise<void>) | undefined;
   let pairingAddress = '';
-  let choice: (options: readonly string[]) => string | undefined = (options) =>
+  let choice: (
+    options: readonly string[],
+  ) => string | undefined | Promise<string | undefined> = (options) =>
     options[0];
   let idle = true;
   let trusted = true;
   const api = {
+    registerTool: () => {},
     on: (event: string, handler: Handler) => handlers.set(event, handler),
     appendEntry: (customType: string, payload: unknown) =>
       snapshots.push({ type: 'custom', customType, data: payload }),
@@ -282,6 +285,57 @@ test('failed prompt startup keeps attachments pending, and new clicks are not co
     text: 'Next request',
   }) as { text: string };
   assert.match(next.text, /Browser elements/u);
+});
+
+test('F7 ignores source choices from another session and preserves pending elements on cancellation or stale source', async (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'sideroom-visual-dialog-'));
+  const harness = createHarness(root);
+  t.after(async () => {
+    await harness.dispatch('session_shutdown');
+    rmSync(root, { recursive: true, force: true });
+  });
+  const file = join(root, 'Save.html');
+  writeFileSync(file, '<button class="account-save">Save profile</button>');
+  receiveSelection({
+    store: createVisualStore(),
+    pi: harness.api,
+    cwd: root,
+    selection,
+  });
+  await harness.dispatch('session_start');
+  const answer = Promise.withResolvers<string | undefined>();
+  const opened = Promise.withResolvers<string>();
+  harness.choose((options) => {
+    const review = options.find((option) => option.startsWith('Review '));
+    if (review) {
+      return review;
+    }
+    opened.resolve(options[0] ?? '');
+    return answer.promise;
+  });
+  const review = harness.shortcut();
+  const label = await opened.promise;
+  await harness.dispatch('session_tree');
+  const count = harness.snapshots.length;
+  answer.resolve(label);
+  await review;
+  assert.equal(harness.snapshots.length, count);
+  harness.choose((options) =>
+    options.find((option) => option.startsWith('Review ')),
+  );
+  await harness.shortcut();
+  assert.equal(harness.snapshots.length, count);
+  harness.choose((options) => {
+    const entry = options.find((option) => option.startsWith('Review '));
+    if (entry) {
+      return entry;
+    }
+    writeFileSync(file, '<button>Changed</button>');
+    return options[0];
+  });
+  await harness.shortcut();
+  assert.equal(harness.snapshots.length, count);
+  assert.match(harness.notices.at(-1) ?? '', /source changed/u);
 });
 
 test('keeps the browser connected across tree navigation and joins again on Pi restart without another pairing dialog', async (t) => {

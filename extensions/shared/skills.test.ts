@@ -19,6 +19,7 @@ test('Pi discovers all packaged skills with automatic invocation enabled', () =>
     'sideroom-grill',
     'sideroom-guidelines',
     'sideroom-persona',
+    'sideroom-visual-setup',
   ]);
   const prompt = formatSkillsForPrompt(skills);
   for (const skill of skills) {

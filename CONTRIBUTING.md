@@ -25,9 +25,9 @@ in Pi.
 - npm and Git.
 - A Pi installation to test against (`pi --version`). Pi and `pi-tui` are
   peer dependencies and devDependencies here; `typebox` is a peer dependency.
-- Pi 0.87.0 or later to develop against. The end-of-run steers build on
-  `agent_before_settle`, which ships in that release, and the devDependencies
-  track 0.87.1.
+- Pi 1.2.0 or later. The guidelines tool uses `model-only` exposure so its
+  documents reach the agent directly, never a nested caller that could discard
+  them. The devDependencies track 1.2.0.
 
 ## Setup
 
@@ -104,6 +104,9 @@ These are not style preferences; a change that breaks one is rejected.
 
 - The tools never write Sideroom state into the repository they run in. Board
   and edited-file history live in the Pi session branch.
+- Explicit visual compiler setup may add a development dependency and edit the
+  selected project's build configuration through the parent agent's normal tools.
+  The setup tool prepares those edits; it does not apply them or create harness files.
 - No slash commands, no standalone CLI, no subprocess wrapper around Pi, no
   project-local harness files. A tool is an extension, and Pi discovers it from
   `extensions/*/index.ts`.
@@ -118,7 +121,8 @@ These are not style preferences; a change that breaks one is rejected.
 - `modified-files` tracks only successful `write`/`edit` results and reapplies
   its widget after `sideroom:todo-widget-refreshed` so it stays below the board.
 - `guidelines` injects a short reminder and blocks mutation until the packaged
-  skill and the matching language guide were read in full.
+  skill and matching language guide are loaded in full through
+  `sideroom_guidelines` or full packaged `read` calls.
 - `sideroom_rules` checks only the lines a mutation adds, and a repeatedly
   firing block degrades to a warning instead of dead-locking the agent.
 - `sideroom_done` steers, never blocks, and stays silent when it cannot detect a
@@ -231,9 +235,13 @@ trapping the agent.
 
 ## Adding a rule or a language guide
 
-- Mechanical rules live in `assets/artifacts/GUIDELINES_TEMPLATE.md`. A new rule
-  needs a detector in `extensions/rules/checks.ts`, a severity in
-  `extensions/rules/catalog.ts`, and a test proving both the hit and the miss.
+- All canonical rules live in `assets/artifacts/GUIDELINES_TEMPLATE.md`. Mirror
+  each addition in every complete language guide and the skill's Do/Don't table.
+  Update the end-of-run review, applicable Jev questions and consistency tests.
+- A mechanical rule also needs a detector in `extensions/rules/checks.ts`, a
+  severity in `extensions/rules/catalog.ts`, and tests proving the hit and miss.
+  Semantic criteria stay in review guidance. Rule 20, Decomposition by intent,
+  is structural but has no line-count limit, mechanical detector or length block.
 - A new language guide goes to
   `skills/sideroom-guidelines/references/languages/<language>.md` and must mirror
   every rule in the canonical seed with idiomatic examples. Register the

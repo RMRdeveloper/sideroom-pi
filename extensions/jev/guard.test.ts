@@ -190,6 +190,35 @@ test('hands a finding to the review instead of the tool result', async () => {
   });
 });
 
+test('carries decomposition findings in the existing single advisory request', async () => {
+  await withHarness(async (harness) => {
+    const source = [
+      'function createPackingSlip(items, destination) {',
+      '  let unitCount = 0;',
+      '  let weightGrams = 0;',
+      '  for (const item of items) {',
+      '    unitCount += item.quantity;',
+      '    weightGrams += item.quantity * item.unitWeightGrams;',
+      '  }',
+      '  return { destination, totals: { unitCount, weightGrams } };',
+      '}',
+    ].join('\n');
+    harness.transport = async (request) => {
+      assert.match(request.body, /"decomposition-by-intent":\{"type":"noul"/);
+      return {
+        status: 200,
+        text: '{"answers":{"decomposition-by-intent":{"noul":0.93}}}',
+      };
+    };
+    assert.equal(await writeFile(harness, { content: source }), undefined);
+    assert.equal(harness.requests.length, 1);
+    assert.equal(harness.guardState.calls, 1);
+    assert.equal(harness.notes.length, 1);
+    assert.match(harness.notes[0] ?? '', /\[decomposition-by-intent\]/);
+    assert.deepEqual(harness.statuses, [JEV_STATUS.ready]);
+  });
+});
+
 test('hands nothing over when every answer stays under the cutoff', async () => {
   await withHarness(async (harness) => {
     harness.transport = answering(0.2);

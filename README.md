@@ -91,7 +91,7 @@ wall of tool calls, it:
   each agent run, the agent must read the shared contract and the one complete
   guide matching the target language. Premature `write`/`edit` calls are
   blocked. The guides cover guard clauses, braced conditionals, fail-fast
-  errors, focused units, and all 19 canonical rules without dumping them into
+  errors, focused units, and all 20 canonical rules without dumping them into
   the system prompt.
 - **Finds the skills below the working directory.** In a trusted monorepo, Pi
   normally ignores project skills stored under child folders. Sideroom scans
@@ -149,8 +149,11 @@ a destination if several Pi sessions are open. Press `Alt+Shift+S` to select
 several elements without opening the popup; Escape or the shortcut exits.
 Review their local source candidates in Pi and send your
 instruction. The click prepares context; it never starts the agent. No project
-configuration or framework plugin is needed. Source ranges are real, but the
-DOM-to-source relationship is inferred and stays labelled as a candidate.
+configuration or framework plugin is needed for inferred source candidates.
+For more precise locations, ask Pi to enable visual compiler context in one
+project. It prepares the development dependency and configuration, including
+projects below your working folder. Compiler locations are checked against local
+markup; missing or mismatched locations stay unresolved.
 Download [the companion ZIP](https://github.com/RMRdeveloper/sideroom-pi/releases/latest/download/sideroom-browser-extension.zip)
 from GitHub Releases, extract it, and load its folder in your browser's developer mode.
 No extension store is required; installation and updates are manual. The same
@@ -190,15 +193,21 @@ scope and preserves behavior and compatibility. See
 ### Guidelines — a gate, not a novel
 
 A short system-prompt contract points at the packaged
-`sideroom-guidelines` skill. Before `write` or `edit`, a guard requires a
-full read of the packaged skill and, for supported targets, the one complete
-language guide under `skills/sideroom-guidelines/references/languages/`.
-Each guide mirrors all 19 rules in the canonical seed with idiomatic examples.
+`sideroom-guidelines` skill. Before `write` or `edit`, call
+`sideroom_guidelines` with the target file's `path` to load the complete skill
+and matching language guide from the packaged catalog. Unsupported languages
+load only the general skill. Full `read` calls of the packaged documents also
+satisfy the same guard; failed or incomplete loads do not. Reuse loaded guides
+in the same run and reload after compaction or a new run. Requires Pi and
+pi-tui 1.2.0 or later; call the tool directly, not through another tool.
+Each guide mirrors all 20 rules in the canonical seed with idiomatic examples.
 The seed, `assets/artifacts/GUIDELINES_TEMPLATE.md`, is never pasted into the
 system prompt. After any successful mutation, one hidden review steer fires when
 the turn settles and asks the agent to re-check every changed file against the
 loaded guide and run the relevant formatter, linter, type checks, and tests —
-so the contract is applied, not just read.
+so the contract is applied, not just read. Rule 20, Decomposition by intent,
+asks for coherent named operations that clarify the caller's flow, even with
+one caller. It keeps tightly coupled steps together and imposes no line limit.
 
 ### Monorepo skills — child skills are still project skills
 
@@ -231,7 +240,8 @@ to TypeSafe's decision model about the changed file and, when available, up to
 four directly related source files. It checks guard clauses, fail fast,
 command/query separation, null handling, immutability, repeated validation,
 responsibility, dependency direction, comments, testability, redundant
-abstractions, consumer compatibility and test quality only when the supplied
+abstractions, decomposition by intent, consumer compatibility and test quality
+only when the supplied
 files support the question. An answer above the cutoff travels with the
 end-of-run guidelines review instead of interrupting each edit. READMEs, JSON,
 lockfiles, deletion-only edits, and files outside the project are never sent.

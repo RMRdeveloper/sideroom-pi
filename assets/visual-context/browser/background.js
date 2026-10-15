@@ -1,10 +1,14 @@
-const PROTOCOL_VERSION = 2;
+importScripts('destinations.js');
+
+const PROTOCOL_VERSION = 3;
 const BRIDGE_PATH = '/sideroom-visual-context';
 const HEARTBEAT_MS = 20_000;
 const RESPONSE_TIMEOUT_MS = 10_000;
 const RETRY_MS = 2_000;
 const RETRY_ALARM = 'sideroom-reconnect';
 const MAX_INSTALLATIONS = 4;
+const MAX_PENDING_RECEIPTS = 8;
+const MAX_MESSAGE_BYTES = 8_192;
 const INSPECTOR_COMMAND = 'toggle-inspector';
 const IDLE_TITLE = 'Select an element for Pi';
 const ACTIVE_TITLE =
@@ -25,10 +29,7 @@ const activeTabs = new Map();
 const receipts = new Map();
 const connections = new Map();
 let paused = false;
-let sessions = [];
-let selected;
-let preferredId;
-let automaticSelection = false;
+const destinations = createDestinations();
 let lastAddress = '';
 let lastNotice = 'Pair once with each Pi installation to select elements.';
 const isConnected = () =>
@@ -75,6 +76,25 @@ async function sendToTab(tabId, message) {
   }
 }
 
+function encodeSelectionFrame(selection, target) {
+  const frame = JSON.stringify({ type: MESSAGE.selection, selection, target });
+  if (new TextEncoder().encode(frame).byteLength > MAX_MESSAGE_BYTES) {
+    throw new Error(
+      'The selected element exceeds the message limit. Select a smaller element.',
+    );
+  }
+  return frame;
+}
+
+async function notifyReceipt({ endpoint, selectionId, notice }) {
+  const receipt = receipts.get(selectionId);
+  if (!receipt || receipt.endpoint !== endpoint) {
+    return;
+  }
+  receipts.delete(selectionId);
+  await sendToTab(receipt.tabId, { action: 'receipt', message: notice });
+}
+
 async function showInspectorIndicator(tabId, { text, title }) {
   await chrome.action.setBadgeBackgroundColor({ tabId, color: '#ffb340' });
   await chrome.action.setBadgeText({ tabId, text });
@@ -97,13 +117,13 @@ async function stopInspectors() {
 }
 
 async function startInspector(tab) {
-  if (!selected || !isConnected()) {
+  const target = destinations.current();
+  if (!target || !isConnected()) {
     throw new Error('Choose an available Pi session first.');
   }
   if (!tab?.id || !/^https?:\/\//u.test(tab.url ?? '')) {
     throw new Error('Open the web page you want to inspect.');
   }
-  const target = selected;
   await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     files: ['content.js'],
@@ -112,7 +132,7 @@ async function startInspector(tab) {
   const shortcut = commands.find(
     (command) => command.name === INSPECTOR_COMMAND,
   )?.shortcut;
-  if (selected !== target) {
+  if (destinations.current() !== target) {
     throw new Error('The destination changed. Start the inspector again.');
   }
   activeTabs.set(tab.id, target);
@@ -144,19 +164,9 @@ async function toggleInspector(commandTab) {
 }
 
 function updateSessions(available) {
-  const previous = selected;
-  sessions = available;
-  selected = sessions.find(
-    (session) => session.id === (preferredId ?? previous?.id),
-  );
-  if (automaticSelection && sessions.length > 1) {
-    selected = undefined;
-    automaticSelection = false;
-  }
-  if (!selected && !preferredId && sessions.length === 1) {
-    selected = sessions[0];
-    automaticSelection = true;
-  }
+  const previous = destinations.current();
+  destinations.update(available);
+  const selected = destinations.current();
   if (
     previous?.id !== selected?.id ||
     previous?.revision !== selected?.revision
@@ -167,7 +177,7 @@ function updateSessions(available) {
   }
   lastNotice = selected
     ? `Connected to ${selected.name}.`
-    : sessions.length
+    : destinations.all().length
       ? 'Choose which Pi session receives your selections.'
       : WAITING_NOTICE;
 }
@@ -188,9 +198,7 @@ async function disconnect() {
   for (const entry of connections.values()) {
     closeConnection(entry);
   }
-  sessions = [];
-  selected = undefined;
-  preferredId = undefined;
+  destinations.clear();
   await stopInspectors();
 }
 
@@ -260,25 +268,29 @@ async function openConnection(entry) {
         }
         if (message.type === MESSAGE.received) {
           lastNotice = `${String(message.candidates)} source candidates. Review in Pi (F7).`;
-          const receipt = receipts.get(message.id);
-          receipts.delete(message.id);
-          if (receipt?.endpoint === entry.endpoint) {
-            await sendToTab(receipt.tabId, {
-              action: 'receipt',
-              message: lastNotice,
-            });
-          }
+          await notifyReceipt({
+            endpoint: entry.endpoint,
+            selectionId: message.id,
+            notice: lastNotice,
+          });
         }
         if (message.type === MESSAGE.error) {
           lastNotice = message.message;
-          for (const [selectionId, receipt] of receipts) {
-            if (receipt.endpoint === entry.endpoint) {
-              receipts.delete(selectionId);
-              await sendToTab(receipt.tabId, {
-                action: 'receipt',
-                message: lastNotice,
-              });
-            }
+          if (typeof message.id === 'string') {
+            await notifyReceipt({
+              endpoint: entry.endpoint,
+              selectionId: message.id,
+              notice: lastNotice,
+            });
+            return;
+          }
+          // Older brokers and connection failures can only identify the installation.
+          for (const selectionId of [...receipts.keys()]) {
+            await notifyReceipt({
+              endpoint: entry.endpoint,
+              selectionId,
+              notice: lastNotice,
+            });
           }
         }
       } catch (cause) {
@@ -331,7 +343,7 @@ async function reconnect(entry) {
   if (!entry.attempt) {
     entry.attempt = openConnection(entry)
       .catch((cause) => {
-        if (!selected) {
+        if (!destinations.current()) {
           lastNotice = cause.message;
         }
         scheduleReconnect(entry);
@@ -412,6 +424,7 @@ async function handleMessage(message, sender) {
     if (message.action !== 'selection' || !target || !isConnected()) {
       throw new Error('Connect to Pi and start the inspector first.');
     }
+    const selected = destinations.current();
     if (target.id !== selected?.id || target.revision !== selected?.revision) {
       throw new Error('The destination changed. Start the inspector again.');
     }
@@ -426,7 +439,7 @@ async function handleMessage(message, sender) {
     if (!entry || entry.socket?.readyState !== WebSocket.OPEN) {
       throw new Error('The destination is no longer available.');
     }
-    if (receipts.size >= 8) {
+    if (receipts.size >= MAX_PENDING_RECEIPTS) {
       throw new Error('Pi is still processing selections. Try again shortly.');
     }
     const page = parseUrl(
@@ -437,13 +450,17 @@ async function handleMessage(message, sender) {
       ...message.selection,
       page: `${page.origin}${page.pathname}`,
     };
+    const frame = encodeSelectionFrame(selection, target);
     receipts.set(selection.id, {
       tabId: sender.tab.id,
       endpoint: entry.endpoint,
     });
-    entry.socket.send(
-      JSON.stringify({ type: MESSAGE.selection, selection, target }),
-    );
+    try {
+      entry.socket.send(frame);
+    } catch (cause) {
+      receipts.delete(selection.id);
+      throw new Error('Cannot send the selected element to Pi.', { cause });
+    }
     return { ok: true };
   }
   if (message.action === 'status') {
@@ -455,8 +472,8 @@ async function handleMessage(message, sender) {
       connected: isConnected(),
       notice: lastNotice,
       address: lastAddress,
-      sessions,
-      selectedId: selected?.id ?? '',
+      sessions: destinations.all(),
+      selectedId: destinations.current()?.id ?? '',
       paused,
       installations: connections.size,
     };
@@ -482,8 +499,8 @@ async function handleMessage(message, sender) {
       ok: true,
       connected: isConnected(),
       notice: lastNotice,
-      sessions,
-      selectedId: selected?.id ?? '',
+      sessions: destinations.all(),
+      selectedId: destinations.current()?.id ?? '',
       address: lastAddress,
     };
   }
@@ -510,21 +527,16 @@ async function handleMessage(message, sender) {
     };
   }
   if (message.action === 'choose') {
-    const destination = sessions.find((session) => session.id === message.id);
-    if (!destination) {
-      throw new Error('That Pi session is no longer available.');
-    }
+    destinations.choose(message.id);
+    const destination = destinations.current();
     await stopInspectors();
-    selected = destination;
-    preferredId = destination.id;
-    automaticSelection = false;
-    lastNotice = `Connected to ${selected.name}.`;
+    lastNotice = `Connected to ${destination.name}.`;
     return {
       ok: true,
       connected: isConnected(),
       notice: lastNotice,
-      sessions,
-      selectedId: selected.id,
+      sessions: destinations.all(),
+      selectedId: destination.id,
     };
   }
   if (message.action === 'inspect') {
