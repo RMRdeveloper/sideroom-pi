@@ -1,5 +1,26 @@
 # Changelog
 
+## 9.0.0
+
+### Major Changes
+
+- a14c005: Add sideroom_guidelines to load the complete packaged coding skill and the target file's language guide in one call. Successful complete results satisfy the existing edit gate alongside full read calls; errors, incomplete results, and stale loads after reset do not. Keep guides out of the system prompt and reuse loaded documents within the active run.
+  
+  Require Pi and pi-tui 1.2.0 or later. The tool is model-only: call it directly so the guides reach the agent instead of a nested caller. Validate delivery after all tool-result handlers finish, so later redaction or errors cannot open the edit gate.
+
+### Minor Changes
+
+- a14c005: Add rule 20, Decomposition by intent, to the canonical guidelines, every language guide and the end-of-run review. The optional Jev review checks the criterion when visible bodies support it, within its existing request and evidence limits. Examples show useful extraction with one caller; no line limit or mechanical length block is added.
+- a14c005: Add opt-in development compiler locations to visual context, with local markup validation, setup plans for selected child projects, and page-to-project associations stored in the Pi session. Reload Pi and the browser companion together for visual protocol version 3; existing pairing addresses remain valid. The companion ZIP is version 1.2.0 and stays a manual install: replace the files in the same folder and reload the extension.
+  
+  Include the sideroom-visual-setup skill to guide configuration and verification, including projects whose development server runs in Docker.
+
+### Patch Changes
+
+- a14c005: Reduce repeated filesystem work in visual context by sharing exclusion rules within each source search and validating each referenced file once per restoration or attachment. Keep candidate ranking bounded to the best eight matches while preserving ordering, search-limit notices, and fresh validation between operations.
+  
+  Separate F7 menus from session changes and browser destination choice from connection handling. Correct nested directory exclusions, retain individual selection receipts across unrelated errors, and reject oversized UTF-8 frames before sending. Keep compiler contracts independent of project discovery and reject configuration mutations or multiple exports that could overwrite an automatic integration.
+
 ## 8.14.0
 
 ### Minor Changes
