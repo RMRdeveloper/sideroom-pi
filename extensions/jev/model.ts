@@ -187,6 +187,19 @@ export const JEV_RULES: readonly JevRule[] = [
     },
   },
   {
+    id: 'decomposition-by-intent',
+    question: {
+      type: NOUL_TYPE,
+      instructions:
+        'In `change.addedLines`, does the changed function obscure orchestration with a coherent implementation operation that a named function with a clear contract would make understandable without reading its implementation, or does a new split make tightly coupled steps harder to understand? Require the operation and its surrounding orchestration or helper caller to be visible in `file.body` or `context.files`; do not infer unseen bodies. One caller is sufficient for a useful extraction. Never flag function length alone or require a split that introduces shared mutable state, excessive parameters, or functions that must be read together.',
+      criteria: {
+        true: 'Visible bodies show added implementation details obscuring the caller flow, with a coherent extractable operation and a clear independent contract, or a new split demonstrably harms comprehension by separating tightly coupled steps',
+        false:
+          'Names and contracts already convey the flow, coupled steps belong together, length is the only signal, or evidence is insufficient',
+      },
+    },
+  },
+  {
     id: 'unnecessary-abstraction',
     question: {
       type: NOUL_TYPE,

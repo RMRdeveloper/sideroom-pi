@@ -4,6 +4,7 @@ import {
   candidateLabel,
   elementLabel,
   type PendingSelection,
+  SOURCE_METHOD,
   VISUAL_WIDGET,
 } from './model.ts';
 
@@ -13,7 +14,10 @@ export const BROWSER_EXTENSION_DIRECTORY = fileURLToPath(
 
 function pendingLabel({ resolution, chosen }: PendingSelection): string {
   if (chosen) {
-    return `${candidateLabel(chosen)} (selected candidate)`;
+    return `${candidateLabel(chosen)}${chosen.startColumn ? `:${String(chosen.startColumn)}` : ''} (${chosen.method === SOURCE_METHOD.compiler ? 'compiler location checked' : 'selected candidate'})`;
+  }
+  if (resolution.issue) {
+    return resolution.issue;
   }
   const truncated = resolution.truncated ? ' · search truncated' : '';
   const capped = resolution.capped ? ' · more candidates' : '';

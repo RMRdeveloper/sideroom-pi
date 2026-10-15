@@ -106,6 +106,7 @@ export async function startBroker({
       publish();
     });
     socket.on('message', (bytes, binary) => {
+      let selectionId: string | undefined;
       try {
         const message = parseEnvelope(bytes.toString(), binary);
         if (!peer.role) {
@@ -191,10 +192,14 @@ export async function startBroker({
           }
           throw new Error('Invalid Pi message.');
         }
-        if (
-          message.type !== MESSAGE_TYPE.selection ||
-          !Check(SessionDescriptorSchema, message.target)
-        ) {
+        if (message.type !== MESSAGE_TYPE.selection) {
+          throw new Error(
+            'Choose a destination session in the browser companion.',
+          );
+        }
+        const selection = parseSelection(message.selection);
+        selectionId = selection.id;
+        if (!Check(SessionDescriptorSchema, message.target)) {
           throw new Error(
             'Choose a destination session in the browser companion.',
           );
@@ -218,7 +223,6 @@ export async function startBroker({
             'Pi is still processing selections. Try again shortly.',
           );
         }
-        const selection = parseSelection(message.selection);
         peer.lastSelectionAt = Date.now();
         const requestId = randomUUID();
         const timer = setTimeout(() => {
@@ -249,7 +253,11 @@ export async function startBroker({
           cause instanceof Error
             ? cause
             : new Error('Cannot route browser selection.', { cause });
-        send(socket, { type: MESSAGE_TYPE.error, message: error.message });
+        send(socket, {
+          type: MESSAGE_TYPE.error,
+          id: selectionId,
+          message: error.message,
+        });
         if (!peer.role) {
           socket.close(1008, 'Invalid pairing');
         }

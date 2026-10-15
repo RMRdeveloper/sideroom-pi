@@ -6,7 +6,13 @@ import {
   isReadToolResult,
   isToolCallEventType,
 } from '@earendil-works/pi-coding-agent';
-import { GUIDELINE_SKILL_PATH, LANGUAGE_GUIDES } from './catalog.ts';
+import {
+  GUIDELINE_SKILL_PATH,
+  GUIDELINES_TOOL_NAME,
+  LANGUAGE_GUIDES,
+  languageGuideFor,
+} from './catalog.ts';
+import type { GuidelinesToolResult } from './execute.ts';
 
 export { GUIDELINE_SKILL_PATH } from './catalog.ts';
 
@@ -19,21 +25,54 @@ interface ReadInput {
 export interface GuidelineReadState {
   skillRead: boolean;
   readonly languageGuidesRead: Set<string>;
+  readonly pendingLoads: Map<string, GuidelinesToolResult>;
 }
 
 export function createGuidelineReadState(): GuidelineReadState {
-  return { skillRead: false, languageGuidesRead: new Set() };
+  return {
+    skillRead: false,
+    languageGuidesRead: new Set(),
+    pendingLoads: new Map(),
+  };
 }
 
 export function resetGuidelineReadState(state: GuidelineReadState): void {
   state.skillRead = false;
   state.languageGuidesRead.clear();
+  state.pendingLoads.clear();
 }
 
 export function registerGuidelineGuard(
   pi: ExtensionAPI,
   state: GuidelineReadState,
 ): void {
+  // This notification follows every tool_result handler, including redactors.
+  pi.on('tool_execution_end', (event, ctx) => {
+    if (event.toolName !== GUIDELINES_TOOL_NAME) {
+      return;
+    }
+    const delivered = state.pendingLoads.get(event.toolCallId);
+    state.pendingLoads.delete(event.toolCallId);
+    const deliveredResult: Partial<GuidelinesToolResult> | undefined =
+      event.result;
+    if (
+      event.isError ||
+      event.parentToolCallId !== undefined ||
+      delivered === undefined ||
+      !Array.isArray(deliveredResult?.content) ||
+      deliveredResult.content.length !== delivered.content.length ||
+      !deliveredResult.content.every(
+        (part, index) =>
+          part.type === 'text' && part.text === delivered.content[index]?.text,
+      )
+    ) {
+      return;
+    }
+    for (const path of delivered.details.paths) {
+      recordGuidelineRead(state, path, ctx.cwd);
+    }
+  });
+
   pi.on('tool_result', (event, ctx) => {
     if (!isReadToolResult(event) || event.isError) {
       return;
@@ -62,7 +101,9 @@ export function registerGuidelineGuard(
     const reason = mutationBlockReason(
       state,
       event.input.path,
-      pi.getActiveTools().includes('read'),
+      pi
+        .getActiveTools()
+        .some((name) => name === 'read' || name === GUIDELINES_TOOL_NAME),
     );
     if (reason === undefined) {
       return;
@@ -113,19 +154,10 @@ export function mutationBlockReason(
     return undefined;
   }
   if (!readToolAvailable) {
-    return `Blocked ${targetPath}: the read tool is inactive, so the guidelines gate cannot be satisfied. Enable read, then read ${requiredPaths.join(' and ')} before retrying the mutation.`;
+    return `Blocked ${targetPath}: the read tool is inactive and sideroom_guidelines is inactive. Enable either tool, then load ${requiredPaths.join(' and ')} before retrying the mutation.`;
   }
 
-  return `Blocked ${targetPath}: read ${requiredPaths.join(' and ')} with the read tool in this agent run, then retry the mutation.`;
-}
-
-function languageGuideFor(path: string): string | undefined {
-  const normalizedPath = stripLeadingAt(path)
-    .replaceAll('\\', '/')
-    .toLowerCase();
-  return LANGUAGE_GUIDES.find(({ extensions }) =>
-    extensions.some((extension) => normalizedPath.endsWith(extension)),
-  )?.path;
+  return `Blocked ${targetPath}: call sideroom_guidelines with path ${JSON.stringify(targetPath)}, or read ${requiredPaths.join(' and ')} in full with the read tool in this agent run, then retry the mutation.`;
 }
 
 const canonicalCatalogPaths = new Map<string, string>();

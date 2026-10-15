@@ -32,6 +32,10 @@ braces check with an indented-suite rule and its own error handling; `generic`
 skips structural checks. `explicit-any` and `suppressed-type-errors` apply to
 TypeScript only.
 
+Rule 20, Decomposition by intent, is structural but requires semantic review.
+It belongs to the guidelines review and the optional Jev questions, not this
+mechanical catalog. No function line limit, length detector or block is added.
+
 The `any` check recognises type assertions, annotations, generic arguments,
 and type aliases, including aliases split across lines. It does not treat
 value-level commas, assignments, or operators as type syntax, and it runs on

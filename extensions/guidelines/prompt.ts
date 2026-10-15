@@ -12,10 +12,10 @@ const LANGUAGE_GUIDE_INDEX = LANGUAGE_GUIDES.map(
 ).join('; ');
 
 export const GUIDELINES_REMINDER = `${GUIDELINES_REMINDER_HEADING}
-Before the first write or edit in each agent run, use the read tool without offset or limit to load these files in full:
+Before write or edit, call sideroom_guidelines with the target path. Reuse loaded guides in this run; reload after compaction. Alternatively, use the read tool without offset or limit to load in full:
 - ${GUIDELINE_SKILL_PATH}
 - for the extension of the file you will change, one of: ${LANGUAGE_GUIDE_INDEX}
-A required read counts only when it succeeds without truncation. Until all required reads succeed, do not call write or edit and do not mutate files through bash or another tool; the extension blocks those mutations.`;
+Only successful loads without truncation count. Until all required documents are loaded, do not call write or edit and do not mutate files through bash or another tool; the extension blocks those mutations.`;
 
 export function appendGuidelinesReminder(systemPrompt: string): string {
   if (systemPrompt.includes(GUIDELINES_REMINDER_HEADING)) {

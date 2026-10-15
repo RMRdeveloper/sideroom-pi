@@ -216,6 +216,43 @@ test('another Pi process takes over when the broker owner closes, and the origin
   assert.equal((await click({ socket, target: survivor })).candidates, 3);
 });
 
+test('routing errors retain the validated selection ID and leave other requests usable', async (t) => {
+  const setup = await fixture(t);
+  const target = descriptor('receipts');
+  let calls = 0;
+  await setup.pi({
+    session: target,
+    onSelection: () => {
+      calls += 1;
+      return { candidates: 2 };
+    },
+  });
+  const { socket } = await setup.browser();
+  const stale = waitForMessage(socket, 'error');
+  socket.send(
+    JSON.stringify({
+      type: 'selection',
+      target: { ...target, revision: randomUUID() },
+      selection: { ...selection, id: 'stale-click' },
+    }),
+  );
+  assert.equal((await stale).id, 'stale-click');
+  assert.equal(calls, 0);
+  assert.equal((await click({ socket, target })).candidates, 2);
+  const busy = waitForMessage(socket, 'error');
+  socket.send(
+    JSON.stringify({
+      type: 'selection',
+      target,
+      selection: { ...selection, id: 'busy-click' },
+    }),
+  );
+  const rejected = await busy;
+  assert.equal(rejected.id, 'busy-click');
+  assert.match(String(rejected.message), /still processing/u);
+  assert.equal(calls, 1);
+});
+
 test('rejects page origins, role spoofing, wrong authorization, source claims and oversized frames', async (t) => {
   const setup = await fixture(t);
   const target = descriptor('protected');

@@ -25,6 +25,7 @@ Rules every TypeScript change must follow.
 | 17 | [Dependency direction](#17-dependency-direction) | architectural |
 | 18 | [Testability](#18-testability-as-a-design-constraint) | architectural |
 | 19 | [Comments](#19-comments) | architectural |
+| 20 | [Decomposition by intent](#20-decomposition-by-intent) | structural |
 
 ---
 
@@ -242,11 +243,47 @@ counter++;
 setInterval(checkPaymentStatus, 5_000);
 ```
 
+### 20. Decomposition by intent
+
+RULE: Extract a block into a named function when it represents a coherent operation and its name and contract let the caller understand the flow without reading its implementation. Keep orchestration separate from implementation details. Do not split solely to reduce line count; keep tightly coupled steps together when separating them would introduce shared mutable state, excessive parameters, or require reading both functions to understand either.
+WHY: Good decomposition reduces how much a reader must understand at once. Function length is a review signal; extraction must improve comprehension rather than merely move code elsewhere.
+
+```ts
+type PackingItem = { quantity: number; unitWeightGrams: number };
+type PackingTotals = { unitCount: number; weightGrams: number };
+type PackingSlip = { destination: string; totals: PackingTotals };
+
+// bad
+function createPackingSlip(items: readonly PackingItem[], destination: string): PackingSlip {
+  let unitCount = 0;
+  let weightGrams = 0;
+  for (const item of items) {
+    unitCount += item.quantity;
+    weightGrams += item.quantity * item.unitWeightGrams;
+  }
+  return { destination, totals: { unitCount, weightGrams } };
+}
+// good
+function createPackingSlip(items: readonly PackingItem[], destination: string): PackingSlip {
+  return { destination, totals: calculatePackingTotals(items) };
+}
+
+function calculatePackingTotals(items: readonly PackingItem[]): PackingTotals {
+  let unitCount = 0;
+  let weightGrams = 0;
+  for (const item of items) {
+    unitCount += item.quantity;
+    weightGrams += item.quantity * item.unitWeightGrams;
+  }
+  return { unitCount, weightGrams };
+}
+```
+
 ---
 
 **When in doubt:** fail fast, keep it flat, keep it small.
 
-**Enforcement note:** rules 1–2 are mechanical and should be backed by TypeScript formatting or linting. Rules 3–10 are structural checks. Rules 11–19 require review judgment.
+**Enforcement note:** rules 1–2 are mechanical and should be backed by TypeScript formatting or linting. Rules 3–10 and 20 are structural; rules 11–19 are architectural. Rule 20 requires semantic review, not a line-count limit or mechanical length detector. Rules 11–20 require review judgment.
 
 ## Language-specific conventions
 

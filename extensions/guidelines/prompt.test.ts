@@ -22,6 +22,11 @@ test('appends the reminder once and keeps an existing prompt', () => {
     true,
   );
   assert.match(GUIDELINES_REMINDER, /sideroom-guidelines/);
+  assert.match(
+    GUIDELINES_REMINDER,
+    /call sideroom_guidelines with the target path/,
+  );
+  assert.match(GUIDELINES_REMINDER, /Reuse loaded guides/);
   assert.match(GUIDELINES_REMINDER, /read tool without offset or limit/);
   assert.match(GUIDELINES_REMINDER, /blocks those mutations/);
   assert.match(GUIDELINES_REMINDER, /without truncation/);
@@ -67,8 +72,11 @@ test('keeps every language guide in structural parity with the canonical seed', 
   const canonicalRules = extractRules(template);
   const canonicalIndex = extractIndex(template);
 
-  assert.equal(canonicalRules.length, 19);
-  assert.equal(canonicalIndex.length, 19);
+  assert.equal(canonicalRules.length, 20);
+  assert.equal(canonicalIndex.length, 20);
+  assertDecompositionByIntent(template, 'canonical seed');
+  assert.match(skill, /Decomposition by intent \(rule 20\)/);
+  assert.match(skill, /even with one caller/);
   assert.match(template, /^# Coding Guidelines$/m);
   assert.match(template, /RULE: Every `if`\/`else` body uses braces/);
 
@@ -79,11 +87,12 @@ test('keeps every language guide in structural parity with the canonical seed', 
     );
     assert.deepEqual(extractIndex(guide), canonicalIndex, file);
     assert.deepEqual(extractRules(guide), canonicalRules, file);
-    assert.equal((guide.match(/^RULE:/gm) ?? []).length, 19, file);
-    assert.equal((guide.match(/^WHY:/gm) ?? []).length, 1, file);
+    assert.equal((guide.match(/^RULE:/gm) ?? []).length, 20, file);
+    assert.equal((guide.match(/^WHY:/gm) ?? []).length, 2, file);
+    assertDecompositionByIntent(guide, file);
     const canonicalGuide =
       guide.split('\n## Language-specific conventions\n')[0] ?? guide;
-    assert.equal((canonicalGuide.match(/^```/gm) ?? []).length, 38, file);
+    assert.equal((canonicalGuide.match(/^```/gm) ?? []).length, 40, file);
     assert.match(
       guide,
       /\*\*When in doubt:\*\* fail fast, keep it flat, keep it small\./,
@@ -92,6 +101,35 @@ test('keeps every language guide in structural parity with the canonical seed', 
     assertFitsSingleRead(guide, file);
   }
 });
+
+function assertDecompositionByIntent(text: string, label: string): void {
+  const section = text.split('### 20. Decomposition by intent\n')[1];
+  assert.ok(section, label);
+  assert.match(
+    text,
+    /^\| 20 \| \[Decomposition by intent\]\(#20-decomposition-by-intent\) \| structural \|$/m,
+    label,
+  );
+  assert.equal(
+    section.match(/^RULE: .+$/m)?.[0],
+    'RULE: Extract a block into a named function when it represents a coherent operation and its name and contract let the caller understand the flow without reading its implementation. Keep orchestration separate from implementation details. Do not split solely to reduce line count; keep tightly coupled steps together when separating them would introduce shared mutable state, excessive parameters, or require reading both functions to understand either.',
+    label,
+  );
+  assert.equal(
+    section.match(/^WHY: .+$/m)?.[0],
+    'WHY: Good decomposition reduces how much a reader must understand at once. Function length is a review signal; extraction must improve comprehension rather than merely move code elsewhere.',
+    label,
+  );
+  const example = section.match(/```[^\n]*\n([\s\S]*?)\n```/u)?.[1];
+  assert.ok(example, label);
+  const goodExample = example.split(/(?:\/\/|#) good\n/u)[1];
+  assert.ok(goodExample, label);
+  const helperName =
+    label === 'python.md' || label === 'rust.md'
+      ? 'calculate_packing_totals'
+      : 'calculatePackingTotals';
+  assert.equal(goodExample.split(`${helperName}(`).length - 1, 2, label);
+}
 
 function assertFitsSingleRead(text: string, label: string): void {
   assert.equal(text.split('\n').length < 2_000, true, label);
