@@ -1,7 +1,7 @@
 {
   "name": "@rmrdeveloper/sideroom-pi",
   "version": "9.0.0",
-  "description": "Pi coding-agent package that asks clarifying questions, shows a live todo board, enforces coding guidelines, and will not call it done while your checks are red.",
+  "description": "Make \"done\" mean done for Pi. Asks before it guesses, enforces your coding rules, and refuses to finish while your project's checks are red.",
   "type": "module",
   "files": [
     "extensions",
