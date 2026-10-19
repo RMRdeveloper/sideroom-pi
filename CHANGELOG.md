@@ -1,5 +1,11 @@
 # Changelog
 
+## 9.0.1
+
+### Patch Changes
+
+- afcb6f6: Update package description and README header.
+
 ## 9.0.0
 
 ### Major Changes
