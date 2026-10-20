@@ -1,7 +1,3 @@
-// The languages the rules know. The name, the extensions and the mark are the
-// same in both languages of the site, so they live here instead of in the two
-// dictionaries. Every mark but Java comes from simple-icons; simple-icons
-// carries no Java mark, so that one comes from the Material Design set.
 
 interface SupportedLanguage {
   readonly name: string;

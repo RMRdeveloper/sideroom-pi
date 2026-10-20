@@ -3,12 +3,7 @@ import {
   isEditToolResult,
   isWriteToolResult,
 } from '@earendil-works/pi-coding-agent';
-import {
-  registerSettleGuard,
-  SETTLE_PRIORITY,
-  startsUserTurn,
-  withHiddenSteer,
-} from '../shared/settle.ts';
+import { registerSettleSupplement, startsUserTurn } from '../shared/settle.ts';
 import {
   applyOfferDecision,
   decideOffer,
@@ -43,7 +38,7 @@ export function registerExplainGuard(
     if (!isEditToolResult(event) && !isWriteToolResult(event)) {
       return;
     }
-    // SAFETY: Pi validates built-in file-tool inputs before emitting tool_result.
+
     const input = event.input as unknown as FileToolInput;
     const pathKey = mutationPathKey(ctx.cwd, input.path);
     if (pathKey === undefined) {
@@ -52,19 +47,14 @@ export function registerExplainGuard(
     recordMutation(state, pathKey);
   });
 
-  // agent_before_settle runs after retries and compaction recovery, so the
-  // walkthrough is never offered over reworked work, and its continuation
-  // stays inside the same run instead of starting a second one.
-  registerSettleGuard(pi, {
-    priority: SETTLE_PRIORITY.explain,
-    pending: (ctx) => decideOffer(state, ctx.mode) === EXPLAIN_DECISION.send,
-    handle: (event, ctx) => {
-      applyOfferDecision(state, decideOffer(state, ctx.mode));
-      return withHiddenSteer({
-        event,
-        customType: EXPLAIN_OFFER_TYPE,
-        content: EXPLAIN_OFFER,
-      });
-    },
+  registerSettleSupplement(pi, (ctx) => {
+    if (decideOffer(state, ctx.mode) !== EXPLAIN_DECISION.send) {
+      return undefined;
+    }
+    applyOfferDecision(state, EXPLAIN_DECISION.send);
+    return {
+      customType: EXPLAIN_OFFER_TYPE,
+      content: `After finishing the requested work, review, and checks: ${EXPLAIN_OFFER}`,
+    };
   });
 }

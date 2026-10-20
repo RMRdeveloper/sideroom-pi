@@ -240,7 +240,6 @@ export function candidateIsCurrent(
   return currentCandidates(cwd, [candidate]).length === 1;
 }
 
-// Each call owns its file versions; no validation survives into another prompt.
 export function currentCandidates(
   cwd: string,
   candidates: readonly SourceCandidate[],
@@ -290,8 +289,6 @@ export function currentCandidates(
   });
 }
 
-// A path that turned into a file on the way reports ENOTDIR, which means the
-// remembered source is gone rather than unreadable.
 function isGone(cause: unknown): boolean {
   return (
     isMissingFile(cause) ||

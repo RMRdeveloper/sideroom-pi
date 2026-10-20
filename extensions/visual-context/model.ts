@@ -118,9 +118,9 @@ export interface SourceCandidate {
 
 export interface SourceResolution {
   readonly candidates: readonly SourceCandidate[];
-  // A limit or unparseable file left the search incomplete; no match is not proof of absence.
+
   readonly truncated: boolean;
-  // More matches existed than the candidate cap lists.
+
   readonly capped: boolean;
   readonly issue?: string;
 }

@@ -13,7 +13,8 @@ import {
 } from '../shared/file-path.ts';
 import { readFileIfExists } from '../shared/read-file.ts';
 import { REVIEW_NOTE_EVENT, type ReviewNote } from '../shared/review-note.ts';
-import { startsUserTurn } from '../shared/settle.ts';
+import { registerSettleWait, startsUserTurn } from '../shared/settle.ts';
+import { JevReviewQueue } from './queue.ts';
 import {
   askJevRequest,
   JEV_FAILURE,
@@ -78,6 +79,7 @@ export interface JevGuardState {
   rateLimitedThisTurn: boolean;
   lastModel: string | undefined;
   calls: number;
+  readonly queue: JevReviewQueue;
   readonly evidence: WorkflowEvidence;
   readonly pending: Map<string, PendingMutation>;
   readonly notedThisTurn: Set<string>;
@@ -96,23 +98,23 @@ export function createJevGuardState(): JevGuardState {
     rateLimitedThisTurn: false,
     lastModel: undefined,
     calls: 0,
+    queue: new JevReviewQueue(),
     evidence: createWorkflowEvidence(),
     pending: new Map(),
     notedThisTurn: new Set(),
   };
 }
 
-// The F10 screen calls this after the user stores a key or asks to retry.
 export function resetJevGuard(state: JevGuardState): void {
+  state.queue.cancel();
   resetWorkflowEvidence(state.evidence);
   state.halted = undefined;
   state.transientFailures = 0;
   state.rateLimitedThisTurn = false;
 }
 
-// Usage and per-turn memory belong to the active session: a new session starts
-// counting from zero. The breaker stays, because it tracks the key.
 export function resetJevSession(state: JevGuardState): void {
+  state.queue.cancel();
   resetWorkflowEvidence(state.evidence);
   state.calls = 0;
   state.rateLimitedThisTurn = false;
@@ -145,23 +147,23 @@ export function registerJevGuard(
   state: JevGuardState,
   dependencies: JevGuardDependencies,
 ): void {
+  registerSettleWait(pi, () => state.queue.drain());
+  pi.on('session_shutdown', () => state.queue.cancel());
+
   pi.on('input', (event) => {
     if (!startsUserTurn(event)) {
       return;
     }
+    state.queue.cancel();
     resetWorkflowEvidence(state.evidence);
     state.notedThisTurn.clear();
     state.rateLimitedThisTurn = false;
   });
 
-  // A call another extension blocks in tool_call never reaches tool_result,
-  // and every result of a turn lands before its turn_end.
   pi.on('turn_end', () => {
     state.pending.clear();
   });
 
-  // The added lines are read before the mutation lands, because after a write
-  // the previous content is gone. The body is read after, from disk.
   pi.on('tool_call', (event, ctx) => {
     const mutation = extractMutation(event, ctx.cwd);
     if (mutation === undefined || !isReviewablePath(mutation.relativePath)) {
@@ -171,9 +173,13 @@ export function registerJevGuard(
     return undefined;
   });
 
-  pi.on('tool_result', async (event, ctx) => {
+  pi.on('tool_result', (event, ctx) => {
     const pending = state.pending.get(event.toolCallId);
     state.pending.delete(event.toolCallId);
+    if (!event.isError && pending !== undefined) {
+      state.queue.invalidate(pending.relativePath);
+      state.queue.invalidate('sideroom_todo');
+    }
     const apiKey = dependencies.apiKey();
     if (
       apiKey === undefined ||
@@ -196,6 +202,7 @@ export function registerJevGuard(
         const check = detectCheckCommand(ctx.cwd);
         if (check !== undefined && commandMatches(event.input.command, check)) {
           state.evidence.checks = 'failed';
+          state.queue.invalidate('sideroom_todo');
         }
       }
       return undefined;
@@ -204,11 +211,13 @@ export function registerJevGuard(
       const check = detectCheckCommand(ctx.cwd);
       if (check !== undefined && commandMatches(event.input.command, check)) {
         state.evidence.checks = 'passed';
+        state.queue.invalidate('sideroom_todo');
       }
       return undefined;
     }
     let requestBody: JevRequestBody | undefined;
     let subject: string;
+    let sourcePaths: readonly string[] = [];
     if (event.toolName === 'sideroom_ask') {
       if (
         typeof event.details !== 'object' ||
@@ -231,6 +240,7 @@ export function registerJevGuard(
         changedIds: completionIds(event.input),
       });
       subject = 'sideroom_todo';
+      sourcePaths = [...state.evidence.files.keys()];
     } else {
       if (
         pending === undefined ||
@@ -240,7 +250,7 @@ export function registerJevGuard(
       }
       subject = pending.relativePath;
       state.evidence.checks = 'stale';
-      // Replace cached evidence even when this version no longer fits the budget.
+      const previous = state.evidence.files.get(subject);
       state.evidence.files.delete(subject);
       if (!isWorthAsking(pending)) {
         state.evidence.partial = true;
@@ -256,7 +266,7 @@ export function registerJevGuard(
         subject,
         body,
         pending.kind,
-        pending.lines,
+        mergeReviewLines({ previous: previous?.change.addedLines ?? [], added: pending.lines, body }),
       );
       if (fileState === undefined) {
         state.evidence.partial = true;
@@ -264,44 +274,72 @@ export function registerJevGuard(
       }
       recordFileEvidence(state.evidence, fileState);
       requestBody = buildRequestBody(fileState);
+      sourcePaths = [subject, ...fileState.context.files.map((file) => file.path)];
     }
     if (requestBody === undefined) {
       return undefined;
     }
 
-    state.calls += 1;
-    const attempt = await askJevRequest({
-      transport: dependencies.transport,
-      apiKey,
-      requestBody,
+    const body = requestBody;
+    return state.queue.enqueue({
+      key: subject,
+      dependencies: sourcePaths,
       signal: ctx.signal,
+      run: async (signal) => {
+        if (!shouldCallJev(state) || dependencies.apiKey() !== apiKey || signal.aborted) {
+          return;
+        }
+        state.calls += 1;
+        const attempt = await askJevRequest({
+          transport: dependencies.transport,
+          apiKey,
+          requestBody: body,
+          signal,
+        });
+        if (signal.aborted || dependencies.apiKey() !== apiKey) {
+          return;
+        }
+        if (attempt.failure !== undefined) {
+          registerFailure(state, attempt.failure);
+          dependencies.report(guardStatus(state), ctx);
+          return undefined;
+        }
+
+        registerSuccess(state);
+        if (attempt.model !== undefined) {
+          state.lastModel = attempt.model;
+        }
+        dependencies.report(JEV_STATUS.ready, ctx);
+
+        const findings = attempt.findings ?? [];
+        const fresh = findings.filter((finding) =>
+          isUnnoted(state, subject, finding),
+        );
+        if (fresh.length === 0) {
+          return undefined;
+        }
+        markNoted(state, subject, fresh);
+        const note: ReviewNote = {
+          text: formatFindings(subject, fresh),
+        };
+        pi.events.emit(REVIEW_NOTE_EVENT, note);
+        return undefined;
+      },
     });
-    if (attempt.failure !== undefined) {
-      registerFailure(state, attempt.failure);
-      dependencies.report(guardStatus(state), ctx);
-      return undefined;
-    }
-
-    registerSuccess(state);
-    if (attempt.model !== undefined) {
-      state.lastModel = attempt.model;
-    }
-    dependencies.report(JEV_STATUS.ready, ctx);
-
-    const findings = attempt.findings ?? [];
-    const fresh = findings.filter((finding) =>
-      isUnnoted(state, subject, finding),
-    );
-    if (fresh.length === 0) {
-      return undefined;
-    }
-    markNoted(state, subject, fresh);
-    const note: ReviewNote = {
-      text: formatFindings(subject, fresh),
-    };
-    pi.events.emit(REVIEW_NOTE_EVENT, note);
-    return undefined;
   });
+}
+
+interface ReviewLinesInput {
+  readonly previous: readonly string[];
+  readonly added: readonly AddedLine[];
+  readonly body: string;
+}
+
+function mergeReviewLines({ previous, added, body }: ReviewLinesInput): readonly AddedLine[] {
+  const changed = new Set([...previous, ...added.map((line) => line.text)].map((text) => text.trim()));
+  return body.split('\n').flatMap((text, index) =>
+    changed.has(text.trim()) ? [{ line: index + 1, text }] : [],
+  );
 }
 
 function isUnnoted(
@@ -322,8 +360,6 @@ function markNoted(
   }
 }
 
-// A user abort says nothing about the service, and a rate limit clears on its
-// own, so neither may count toward switching Jev off.
 function registerFailure(state: JevGuardState, failure: JevFailure): void {
   if (failure === JEV_FAILURE.cancelled) {
     return;
@@ -351,8 +387,6 @@ function registerSuccess(state: JevGuardState): void {
   state.transientFailures = 0;
 }
 
-// A deletion-only edit leaves nothing for the questions to read, and only
-// the project-relative path of a supported language may leave the machine.
 function isWorthAsking(mutation: PendingMutation): boolean {
   return mutation.lines.length > 0 && isReviewablePath(mutation.relativePath);
 }

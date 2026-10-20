@@ -48,12 +48,12 @@ test('a failure loading either document throws instead of returning a partial lo
   ]) {
     assert.throws(
       () =>
-        executeGuidelines('example.ts', (path) => {
+        executeGuidelines('example.ts', { readDocument: (path) => {
           if (path === failedPath) {
             throw new Error(`Cannot load ${path}`);
           }
           return readFileSync(path, 'utf8');
-        }),
+        } }),
       /Cannot load/,
     );
   }
@@ -61,7 +61,7 @@ test('a failure loading either document throws instead of returning a partial lo
 
 test('empty packaged documents fail explicitly', () => {
   assert.throws(
-    () => executeGuidelines('README.md', () => '  \n'),
+    () => executeGuidelines('README.md', { readDocument: () => '  \n' }),
     /Empty guidelines document/,
   );
 });

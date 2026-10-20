@@ -10,8 +10,59 @@ import type {
 const COMPLETED_OUTCOME = 'completed';
 const CUSTOM_MESSAGE_ENTRY = 'custom_message';
 const SETTLE_PRIORITY_EVENT = 'sideroom:settle-priority';
+const SETTLE_SUPPLEMENT_EVENT = 'sideroom:settle-supplement';
+const SETTLE_WAIT_EVENT = 'sideroom:settle-wait';
 
-export const SETTLE_PRIORITY = { review: 0, done: 1, explain: 2 } as const;
+interface SettleWaitRequest {
+  readonly ctx: ExtensionContext;
+  readonly waits: Promise<void>[];
+}
+
+export function registerSettleWait(
+  pi: ExtensionAPI,
+  wait: (ctx: ExtensionContext) => Promise<void>,
+): void {
+  pi.events.on(SETTLE_WAIT_EVENT, (payload) => {
+    const request = payload as SettleWaitRequest;
+    request.waits.push(wait(request.ctx));
+  });
+  pi.on('agent_before_settle', async (event, ctx) => {
+    if (acceptsSettleSteer(event)) {
+      await wait(ctx);
+    }
+  });
+}
+
+async function waitForSettle(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
+  const request: SettleWaitRequest = { ctx, waits: [] };
+  pi.events.emit(SETTLE_WAIT_EVENT, request);
+  await Promise.all(request.waits);
+}
+
+export const SETTLE_PRIORITY = { review: 0, persona: 1, done: 2 } as const;
+
+interface SettleSupplement {
+  readonly customType: string;
+  readonly content: string;
+}
+
+interface SettleSupplementRequest {
+  readonly ctx: ExtensionContext;
+  readonly messages: SettleSupplement[];
+}
+
+export function registerSettleSupplement(
+  pi: ExtensionAPI,
+  prepare: (ctx: ExtensionContext) => SettleSupplement | undefined,
+): void {
+  pi.events.on(SETTLE_SUPPLEMENT_EVENT, (payload) => {
+    const request = payload as SettleSupplementRequest;
+    const message = prepare(request.ctx);
+    if (message !== undefined) {
+      request.messages.push(message);
+    }
+  });
+}
 
 interface SettlePriorityRequest {
   readonly ctx: ExtensionContext;
@@ -31,8 +82,6 @@ const USER_INPUT_SOURCES: ReadonlySet<InputSource> = new Set([
   'rpc',
 ]);
 
-// A message typed while the agent runs joins the current run as a steer or
-// follow-up; only input that arrives idle opens a new turn.
 export function startsUserTurn(event: InputEvent): boolean {
   return (
     USER_INPUT_SOURCES.has(event.source) &&
@@ -40,8 +89,6 @@ export function startsUserTurn(event: InputEvent): boolean {
   );
 }
 
-// Any queued message or an earlier handler's continuation still has work to
-// run. Yield without consuming the guard's state until a quiet boundary.
 export function acceptsSettleSteer(event: AgentBeforeSettleEvent): boolean {
   return (
     event.outcome === COMPLETED_OUTCOME &&
@@ -50,9 +97,6 @@ export function acceptsSettleSteer(event: AgentBeforeSettleEvent): boolean {
   );
 }
 
-// Pi gives each extension its own API object. Its synchronous event bus is
-// shared, so ask which stages are pending rather than relying on load order
-// or module-global state that would leak across sessions and reloads.
 export function registerSettleGuard(
   pi: ExtensionAPI,
   guard: SettleGuard,
@@ -64,8 +108,12 @@ export function registerSettleGuard(
     }
   });
 
-  pi.on('agent_before_settle', (event, ctx) => {
-    if (!acceptsSettleSteer(event) || !guard.pending(ctx)) {
+  pi.on('agent_before_settle', async (event, ctx) => {
+    if (!acceptsSettleSteer(event)) {
+      return;
+    }
+    await waitForSettle(pi, ctx);
+    if (ctx.signal?.aborted || ctx.hasPendingMessages() || !acceptsSettleSteer(event) || !guard.pending(ctx)) {
       return;
     }
     const request: SettlePriorityRequest = { ctx, priorities: new Set() };
@@ -73,12 +121,29 @@ export function registerSettleGuard(
     if ([...request.priorities].some((priority) => priority < guard.priority)) {
       return;
     }
-    return guard.handle(event, ctx);
+    const continuation = guard.handle(event, ctx);
+    if (!continuation?.continue) {
+      return continuation;
+    }
+    const supplements: SettleSupplementRequest = { ctx, messages: [] };
+    pi.events.emit(SETTLE_SUPPLEMENT_EVENT, supplements);
+    return {
+      ...continuation,
+      entries: [
+        ...(continuation.entries ?? event.entries),
+        ...supplements.messages.map(
+          (message) =>
+            ({
+              type: CUSTOM_MESSAGE_ENTRY,
+              ...message,
+              display: false,
+            }) as const,
+        ),
+      ],
+    };
   });
 }
 
-// Handlers chain on agent_before_settle, so keep the entries earlier handlers
-// proposed; replacing them would drop another extension's steer.
 interface HiddenSteerOptions {
   readonly event: AgentBeforeSettleEvent;
   readonly customType: string;

@@ -6,8 +6,10 @@ import {
   isToolCallEventType,
   isWriteToolResult,
 } from '@earendil-works/pi-coding-agent';
+import { registerCheckStatus } from '../shared/check-status.ts';
 import {
   registerSettleGuard,
+  registerSettleSupplement,
   SETTLE_PRIORITY,
   withHiddenSteer,
 } from '../shared/settle.ts';
@@ -45,6 +47,13 @@ export function registerDoneGuard({
 }: DoneGuardOptions): void {
   const checkRuns = new Set<string>();
   const mutationPaths = new Map<string, string>();
+
+  registerCheckStatus(pi, (ctx) => {
+    const check = resolveCommand(ctx);
+    return check === undefined
+      ? undefined
+      : { command: check.display, green: state.checksGreen };
+  });
 
   pi.on('tool_call', (event, ctx) => {
     if (
@@ -84,6 +93,17 @@ export function registerDoneGuard({
         state.checksGreen = !event.isError;
       }
     }
+  });
+
+  registerSettleSupplement(pi, (ctx) => {
+    if (!shouldNoticeMissingTest(state, resolveTestSetup(ctx))) {
+      return undefined;
+    }
+    state.noticedMissingTest = true;
+    return {
+      customType: MISSING_TEST_NOTICE_TYPE,
+      content: formatMissingTestNotice(),
+    };
   });
 
   registerSettleGuard(pi, {

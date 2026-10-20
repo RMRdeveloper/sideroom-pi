@@ -23,7 +23,6 @@ export const ASK_PROMPT_GUIDELINES = [
   'sideroom_ask only works in the interactive TUI; it errors in print, JSON, and RPC modes.',
 ];
 
-// Pi loads extensions/*/index.ts through export default.
 export default function registerAsk(pi: ExtensionAPI): void {
   pi.registerTool({
     name: TOOL_NAME,

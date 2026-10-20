@@ -10,7 +10,7 @@ const LEXICAL_MODE = {
 type LexicalMode = (typeof LEXICAL_MODE)[keyof typeof LEXICAL_MODE];
 
 export interface MaskOptions {
-  /** Keep comment text so a caller can read the directives inside it. */
+
   readonly keepComments?: boolean;
 }
 

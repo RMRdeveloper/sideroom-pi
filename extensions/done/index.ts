@@ -15,7 +15,6 @@ import {
 } from './guard.ts';
 import { createDoneState, resetDoneRun } from './model.ts';
 
-// Pi loads extensions/*/index.ts through export default.
 export default function registerDone(pi: ExtensionAPI): void {
   const state = createDoneState();
   const cache = new Map<string, CheckCommand | undefined>();

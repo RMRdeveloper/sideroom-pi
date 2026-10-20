@@ -84,8 +84,7 @@ export async function ensurePairing(
     flag: 'wx',
   });
   try {
-    // Linking a complete file prevents concurrent Pi processes from reading
-    // a half-written credential or replacing another process's identity.
+
     linkSync(staging, join(directory, FILE));
   } catch (cause) {
     if (!hasCode(cause, 'EEXIST')) {

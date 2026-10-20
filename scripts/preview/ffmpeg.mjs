@@ -1,4 +1,3 @@
-// The ffmpeg boundary: rasterizing SVG frames and encoding them into the video.
 
 import { execFileSync } from 'node:child_process';
 

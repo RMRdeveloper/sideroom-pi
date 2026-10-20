@@ -1,6 +1,3 @@
-// Prints how many tokens each session re-sent and how much of that followed a
-// work-board update. Run it with `npm run cache:report`; pass session files or
-// directories to read something other than this project's sessions.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -42,7 +39,6 @@ function listSessionFiles(directory) {
     .map((name) => join(directory, name));
 }
 
-// Pi names each project's session directory after its working directory.
 function defaultSessionDir() {
   const encoded = `--${process.cwd().slice(1).replaceAll('/', '-')}--`;
   const directory = join(SESSIONS_ROOT, encoded);

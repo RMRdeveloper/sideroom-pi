@@ -22,7 +22,7 @@ test('resolves the path aliases accepted by Pi file tools', () => {
     resolve(homedir(), 'app.ts'),
   );
   assert.equal(
-    resolveFileToolPath('/work', `src/narrow\u202Fspace.ts`),
+    resolveFileToolPath('/work', 'src/narrow\u202Fspace.ts'),
     resolve('/work/src/narrow space.ts'),
   );
 });

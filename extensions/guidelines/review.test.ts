@@ -60,8 +60,7 @@ function register(): Harness {
         handlers.set(name, handler);
         return;
       }
-      // Pi chains handlers; tests compose them the same way so one
-      // registration can cover both the read gate and the review guard.
+
       handlers.set(name, ((event: never, ctx: never) => {
         existing(event, ctx);
         return handler(event, ctx);
@@ -104,8 +103,8 @@ function mutate(harness: Harness, isError = false): void {
   );
 }
 
-function settle(harness: Harness, options: SettleOptions = {}): void {
-  const steer = handlerOf(harness, 'agent_before_settle')(
+async function settle(harness: Harness, options: SettleOptions = {}): Promise<void> {
+  const steer = await handlerOf(harness, 'agent_before_settle')(
     {
       type: 'agent_before_settle',
       outcome: options.outcome ?? 'completed',
@@ -117,7 +116,7 @@ function settle(harness: Harness, options: SettleOptions = {}): void {
         })),
       },
     } as never,
-    {} as never,
+    { hasPendingMessages: () => false } as never,
   );
   if (steer !== undefined) {
     harness.steers.push(steer as AgentBeforeSettleEventResult);
@@ -132,10 +131,10 @@ function input(
   handlerOf(harness, 'input')({ source, streamingBehavior } as never);
 }
 
-test('appends one hidden review and continues after a mutation settles', () => {
+test('appends one hidden review and continues after a mutation settles', async () => {
   const harness = register();
   mutate(harness);
-  settle(harness);
+  await settle(harness);
 
   assert.deepEqual(harness.steers, [
     {
@@ -152,10 +151,10 @@ test('appends one hidden review and continues after a mutation settles', () => {
   ]);
 });
 
-test('reviews intent and coupling, not function length, only in changes from this run', () => {
+test('reviews intent and coupling, not function length, only in changes from this run', async () => {
   const harness = register();
   mutate(harness);
-  settle(harness);
+  await settle(harness);
 
   const steer = steerText(harness, 0);
   assert.match(steer, /changes this run introduced/);
@@ -170,122 +169,121 @@ test('reviews intent and coupling, not function length, only in changes from thi
   assert.match(steer, /Do not refactor unrelated code/);
 });
 
-test('keeps the entries earlier handlers proposed', () => {
+test('keeps the entries earlier handlers proposed', async () => {
   const harness = register();
   mutate(harness);
-  settle(harness, { entries: [EARLIER_ENTRY] });
+  await settle(harness, { entries: [EARLIER_ENTRY] });
 
   assert.equal(harness.steers[0]?.entries?.length, 2);
   assert.deepEqual(harness.steers[0]?.entries?.[0], EARLIER_ENTRY);
 });
 
-test('stays silent without a mutation', () => {
+test('stays silent without a mutation', async () => {
   const harness = register();
-  settle(harness);
+  await settle(harness);
   assert.deepEqual(harness.steers, []);
 });
 
-test('ignores a failed mutation', () => {
+test('ignores a failed mutation', async () => {
   const harness = register();
   mutate(harness, true);
-  settle(harness);
+  await settle(harness);
   assert.deepEqual(harness.steers, []);
 });
 
-test('stays silent when the user aborted or the run errored', () => {
+test('stays silent when the user aborted or the run errored', async () => {
   const harness = register();
   mutate(harness);
-  settle(harness, { outcome: 'aborted' });
-  settle(harness, { outcome: 'error' });
+  await settle(harness, { outcome: 'aborted' });
+  await settle(harness, { outcome: 'error' });
   assert.deepEqual(harness.steers, []);
 });
 
-test('yields to a pending user message', () => {
+test('yields to a pending user message', async () => {
   const harness = register();
   mutate(harness);
-  settle(harness, { pendingRoles: ['user'] });
+  await settle(harness, { pendingRoles: ['user'] });
   assert.deepEqual(harness.steers, []);
 
-  settle(harness, { pendingRoles: ['custom'] });
+  await settle(harness, { pendingRoles: ['custom'] });
   assert.deepEqual(harness.steers, []);
-  settle(harness);
+  await settle(harness);
   assert.equal(harness.steers.length, 1);
 });
 
-test('steers at most once per turn and not again on its own continuation', () => {
+test('steers at most once per turn and not again on its own continuation', async () => {
   const harness = register();
   mutate(harness);
-  settle(harness);
+  await settle(harness);
   mutate(harness);
-  settle(harness);
+  await settle(harness);
   assert.equal(harness.steers.length, 1);
 });
 
-test('does not re-arm on a message typed while the run is active', () => {
+test('does not re-arm on a message typed while the run is active', async () => {
   const harness = register();
   mutate(harness);
-  settle(harness);
+  await settle(harness);
 
   input(harness, 'interactive', 'steer');
   mutate(harness);
-  settle(harness);
+  await settle(harness);
   input(harness, 'interactive', 'followUp');
   mutate(harness);
-  settle(harness);
+  await settle(harness);
   assert.equal(harness.steers.length, 1);
 });
 
-test('re-arms after an idle user prompt and a new mutation', () => {
+test('re-arms after an idle user prompt and a new mutation', async () => {
   const harness = register();
   mutate(harness);
-  settle(harness);
+  await settle(harness);
   assert.equal(harness.steers.length, 1);
 
   input(harness, 'interactive');
-  settle(harness);
+  await settle(harness);
   assert.equal(harness.steers.length, 1);
 
   mutate(harness);
-  settle(harness);
+  await settle(harness);
   assert.equal(harness.steers.length, 2);
 });
 
-test('does not re-arm on extension-sourced input', () => {
+test('does not re-arm on extension-sourced input', async () => {
   const harness = register();
   mutate(harness);
-  settle(harness);
+  await settle(harness);
 
   input(harness, 'extension');
   mutate(harness);
-  settle(harness);
+  await settle(harness);
   assert.equal(harness.steers.length, 1);
 });
 
-test('clears review state when a session starts', () => {
+test('clears review state when a session starts', async () => {
   const harness = register();
   mutate(harness);
   handlerOf(harness, 'session_start')({} as never);
-  settle(harness);
+  await settle(harness);
   assert.deepEqual(harness.steers, []);
 });
 
-test('keeps review state independent of the read-gate reset', () => {
+test('keeps review state independent of the read-gate reset', async () => {
   const harness = register();
   mutate(harness);
-  // before_agent_start resets read state only; the review flag must survive
-  // so a steer-triggered continuation cannot loop.
+
   handlerOf(harness, 'before_agent_start')({ systemPrompt: 'base' } as never);
-  settle(harness);
+  await settle(harness);
   assert.equal(harness.steers.length, 1);
-  settle(harness);
+  await settle(harness);
   assert.equal(harness.steers.length, 1);
 });
 
-test('carries semantic notes gathered before the review', () => {
+test('carries semantic notes gathered before the review', async () => {
   const harness = register();
   mutate(harness);
   emitNote(harness, { text: 'Jev flagged src/example.ts' });
-  settle(harness);
+  await settle(harness);
 
   assert.equal(
     steerText(harness, 0),
@@ -293,14 +291,14 @@ test('carries semantic notes gathered before the review', () => {
   );
 });
 
-test('follows up once on notes that arrive after the review fired', () => {
+test('follows up once on notes that arrive after the review fired', async () => {
   const harness = register();
   mutate(harness);
-  settle(harness);
+  await settle(harness);
 
   mutate(harness);
   emitNote(harness, { text: 'first late note' });
-  settle(harness);
+  await settle(harness);
   assert.equal(
     steerText(harness, 1),
     `${REVIEW_NOTES_STEER}\n\nfirst late note`,
@@ -308,44 +306,44 @@ test('follows up once on notes that arrive after the review fired', () => {
 
   mutate(harness);
   emitNote(harness, { text: 'second late note' });
-  settle(harness);
+  await settle(harness);
   assert.equal(harness.steers.length, 2);
 });
 
-test('keeps late notes when the follow-up had to yield', () => {
+test('keeps late notes when the follow-up had to yield', async () => {
   const harness = register();
   mutate(harness);
-  settle(harness);
+  await settle(harness);
 
   emitNote(harness, { text: 'late note' });
-  settle(harness, { pendingRoles: ['user'] });
-  settle(harness);
+  await settle(harness, { pendingRoles: ['user'] });
+  await settle(harness);
   assert.equal(harness.steers.length, 2);
   assert.match(steerText(harness, 1), /late note/);
 });
 
-test('ignores a malformed note', () => {
+test('ignores a malformed note', async () => {
   const harness = register();
   mutate(harness);
   emitNote(harness, { note: 'wrong shape' });
   emitNote(harness, 'plain string');
-  settle(harness);
+  await settle(harness);
   assert.equal(steerText(harness, 0), REVIEW_STEER);
 });
 
-test('drops notes from the previous turn on an idle user prompt', () => {
+test('drops notes from the previous turn on an idle user prompt', async () => {
   const harness = register();
   mutate(harness);
-  settle(harness);
+  await settle(harness);
   emitNote(harness, { text: 'stale note' });
 
   input(harness, 'interactive');
   mutate(harness);
-  settle(harness);
+  await settle(harness);
   assert.equal(steerText(harness, 1), REVIEW_STEER);
 });
 
-test('a workflow note alone starts one evidence-based review', () => {
+test('a workflow note alone starts one evidence-based review', async () => {
   const state = createReviewState();
   state.notes.push('orphan note');
   assert.match(
@@ -360,7 +358,7 @@ test('a workflow note alone starts one evidence-based review', () => {
   assert.equal(pendingReviewSteer(state), undefined);
 });
 
-test('shouldReview requires a mutation and an unarmed flag', () => {
+test('shouldReview requires a mutation and an unarmed flag', async () => {
   const state = createReviewState();
   assert.equal(shouldReview(state), false);
 
@@ -376,38 +374,38 @@ test('shouldReview requires a mutation and an unarmed flag', () => {
   assert.equal(state.steeredThisTurn, false);
 });
 
-test('keeps the review armed when an earlier handler continues implementation', () => {
+test('keeps the review armed when an earlier handler continues implementation', async () => {
   const harness = register();
   mutate(harness);
-  settle(harness, { entries: [EARLIER_ENTRY], continue: true });
+  await settle(harness, { entries: [EARLIER_ENTRY], continue: true });
   assert.deepEqual(harness.steers, []);
   mutate(harness);
-  settle(harness);
+  await settle(harness);
   assert.equal(harness.steers.length, 1);
 });
 
-test('keeps late notes while a non-user continuation is queued', () => {
+test('keeps late notes while a non-user continuation is queued', async () => {
   const harness = register();
   mutate(harness);
-  settle(harness);
+  await settle(harness);
   emitNote(harness, { text: 'late note' });
-  settle(harness, { pendingRoles: ['custom'] });
+  await settle(harness, { pendingRoles: ['custom'] });
   assert.equal(harness.steers.length, 1);
-  settle(harness);
+  await settle(harness);
   assert.match(steerText(harness, 1), /late note/);
 });
 
-test('delivers a questionnaire note at settle without requiring a code mutation', () => {
+test('delivers a questionnaire note at settle without requiring a code mutation', async () => {
   const harness = register();
   emitNote(harness, { text: 'Question options visibly overlap' });
-  settle(harness);
+  await settle(harness);
   assert.match(steerText(harness, 0), /questionnaire or task contract/);
   assert.match(steerText(harness, 0), /Question options visibly overlap/);
-  settle(harness);
+  await settle(harness);
   assert.equal(harness.steers.length, 1);
 });
 
-test('a late workflow note preserves the task-review contract without code changes', () => {
+test('a late workflow note preserves the task-review contract without code changes', async () => {
   const state = createReviewState();
   state.notes.push('Question options overlap');
   markReviewSteered(state);

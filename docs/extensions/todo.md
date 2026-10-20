@@ -141,30 +141,32 @@ Reconstruction:
 A forked session inherits the board visible at its fork point and then evolves
 independently.
 
-## Skip prevention
+## Board reminders
 
-Guards steer but never block mutations.
+After the first successful `write` or `edit` of a user turn, append one hidden
+`sideroom-todo-reminder` with `{ triggerTurn: false, deliverAs: 'steer' }`.
+Pi appends it at the end of the current turn without scheduling another model
+response. The next natural response can act on it.
 
-- **Propose nudge:** if a mutating tool (`write`, `edit`, `bash`) runs with an
-  empty board, send one nudge to `propose`. At most once per real user prompt.
-- **Update watchdog:** if a turn mutated files but never called `sideroom_todo`,
-  send one steer to `update`. At most once per turn.
+With an empty board, suggest `propose` only in the TUI and only for a multi-step
+implementation. With an open board, remind the agent to update at task
+milestones, combining completion and the next task in one call. A closed board,
+`bash`, reads, and failed mutations do not trigger a reminder. The reminder
+never treats a tool call as proof that a task finished.
 
-Both use `sendMessage({ display: false }, { triggerTurn: true, deliverAs: 'steer' })`.
-A sent steer silences only the rest of its own turn: `steerFromUs` resets on
-`turn_start` with the per-turn counters, so a later turn can steer again.
-`proposeNudgedThisRun` resets only on an `input` with `source: 'interactive'` or
-`'rpc'`, never on `agent_start`/`before_agent_start`.
+The allowance resets on idle interactive/RPC input and `session_start`, not on
+each model turn or a message typed while the run is active. There is no
+`turn_end` watchdog and no forced continuation for board bookkeeping.
 
 ## Files
 
 | File | Role |
 | --- | --- |
 | `extensions/todo/index.ts` | Registers the tool and composes collaborators. |
-| `extensions/todo/model.ts` | Schemas, parsing, normalization, invariants, board formatting, nudge/watchdog decisions. |
+| `extensions/todo/model.ts` | Schemas, parsing, normalization, invariants, board formatting. |
 | `extensions/todo/execute.ts` | Builds propose/update results without mutating the store. |
 | `extensions/todo/session.ts` | Snapshot reconstruction, widget refresh, board-block message, refresh event. |
-| `extensions/todo/guards.ts` | Nudge and watchdog steers. |
+| `extensions/todo/guards.ts` | Non-triggering board reminders. |
 | `extensions/todo/ui.ts` | Read-only widget, row cap, hidden-row hint, and `F9` overlay. |
 
 ## Tests

@@ -347,8 +347,6 @@ function registerGuidelines(pi: ExtensionAPI): void {
 type EventHandler = (event: never, ctx?: never) => unknown;
 type GuardResult = { block?: boolean; reason?: string } | undefined;
 
-// Pi chains handlers registered for the same event; the review guard and the
-// read gate both subscribe to tool_result, so tests must compose them.
 function chain(
   handlers: Map<string, EventHandler>,
   name: string,

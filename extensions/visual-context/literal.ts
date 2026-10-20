@@ -13,7 +13,6 @@ export function isBabelSyntaxError(cause: unknown): boolean {
   );
 }
 
-// Only syntax literals are read. No inspected source is imported or executed.
 export function literalText(expression: string): string | undefined {
   let node: ReturnType<typeof parseExpression>;
   try {

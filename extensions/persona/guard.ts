@@ -7,6 +7,12 @@ import {
 import { resolveFileToolPath } from '../shared/file-path.ts';
 import { readFileIfExists } from '../shared/read-file.ts';
 import {
+  registerSettleGuard,
+  registerSettleSupplement,
+  SETTLE_PRIORITY,
+  withHiddenSteer,
+} from '../shared/settle.ts';
+import {
   PERSONA_STEER_TYPE,
   type ProhibitionId,
   TEXT_SCOPE,
@@ -23,11 +29,9 @@ import {
   formatSteer,
 } from './model.ts';
 
-// A rule that keeps firing degrades to a steer instead of trapping the agent.
 const BLOCK_DEGRADE_AFTER = 3;
 const CLEAN_RESET_AFTER = 5;
 
-// One agent run can be corrected at most this many times.
 const STEER_LIMIT_PER_RUN = 3;
 
 interface ExtractedMutation {
@@ -40,6 +44,7 @@ export interface PersonaGuardState {
   cleanMutations: number;
   steersThisRun: number;
   blocksThisRun: number;
+  pendingProse: string | undefined;
 }
 
 export function createPersonaGuardState(): PersonaGuardState {
@@ -48,12 +53,14 @@ export function createPersonaGuardState(): PersonaGuardState {
     cleanMutations: 0,
     steersThisRun: 0,
     blocksThisRun: 0,
+    pendingProse: undefined,
   };
 }
 
 export function resetPersonaRun(state: PersonaGuardState): void {
   state.steersThisRun = 0;
   state.blocksThisRun = 0;
+  state.pendingProse = undefined;
 }
 
 export function registerPersonaGuard(
@@ -73,8 +80,12 @@ export function registerPersonaGuard(
     return blockDecision;
   });
 
-  pi.on('message_end', (event, ctx) => {
+  pi.on('message_end', (event) => {
     if (event.message.role !== 'assistant') {
+      return undefined;
+    }
+    state.pendingProse = undefined;
+    if (event.message.stopReason !== 'stop') {
       return undefined;
     }
     const violations = findViolations(
@@ -85,9 +96,37 @@ export function registerPersonaGuard(
       return undefined;
     }
 
-    sendPersonaSteer(pi, state, formatSteer(violations));
-    report(ctx);
+    state.pendingProse = formatSteer(violations);
     return undefined;
+  });
+
+  const pending = () =>
+    state.pendingProse !== undefined &&
+    state.steersThisRun < STEER_LIMIT_PER_RUN;
+  const prepare = (ctx: ExtensionContext) => {
+    if (
+      state.pendingProse === undefined ||
+      state.steersThisRun >= STEER_LIMIT_PER_RUN
+    ) {
+      return undefined;
+    }
+    const content = state.pendingProse;
+    state.pendingProse = undefined;
+    state.steersThisRun += 1;
+    report(ctx);
+    return { customType: PERSONA_STEER_TYPE, content };
+  };
+  registerSettleSupplement(pi, prepare);
+  registerSettleGuard(pi, {
+    priority: SETTLE_PRIORITY.persona,
+    pending,
+    handle: (event, ctx) => {
+      const message = prepare(ctx);
+      if (message === undefined) {
+        return;
+      }
+      return withHiddenSteer({ event, ...message });
+    },
   });
 }
 
@@ -160,7 +199,7 @@ function sendPersonaSteer(
   state.steersThisRun += 1;
   pi.sendMessage(
     { customType: PERSONA_STEER_TYPE, content, display: false },
-    { triggerTurn: true, deliverAs: 'steer' },
+    { triggerTurn: false, deliverAs: 'steer' },
   );
 }
 

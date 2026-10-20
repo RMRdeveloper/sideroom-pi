@@ -67,8 +67,6 @@ export interface VisualPathPolicy {
   readonly allowedPath: (path: string) => string | undefined;
 }
 
-// Reuse ignore rules only within one synchronous operation. File metadata is
-// always read again: a remembered path must not authorize a replacement symlink.
 export function createPathPolicy(cwd: string): VisualPathPolicy {
   const root = realpathSync(cwd);
   const policies = new Map<
@@ -133,7 +131,6 @@ export function createPathPolicy(cwd: string): VisualPathPolicy {
   }
 }
 
-// Browser paths are untrusted, including paths reported by compiler plugins.
 export function allowedPath(cwd: string, path: string): string | undefined {
   return createPathPolicy(cwd).allowedPath(path);
 }

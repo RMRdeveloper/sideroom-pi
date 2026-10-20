@@ -3,6 +3,7 @@ import {
   isEditToolResult,
   isWriteToolResult,
 } from '@earendil-works/pi-coding-agent';
+import { readCheckStatus } from '../shared/check-status.ts';
 import { isReviewNote, REVIEW_NOTE_EVENT } from '../shared/review-note.ts';
 import {
   registerSettleGuard,
@@ -14,13 +15,13 @@ import {
 export const REVIEW_STEER_TYPE = 'sideroom-guidelines-review';
 
 export const REVIEW_STEER =
-  'Finish any remaining requested implementation before reviewing. Review the changes this run introduced against the loaded Sideroom language guide: fix only demonstrated violations caused by those changes, preserving all requested requirements and existing behavior. KISS and YAGNI do not justify removing required error handling, compatibility, or tests. Include rule 20, Decomposition by intent: names and contracts should separate orchestration from coherent implementation details, even with one caller. Do not split solely for line count or separate tightly coupled steps into shared mutable state, excessive parameters, or functions that must be read together. Do not refactor unrelated code. Then run the relevant formatter, linter, type checks, and tests. If the guide is no longer in context, re-read it in full first.';
+  'Finish any remaining requested implementation before reviewing. Review the changes this run introduced against the loaded Sideroom language guide: fix only demonstrated violations caused by those changes, preserving all requested requirements and existing behavior. KISS and YAGNI do not justify removing required error handling, compatibility, or tests. Include rule 20, Decomposition by intent: names and contracts should separate orchestration from coherent implementation details, even with one caller. Do not split solely for line count or separate tightly coupled steps into shared mutable state, excessive parameters, or functions that must be read together. Do not refactor unrelated code. Reuse relevant checks that already passed in this user turn after the latest file mutation. Run only missing, failed, or stale formatter, linter, type checks, and tests; any further file mutation makes earlier checks stale. If the guide is no longer in context, re-read it in full first.';
 
 export const WORKFLOW_REVIEW_STEER =
   'Verify the semantic notes below against the visible evidence and the questionnaire or task contract. Correct only demonstrated ambiguity or contradictions; respect user answers and ask again only when clarification is necessary. Missing evidence is not proof of unfinished work. Do not create unrelated implementation work. Run project checks only if code changes.';
 
 export const REVIEW_NOTES_STEER =
-  'Additional semantic notes arrived after the review. Verify each against the loaded Sideroom language guide, fix only demonstrated violations introduced by this run without removing required behavior or refactoring unrelated code, then rerun the relevant checks.';
+  'Additional semantic notes arrived after the review. Verify each against the loaded Sideroom language guide, fix only demonstrated violations introduced by this run without removing required behavior or refactoring unrelated code, reuse checks that remain valid, and run only missing, failed, or stale checks after any corrective edit.';
 
 export interface ReviewState {
   mutated: boolean;
@@ -49,8 +50,6 @@ export function shouldReview(state: ReviewState): boolean {
   return (state.mutated || state.notes.length > 0) && !state.steeredThisTurn;
 }
 
-// Notes that arrive after the review fired get one follow-up per turn, so a
-// fix that draws new notes cannot keep the run going.
 export function pendingReviewSteer(state: ReviewState): string | undefined {
   if (shouldReview(state)) {
     return withNotes(
@@ -110,23 +109,23 @@ export function registerReviewGuard(
     }
   });
 
-  // agent_before_settle runs after retries and compaction recovery, and its
-  // continuation stays inside the same run. agent_settled is notification-only:
-  // a steer sent there starts a second run after the user already saw the
-  // agent stop, and it fires even when the user pressed Escape.
   registerSettleGuard(pi, {
     priority: SETTLE_PRIORITY.review,
     pending: () => pendingReviewSteer(state) !== undefined,
-    handle: (event) => {
+    handle: (event, ctx) => {
       const steer = pendingReviewSteer(state);
       if (steer === undefined) {
         return;
       }
       markReviewSteered(state);
+      const check = readCheckStatus(pi, ctx);
+      const checkNote = check?.green
+        ? `\n\nThe detected project check \`${check.command}\` passed after the latest successful file mutation in this user turn. Reuse that result if this review changes no files; rerun it after any further mutation.`
+        : '';
       return withHiddenSteer({
         event,
         customType: REVIEW_STEER_TYPE,
-        content: steer,
+        content: steer + checkNote,
       });
     },
   });

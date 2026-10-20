@@ -72,8 +72,6 @@ function renderedMask(overlay: JevKeyOverlay, width = 60): string {
   return overlay.render(width).join('\n');
 }
 
-// The rendered line is truncated to the panel width, so the cap is only visible
-// in a panel wide enough to hold it.
 function maskCount(overlay: JevKeyOverlay, width = 60): number {
   return renderedMask(overlay, width).split('•').length - 1;
 }

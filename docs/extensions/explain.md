@@ -1,84 +1,55 @@
 # Walkthrough offer (`explain`)
 
-Once an implementation settles, the agent offers to explain what changed and how
-to test it, through `sideroom_ask`. There is no tool, widget, or persisted
-state. The turn's in-memory state decides when to send one steer.
+The walkthrough offer joins an already necessary end-of-work continuation.
+It never requests a model response by itself. There is no tool, widget, or
+persisted state.
 
 ## Trigger
 
-| Moment | Effect |
-| --- | --- |
-| `input` from `interactive` or `rpc` while the agent is idle | Clears the turn state, so a new user prompt re-arms the offer. A message typed while the agent runs joins the current run and changes nothing. |
-| `tool_result` for a successful `write`/`edit` | Adds the resolved file path to the turn's mutated files. |
-| `agent_before_settle` | Offers when five distinct files changed and the mode is `tui`, after pending guidelines review, semantic follow-ups, and check/coverage steers. Yields to aborts, errors, any queued message, or an earlier continuation. |
+Successful `write`/`edit` results count distinct paths using Pi's aliases and
+canonical file identity. At least five files must have changed in the user
+turn, and the mode must be `tui` because the offer uses `sideroom_ask`.
 
-`agent_end` is deliberately not used. Pi may still retry, auto-compact, or drain
-queued messages after it, so an offer there could land on work that is about to
-be redone. `agent_before_settle` runs after all of that, and its continuation
-stays inside the same run.
+At a completed, quiet `agent_before_settle`, the shared settle guard selects
+necessary work: review and late semantic notes, then a pending persona
+correction, then checks/coverage. Through `sideroom:settle-supplement`, explain
+can append its instruction to that same continuation, regardless of extension
+load order. The instruction says to finish the implementation, review and
+checks before asking the question. The offer cannot claim that checks passed.
 
-`agent_settled` is not used either. Pi documents it as notification-only; a
-steer sent there with `triggerTurn` opens a second run after the user already
-saw the agent stop, and it fires after Escape too.
+If no stage needs to continue, explain stays silent. This also applies when
+explain runs alone or the five-file threshold is reached after the last
+necessary continuation. The extension does not wake the model just to offer
+an optional explanation.
 
 ## Limits
 
-- **Once per turn.** The flag is set when the offer is appended, so the
-  continuation the offer itself starts cannot re-trigger it.
-- **After review and checks.** The shared settle guard queries pending stages
-  through Pi's synchronous event bus. Review, including late semantic notes,
-  has first priority; checks and the coverage notice have second priority; the
-  offer comes last. Only one stage steers at a boundary, in every extension
-  loading order. No fixed one-boundary delay is needed, and the offer also
-  works when the other extensions are disabled.
-- **Never over queued work.** An aborted or errored run, any pending message,
-  or an earlier handler's continuation postpones the offer without consuming it.
-- **At least five distinct files.** `EXPLAIN_FILE_THRESHOLD = 5` files must be
-  mutated in the turn. Files are counted through the same aliases as Pi's
-  built-in file tools and existing paths are canonicalized, so relative,
-  `@`-prefixed, home-relative, absolute, and symbolic-link paths to one file
-  count once. A turn that touches fewer files stays silent, because a small
-  adjustment does not need a walkthrough.
-- **Only in the TUI.** `sideroom_ask` returns an explicit UI-not-available error
-  in every other mode, so `explain` gates on `ctx.mode === 'tui'`.
-- **Only after a real mutation.** A failed `write`/`edit` does not count.
-- **Bounded checks.** The offer waits while `done` has an eligible steer. If
-  its steering budget is exhausted, the offer may still appear with red checks;
-  the offer itself does not claim that checks passed.
+- Once per user turn, marked only when the supplement is actually appended.
+- Only successful file mutations count; aliases of one file count once.
+- Aborts, errors, queued messages and earlier continuations do not consume the
+  offer. It does not run on `agent_end` or `agent_settled`.
+- Idle interactive/RPC input re-arms it; input typed during a run does not.
+- `session_start` clears its in-memory state.
 
 ## The offer
 
-The steer names the intent, not the final sentence:
+After finishing the requested work, review, and checks:
 
 > Use sideroom_ask for one question in the user's language with four parallel
 > options: changes only, test steps only, both, or no explanation. Recommend
 > changes only.
 
-The agent writes the question in the user's language, because the extension
-cannot know which language the user speaks, and it writes the four labels in one
-grammatical form: four noun phrases, never a verb phrase beside a subordinate
-clause. *Parallel* is the whole instruction the extension gives; the wording is
-the agent's.
+The agent writes the wording in the user's language. `sideroom_ask` owns the
+recommendation, Out of scope and custom-answer rows.
 
-The rest of the questionnaire contract — four options, one recommendation, plus
-the always-on *Out of scope* and custom answer — stays owned by `sideroom_ask`.
-Declining is a caller option here rather than *Out of scope*, so the question
-renders six rows.
+## Files and tests
 
-## Files
+`index.ts` initializes session state; `model.ts` owns file counting, the TUI
+gate, the threshold and the offer text; `guard.ts` records mutations and
+registers the supplement. `extensions/shared/settle.ts` owns necessary
+continuations and supplement collection through Pi's synchronous event bus.
 
-| File | Role |
-| --- | --- |
-| `extensions/explain/index.ts` | Creates the turn state and clears it on `session_start`. |
-| `extensions/explain/model.ts` | The turn state, the five-file threshold, path keying, the TUI gate, the offer decision, and the offer text. |
-| `extensions/explain/guard.ts` | Event wiring and the single steer. |
-| `extensions/shared/file-path.ts` | Pi-compatible path aliases and canonical file identity. |
-| `extensions/shared/settle.ts` | When a boundary accepts a steer, the hidden steer entry, and which `input` opens a turn. |
-
-## Tests
-
-`model.test.ts` covers the offer decision, the threshold, path keying, and
-caps the complete offer at 180 characters. `index.test.ts` covers the wiring,
-session reset, all silence paths including abort and error, input typed during
-a run, re-arming on the next idle prompt, and the review arriving before the
-offer in both extension load orders.
+`model.test.ts` covers the threshold, aliases and re-arming. `index.test.ts`
+covers non-triggering standalone behavior, load order, successful mutations,
+input timing, resets, and abort/error paths. `shared/settle.test.ts` verifies
+coalescing with review, persona and checks without an extra closing turn.

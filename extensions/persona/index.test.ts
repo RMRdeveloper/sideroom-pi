@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -35,9 +36,15 @@ function register(): Harness {
   )[] = [];
   const statuses: (string | undefined)[] = [];
   let tool: RegisteredTool | undefined;
+  const bus = new EventEmitter();
   const api = {
     on(name: string, handler: EventHandler) {
       handlers.set(name, handler);
+    },
+    events: {
+      on: (name: string, handler: (payload: unknown) => void) =>
+        bus.on(name, handler),
+      emit: (name: string, payload: unknown) => bus.emit(name, payload),
     },
     registerTool(definition: RegisteredTool) {
       tool = definition;
@@ -68,6 +75,7 @@ function context(
 ): never {
   return {
     cwd,
+    hasPendingMessages: () => false,
     hasUI,
     ui: {
       setStatus(_key: string, value: string | undefined) {
@@ -87,7 +95,11 @@ function writeEvent(path: string, content: string): never {
 
 function assistantEvent(text: string): never {
   return {
-    message: { role: 'assistant', content: [{ type: 'text', text }] },
+    message: {
+      role: 'assistant',
+      stopReason: 'stop',
+      content: [{ type: 'text', text }],
+    },
   } as never;
 }
 
@@ -97,7 +109,24 @@ function handlerOf(harness: Harness, name: string): EventHandler {
   return handler;
 }
 
-test('registers the tool without duplicated prompt guidelines', () => {
+async function settle(harness: Harness, overrides: object = {}): Promise<unknown> {
+  const boundary = await handlerOf(harness, 'agent_before_settle')(
+    {
+      outcome: 'completed',
+      continue: false,
+      entries: [],
+      context: { pendingMessages: [] },
+      ...overrides,
+    } as never,
+    context(harness.cwd, harness.statuses),
+  ) as { entries?: { content: string }[] } | undefined;
+  for (const entry of boundary?.entries ?? []) {
+    harness.steers.push(entry.content);
+  }
+  return boundary;
+}
+
+test('registers the tool without duplicated prompt guidelines', async () => {
   const harness = register();
   try {
     assert.equal(harness.tool?.name, PERSONA_TOOL_NAME);
@@ -107,7 +136,7 @@ test('registers the tool without duplicated prompt guidelines', () => {
   }
 });
 
-test('blocks a write that adds a decorative symbol, then degrades', () => {
+test('blocks a write that adds a decorative symbol, then degrades', async () => {
   const harness = register();
   try {
     const toolCall = handlerOf(harness, 'tool_call');
@@ -136,7 +165,7 @@ test('blocks a write that adds a decorative symbol, then degrades', () => {
   }
 });
 
-test('does not re-flag an existing symbol through Pi path aliases', () => {
+test('does not re-flag an existing symbol through Pi path aliases', async () => {
   const harness = register();
   try {
     const toolCall = handlerOf(harness, 'tool_call');
@@ -151,7 +180,7 @@ test('does not re-flag an existing symbol through Pi path aliases', () => {
   }
 });
 
-test('steers at most three times per run and resets on the next prompt', () => {
+test('steers at most three times per run and resets on the next prompt', async () => {
   const harness = register();
   try {
     const messageEnd = handlerOf(harness, 'message_end');
@@ -160,25 +189,24 @@ test('steers at most three times per run and resets on the next prompt', () => {
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
       messageEnd(event(), ctx);
+      await settle(harness);
     }
     assert.equal(harness.steers.length, 3);
-    for (const options of harness.steerOptions) {
-      assert.equal(options?.triggerTurn, true);
-      assert.equal(options?.deliverAs, 'steer');
-    }
+    assert.equal(harness.steerOptions.length, 0);
 
     handlerOf(harness, 'before_agent_start')(
       { systemPrompt: 'base' } as never,
       context(harness.cwd, harness.statuses),
     );
     messageEnd(event(), ctx);
+    await settle(harness);
     assert.equal(harness.steers.length, 4);
   } finally {
     rmSync(harness.cwd, { recursive: true, force: true });
   }
 });
 
-test('counts blocks and steers for the current run', () => {
+test('counts blocks and steers for the current run', async () => {
   const harness = register();
   try {
     const toolCall = handlerOf(harness, 'tool_call');
@@ -189,6 +217,7 @@ test('counts blocks and steers for the current run', () => {
     assert.equal(harness.statuses.at(-1), 'persona: direct · 1 block');
 
     messageEnd(assistantEvent('Great question! Here it is.'), ctx);
+    await settle(harness);
     assert.equal(
       harness.statuses.at(-1),
       'persona: direct · 1 block · 1 steer',
@@ -204,7 +233,7 @@ test('counts blocks and steers for the current run', () => {
   }
 });
 
-test('leaves plain prose alone', () => {
+test('leaves plain prose alone', async () => {
   const harness = register();
   try {
     handlerOf(
@@ -217,7 +246,7 @@ test('leaves plain prose alone', () => {
   }
 });
 
-test('appends the reminder once per prompt', () => {
+test('appends the reminder once per prompt', async () => {
   const harness = register();
   try {
     const beforeAgentStart = handlerOf(harness, 'before_agent_start');
@@ -238,7 +267,7 @@ test('appends the reminder once per prompt', () => {
   }
 });
 
-test('publishes the footer status only when the UI is available', () => {
+test('publishes the footer status only when the UI is available', async () => {
   const harness = register();
   try {
     const sessionStart = handlerOf(harness, 'session_start');
@@ -248,6 +277,39 @@ test('publishes the footer status only when the UI is available', () => {
 
     sessionStart({} as never, context(harness.cwd, harness.statuses, false));
     assert.equal(harness.statuses.length, 1);
+  } finally {
+    rmSync(harness.cwd, { recursive: true, force: true });
+  }
+});
+
+test('does not correct superseded prose, tool calls, failed responses or aborted runs', async () => {
+  const harness = register();
+  try {
+    const messageEnd = handlerOf(harness, 'message_end');
+    const ctx = context(harness.cwd, harness.statuses);
+    messageEnd(assistantEvent('Great question!'), ctx);
+    assert.equal(harness.steers.length, 0);
+    assert.equal(await settle(harness, { outcome: 'aborted' }), undefined);
+    assert.equal(
+      await settle(harness, { context: { pendingMessages: [{}] } }),
+      undefined,
+    );
+    messageEnd(assistantEvent('Updated the file.'), ctx);
+    assert.equal(await settle(harness), undefined);
+    for (const stopReason of ['toolUse', 'error', 'aborted']) {
+      messageEnd(
+        {
+          message: {
+            role: 'assistant',
+            stopReason,
+            content: [{ type: 'text', text: 'Great question!' }],
+          },
+        } as never,
+        ctx,
+      );
+      assert.equal(await settle(harness), undefined);
+    }
+    assert.deepEqual(harness.steers, []);
   } finally {
     rmSync(harness.cwd, { recursive: true, force: true });
   }
