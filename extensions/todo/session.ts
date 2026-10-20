@@ -94,8 +94,7 @@ export function registerSessionRefreshEvents(
   store: TodoStore,
   restoreAndRefresh: BoardLifecycle,
 ): void {
-  // A restore can drop the sent block from the model's context, so an unchanged
-  // board still has to be announced again.
+
   const restoreSession = (ctx: ExtensionContext) => {
     restoreAndRefresh(ctx);
     forgetSentBoardBlock(store);
@@ -132,8 +131,6 @@ export function registerBoardContext(
   });
 }
 
-// The block rides a session message instead of the system prompt: a volatile
-// system prompt invalidates the cached prefix of the whole request.
 function pendingBoardBlock(store: TodoStore): string | undefined {
   if (store.items.length === 0) {
     return undefined;

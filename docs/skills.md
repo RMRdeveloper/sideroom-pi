@@ -18,6 +18,7 @@ does not need to name a skill for automatic selection.
 | Improve an existing codebase, redesign modules, or prepare for long-term growth | `sideroom-codebase-design` | Survey and design together, or focus directly on a chosen module. Text reports only. Review does not authorize implementation; known growth needs guide changes. |
 | Ambiguous business terms, names, statuses, or relationships | `sideroom-domain-modeling` | A few terms, including conflicts found during implementation. Mechanical symbol renames need no modeling. |
 | Derive or complete domain vocabulary across existing business code | `sideroom-domain-scaffold` | Code-first glossary work. Generic README or API documentation does not automatically need it. |
+| Write, revise, review, or split user stories and acceptance criteria | `sideroom-user-stories` | Produces text using project conventions. Open feature plans go through grill; drafting does not authorize publication, metadata changes, or implementation. |
 | Any `write` or `edit` | `sideroom-guidelines` | Load the complete skill and matching language guide with `sideroom_guidelines` (`path` is the target file) or full packaged `read` calls. Reuse in the same run; reload after compaction or a new run. Unsupported languages need only the general skill. Read-only investigation needs neither. |
 | Substantial explanations, reports, implementation summaries, or user-facing documentation | `sideroom-persona` | Load the complete guide through the tool or `read`, then reuse it while in context. Brief acknowledgments use the reminder. |
 | Enable, review, or troubleshoot precise browser source locations | `sideroom-visual-setup` | Reuses the setup tool; checks project choice and runtime paths, including Docker. Ordinary UI edits do not require setup. |
@@ -36,6 +37,13 @@ produces no diagrams or HTML reports, and needs no automatic subagents.
 The [skill](../skills/sideroom-codebase-design/SKILL.md) contains the workflow;
 its [growth reference](../skills/sideroom-codebase-design/references/growth.md)
 contains the conditional assessment. Its upstream MIT notice ships beside it.
+
+The [user stories skill](../skills/sideroom-user-stories/SKILL.md) owns story
+wording, scope, acceptance criteria, and readiness review. It uses conditional
+[templates](../skills/sideroom-user-stories/references/templates.md) and
+[review guidance](../skills/sideroom-user-stories/references/review.md), keeps
+unresolved behavior out of agreed requirements, and supports technical
+enablement and bug formats without imposing an issue tracker.
 
 ## Discovery versus selection
 
@@ -66,6 +74,10 @@ prove improved selection or prose quality.
 
 | Example request | Expected behavior |
 | --- | --- |
+| “Redacta una historia con estos requisitos ya aprobados.” | User stories: title, actor/capability/value, scope, and observable acceptance; no repeated interview or remote writes. |
+| “Revisa esta historia: gestionar reservas correctamente.” | User stories: identify missing actor, result, and verifiable behavior; ask targeted questions or label a draft instead of inventing rules. |
+| “Divide esta historia que incluye API, UI y persistencia.” | User stories: split only independent outcomes or an approved project boundary; do not assume three layers require three stories. |
+| “Publica esta historia en nuestro tablero.” | User stories: verify destination, required metadata, and duplicates; publish only with actual access and report the saved result honestly. |
 | “Quiero añadir suscripciones, veamos qué debería incluir.” | Grill after reading project facts; vocabulary can already be clear. |
 | “La API está definida, falta decidir cómo reintentar pagos.” | Architecture for the unresolved failure decision. |
 | “Account significa cliente aquí y usuario en facturación.” | Domain modeling for the conflicting term. |
@@ -79,6 +91,6 @@ prove improved selection or prose quality.
 | “Prepara este servicio para escalar, aunque no tenemos métricas todavía.” | Codebase design: identify code-level risks, label missing capacity evidence, and propose measurements before infrastructure changes. |
 
 The automated catalog test uses Pi's real loader to verify visibility, valid
-frontmatter, and automatic invocation for all eight packaged skills. The persona
+frontmatter, and automatic invocation for all nine packaged skills. The persona
 tool test checks that its result contains the entire packaged guide. These
 checks protect discovery and loading, not a model's adherence to the voice.

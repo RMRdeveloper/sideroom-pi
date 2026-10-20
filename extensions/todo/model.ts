@@ -66,25 +66,11 @@ const UpdateParamsSchema = Type.Object({
   patches: TodoPatchesField,
 });
 
-/**
- * Strict validator and types for sideroom_todo arguments. Kept as a
- * discriminated union so invalid action/field combinations are rejected
- * exactly. This schema is not registered with Pi; see
- * TodoToolParametersSchema.
- */
 export const TodoParamsSchema = Type.Union([
   ProposeParamsSchema,
   UpdateParamsSchema,
 ]);
 
-/**
- * Tool-facing schema registered with Pi. It must stay a top-level object:
- * Claude Code silently drops every tool of an MCP server when one tool's
- * inputSchema has a non-object top level (anyOf/oneOf/allOf), which is exactly
- * what TodoParamsSchema emits. The discriminated union is still enforced at
- * runtime by parseTodoParams. See docs/extensions/todo.md ("Tool schema
- * compatibility") for the bug references and the condition to revert.
- */
 export const TodoToolParametersSchema = Type.Object({
   action: TodoActionSchema,
   items: Type.Optional(TodoItemsField),
@@ -110,13 +96,13 @@ export interface TodoPatch {
 
 export type ParsedTodoParams =
   | {
-      readonly action: typeof TODO_ACTION.propose;
-      readonly items: readonly TodoItem[];
-    }
+    readonly action: typeof TODO_ACTION.propose;
+    readonly items: readonly TodoItem[];
+  }
   | {
-      readonly action: typeof TODO_ACTION.update;
-      readonly patches: readonly TodoPatch[];
-    };
+    readonly action: typeof TODO_ACTION.update;
+    readonly patches: readonly TodoPatch[];
+  };
 
 export type ParseTodoResult =
   | { readonly ok: true; readonly params: ParsedTodoParams }
@@ -125,15 +111,6 @@ export type ParseTodoResult =
 export type ApplyTodoResult =
   | { readonly ok: true; readonly items: readonly TodoItem[] }
   | { readonly ok: false; readonly message: string };
-
-export interface TodoGuardState {
-  readonly items: readonly TodoItem[];
-  readonly turnMutated: boolean;
-  readonly turnCalledTodo: boolean;
-  readonly proposeNudgedThisRun: boolean;
-  readonly updateWatchdogThisTurn: boolean;
-  readonly steerFromUs: boolean;
-}
 
 const STATUS_MARKS: Readonly<Record<TodoStatus, string>> = {
   [TODO_STATUS.pending]: '-',
@@ -291,25 +268,6 @@ export function formatBoardBlock(items: readonly TodoItem[]): string {
     '',
     BOARD_INSTRUCTIONS,
   ].join('\n');
-}
-
-export function shouldNudgePropose(state: TodoGuardState): boolean {
-  return (
-    state.turnMutated &&
-    state.items.length === 0 &&
-    !state.proposeNudgedThisRun &&
-    !state.steerFromUs
-  );
-}
-
-export function shouldWatchdogUpdate(state: TodoGuardState): boolean {
-  return (
-    state.turnMutated &&
-    state.items.length > 0 &&
-    !state.turnCalledTodo &&
-    !state.updateWatchdogThisTurn &&
-    !state.steerFromUs
-  );
 }
 
 function normalizeItems(

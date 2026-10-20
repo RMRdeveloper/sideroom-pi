@@ -1,9 +1,3 @@
-// Regenerates media/preview.png and media/preview.mp4, the gallery assets that
-// package.json declares as pi.image and pi.video.
-//
-// The widgets only expose render(width) -> ANSI lines, so the scenes drive them
-// with a stub host, and librsvg (which the local ffmpeg build ships) turns the
-// result into the committed PNG and MP4. Run it with `npm run preview`.
 
 import {
   mkdirSync,
@@ -67,7 +61,6 @@ function writeSvg(svgPath, panels) {
   writeFileSync(svgPath, buildSvg(panels));
 }
 
-// A panel pairs a measured box with the lines drawn inside it.
 function toPanels(entries) {
   const boxes = measurePanels(entries, COLUMNS);
   return entries.map((entry, index) => ({

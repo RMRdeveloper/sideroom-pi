@@ -170,10 +170,10 @@ test('configuration plans preserve runtime behavior and defer unsupported custom
       exports: undefined as unknown as {
         plugins: (
           | {
-              apply(compiler: {
-                options: { mode: string; module?: { rules?: unknown[] } };
-              }): void;
-            }
+            apply(compiler: {
+              options: { mode: string; module?: { rules?: unknown[] } };
+            }): void;
+          }
           | string
         )[];
         mode: string;

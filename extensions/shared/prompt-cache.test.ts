@@ -22,9 +22,6 @@ import registerVisualContext from '../visual-context/index.ts';
 
 const BASE_SYSTEM_PROMPT = 'base system prompt';
 
-// The extensions that always touch a plain system prompt. Monorepo skills adds
-// a static note only after resource discovery finds child-folder skills; the
-// cache contract for that conditional path is tested below.
 const SYSTEM_PROMPT_MUTATORS = ['guidelines', 'persona'];
 
 const EXTENSIONS: readonly ExtensionEntry[] = [
@@ -137,8 +134,6 @@ interface ComposedPrompt {
   readonly messages: readonly { readonly content?: string }[];
 }
 
-// Mirrors how Pi chains before_agent_start results: each handler sees the
-// system prompt the earlier handlers produced, and messages are collected.
 function composeSystemPrompt(harness: Harness): ComposedPrompt {
   let systemPrompt = BASE_SYSTEM_PROMPT;
   const messages: { content?: string }[] = [];

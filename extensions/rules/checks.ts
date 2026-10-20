@@ -39,9 +39,6 @@ const DEBUG_PATTERNS: readonly RegExp[] = [
   /\bdbg!\s*\(/,
 ];
 
-// Keep these patterns on syntax that can only introduce a type. Value-level
-// commas, assignments, and operators may legally surround an identifier named
-// `any`, so they are deliberately absent.
 const EXPLICIT_ANY_PATTERNS: readonly RegExp[] = [
   /\bas\s+any\b/,
   /\b(?:keyof|satisfies)\s+any\b/,
@@ -54,8 +51,6 @@ const EXPLICIT_ANY_PATTERNS: readonly RegExp[] = [
   /^\s*(?:(?:public|private|protected|readonly|static|declare|abstract)\s+)*[$\w]+[?!]?\s*:\s*(?:(?:=>)|[^;,=\n])*\bany\b[^;=\n]*(?:;|=)/,
 ];
 
-// A suppression is a comment whose first token is the directive; prose that
-// mentions the directive, or a string that quotes it, is not one.
 const SUPPRESSED_TYPE_ERRORS =
   /(?:^|\s)(?:\/\/|\/\*)\s*@ts-(?:ignore|nocheck)\b/;
 

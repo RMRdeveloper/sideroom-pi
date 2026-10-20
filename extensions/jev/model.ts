@@ -6,14 +6,8 @@ export type { AddedLine } from '../rules/model.ts';
 export const JEV_ENDPOINT = 'https://api.typesafe.ai/v1/systemone';
 export const JEV_MODEL = 'jev-latest';
 
-// A noul answer carries a probability and no confidence, so this cutoff is the
-// only brake. Below it Jev is saying it has nothing to go on, which would be
-// noise on every edit.
 export const VIOLATION_PROBABILITY = 0.8;
 
-// TypeSafe documents 32k tokens for state plus the longest question and 64k
-// for the full request. JSON UTF-8 bytes are a deliberately conservative
-// upper bound; no third-party tokenizer can promise the model's exact count.
 export const MAX_STATE_BYTES = 32_000;
 export const MAX_REQUEST_BYTES = 64_000;
 
@@ -30,7 +24,6 @@ export interface JevRule {
   readonly question: JevNoulQuestion;
 }
 
-// Questions must only use evidence in the file and the selected direct neighbours.
 export const JEV_RULES: readonly JevRule[] = [
   {
     id: 'guard-clauses',
@@ -290,7 +283,6 @@ export function addedLinesForEdit(
   return edits.flatMap((edit) => addedLines(edit.oldText, edit.newText));
 }
 
-// Questions are about code structure; a README or a lockfile has no useful state.
 export function isReviewablePath(path: string): boolean {
   return languageForPath(path) !== LANGUAGE.generic;
 }

@@ -5,8 +5,6 @@ export { LANGUAGE_GUIDE_FILES } from './catalog.ts';
 export const GUIDELINES_REMINDER_HEADING =
   'Sideroom coding guidelines (always-on reminder):';
 
-// One dense index instead of one sentence per language: the same paths and the
-// same requirement, a fraction of the tokens every turn.
 const LANGUAGE_GUIDE_INDEX = LANGUAGE_GUIDES.map(
   ({ extensions, path }) => `${extensions.join('/')} ${path}`,
 ).join('; ');

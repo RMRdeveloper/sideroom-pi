@@ -50,7 +50,7 @@ export function parseJsx(source: string, typescript: boolean): ParsedMarkup {
     let attributes: Record<string, string | undefined> = {};
     for (const attribute of node.openingElement.attributes) {
       if (attribute.type === 'JSXSpreadAttribute') {
-        // A spread may overwrite descriptors or make captured text private.
+
         attributes = { hidden: undefined, contenteditable: undefined };
         continue;
       }
@@ -92,7 +92,7 @@ export function parseJsx(source: string, typescript: boolean): ParsedMarkup {
     }
     const children = node.children.flatMap((child): readonly SourceNode[] => {
       if (child.type === 'JSXText') {
-        // JSX trims indentation at line boundaries, unlike HTML textContent.
+
         const lines = child.value.replace(/\t/gu, ' ').split(/\r\n|\n|\r/u);
         const text = lines
           .map((line, index) => {

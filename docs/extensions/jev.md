@@ -15,7 +15,7 @@ mechanical check can decide.
   guidelines review carries it in its end-of-run steer. A note that arrives
   after the review fired gets one follow-up steer per turn. Nothing blocks, and
   nothing reaches the system prompt, so the cached prefix survives.
-- **One request per successful mutation worth asking about**, carrying only the
+- **A queued review for each successful mutation worth asking about**, carrying only the
   applicable `noul` questions and one shared state. No request is made for a
   file outside a supported language (`.md`, `.json`, `.yaml`, lockfiles), for an
   edit that adds no lines, or for a file outside the working directory.
@@ -33,7 +33,8 @@ mechanical check can decide.
   Workflow requests below send only the selected question or task wording.
 - **Trigger.** `tool_call` records the added lines, because after a `write` the
   previous content is already gone. `tool_result` reads the resulting body from
-  disk and asks. A call another extension blocks never reaches `tool_result`,
+  disk and queues a review without waiting for HTTP. A call another extension
+  blocks never reaches `tool_result`,
   so recorded calls are dropped on `turn_end` and on `session_start`.
 - **Budget.** The official Jev 1.13 limits are 32k tokens for state plus the
   longest question and 64k tokens for the entire request. Without a service
@@ -43,10 +44,24 @@ mechanical check can decide.
   after 1,024 source files or ten folder levels and never includes more than
   four neighbours. Incomplete discovery sets `context.partial` rather than
   pretending the missing evidence is absent.
-- **Escape cuts the request.** Pi waits for every `tool_result` handler before
-  the result reaches the model, so the request follows the run's abort signal
-  as well as the three-second timeout. A request is not started once the run is
-  aborted, and a cancelled request does not count as a failure.
+- **Background queue.** One request runs while the parent agent continues;
+  at most sixteen snapshots wait. A new review replaces queued work for the
+  same subject and cancels an older active version. At capacity, the producing tool waits for a free slot instead of
+  discarding a distinct file review. Source requests track
+  their observed dependencies; changes to those files cancel stale snapshots.
+  Surviving added lines from a retained prior file snapshot are merged into
+  the latest review. Completion snapshots are invalidated by source/check
+  changes. The existing four-file evidence limit still applies.
+- **Drain before review.** At a completed, quiet `agent_before_settle`, shared
+  guards wait for queued reviews before selecting priorities or consuming
+  notes, regardless of extension load order. The HTTP wait does not request an
+  extra model turn. Standalone Jev also drains at this boundary.
+- **Escape cuts the request.** Requests combine the run signal and queue
+  cancellation with the three-second HTTP timeout. No request starts for an
+  aborted run, a missing/changed key or a paused breaker. Cancelled/replaced
+  responses cannot emit notes or change the breaker, even if a transport
+  ignores cancellation. Idle user input, session reset, key rearm and shutdown
+  cancel outstanding work. Session call counts reflect actual started requests.
 - **Cutoff.** An answer at or above `0.8` probability becomes a note. A `noul`
   carries no confidence field, so the probability itself is the only brake.
 - **Usage counter.** Every request increments a counter for the active session.
@@ -202,3 +217,7 @@ budgets, evidence eviction, check invalidation and turn reset. Guard tests also
 exercise workflow calls, failure policies, cancelled questionnaires and exclusion
 of user answers and command output. These tests stub Jev; real-model false-positive
 rates have not been measured.
+
+`extensions/jev/queue.ts` owns bounded background scheduling; its tests cover
+replacement, dependency invalidation, cancellation, backlog limits and errors.
+Shared settle tests verify that delayed notes join review before checks.

@@ -423,7 +423,7 @@ function schemaErrorMessage(value: unknown): string {
     return `Error: Option ${String(optionIndex + 1)} for question '${id}' may contain at most ${String(MAX_OPTION_LABEL_LENGTH)} characters`;
   }
 
-  return `Error: Invalid sideroom_ask parameters`;
+  return 'Error: Invalid sideroom_ask parameters';
 }
 
 function questionId(

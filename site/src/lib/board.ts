@@ -1,6 +1,3 @@
-// The board widget's own rules, kept here so the page shows the same rows the
-// terminal shows: the step in progress first, then the queued ones, then the
-// resolved ones.
 
 export const BOARD_STATUS = {
   PENDING: 'pending',
@@ -12,7 +9,6 @@ export type BoardStatus = (typeof BOARD_STATUS)[keyof typeof BOARD_STATUS];
 
 const BOARD_STATUSES: readonly BoardStatus[] = Object.values(BOARD_STATUS);
 
-// The terminal pads the status column to its longest value.
 export const BOARD_STATUS_COLUMN = Math.max(
   ...BOARD_STATUSES.map((status) => status.length),
 );
@@ -28,7 +24,6 @@ export interface VisibleBoardRows {
   readonly hiddenCount: number;
 }
 
-// U+2713 is the glyph the tool prints for a resolved item, not ornament.
 const STATUS_MARKS: Readonly<Record<BoardStatus, string>> = {
   [BOARD_STATUS.IN_PROGRESS]: '>',
   [BOARD_STATUS.PENDING]: '-',

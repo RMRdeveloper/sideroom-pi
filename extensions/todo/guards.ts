@@ -1,109 +1,65 @@
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-} from '@earendil-works/pi-coding-agent';
 import {
-  shouldNudgePropose,
-  shouldWatchdogUpdate,
-  TOOL_NAME,
-} from './model.ts';
+  type ExtensionAPI,
+  type ExtensionContext,
+  isEditToolResult,
+  isWriteToolResult,
+} from '@earendil-works/pi-coding-agent';
+import { startsUserTurn } from '../shared/settle.ts';
+import { TODO_STATUS } from './model.ts';
 import type { TodoStore } from './session.ts';
 
-const NUDGE_TYPE = 'sideroom-todo-nudge';
-const WATCHDOG_TYPE = 'sideroom-todo-watchdog';
-const MUTATING_TOOL_NAMES = new Set(['write', 'edit', 'bash']);
-
-interface TodoRunState {
-  proposeNudgedThisRun: boolean;
-  updateWatchdogThisTurn: boolean;
-  turnMutated: boolean;
-  turnCalledTodo: boolean;
-  steerFromUs: boolean;
-}
+const REMINDER_TYPE = 'sideroom-todo-reminder';
 
 export function registerGuardEvents(
   pi: ExtensionAPI,
   store: TodoStore,
   restore: (ctx: ExtensionContext) => void,
 ): void {
-  const runState = createTodoRunState();
+  let remindedThisTurn = false;
 
   pi.on('input', (event) => {
-    if (event.source === 'interactive' || event.source === 'rpc') {
-      runState.proposeNudgedThisRun = false;
-      runState.steerFromUs = false;
+    if (startsUserTurn(event)) {
+      remindedThisTurn = false;
     }
   });
+  pi.on('session_start', () => {
+    remindedThisTurn = false;
+  });
 
-  pi.on('turn_start', () => resetTurnState(runState));
-
-  pi.on('tool_execution_start', (event, ctx) => {
-    if (event.toolName === TOOL_NAME) {
-      runState.turnCalledTodo = true;
+  pi.on('tool_result', (event, ctx) => {
+    if (
+      remindedThisTurn ||
+      event.isError ||
+      (!isWriteToolResult(event) && !isEditToolResult(event))
+    ) {
       return;
     }
-    if (!MUTATING_TOOL_NAMES.has(event.toolName)) {
-      return;
-    }
-
-    runState.turnMutated = true;
     restore(ctx);
-    if (!shouldNudgePropose({ items: store.items, ...runState })) {
+    if (store.items.length === 0 && ctx.mode !== 'tui') {
+      return;
+    }
+    if (
+      store.items.length > 0 &&
+      !store.items.some(
+        (item) =>
+          item.status === TODO_STATUS.pending ||
+          item.status === TODO_STATUS.inProgress,
+      )
+    ) {
       return;
     }
 
-    runState.proposeNudgedThisRun = true;
-    sendSteer(
-      pi,
-      runState,
-      NUDGE_TYPE,
-      'Use sideroom_todo propose now to create the live board before continuing implementation.',
+    remindedThisTurn = true;
+    pi.sendMessage(
+      {
+        customType: REMINDER_TYPE,
+        content:
+          store.items.length === 0
+            ? 'Use sideroom_todo propose if this implementation has multiple steps. Maintain the board at task milestones, not after every tool call.'
+            : 'Update sideroom_todo when a task changes status, combining completion and the next task in one call. Do not update merely because a tool ran.',
+        display: false,
+      },
+      { triggerTurn: false, deliverAs: 'steer' },
     );
   });
-
-  pi.on('turn_end', (_event, ctx) => {
-    restore(ctx);
-    if (!shouldWatchdogUpdate({ items: store.items, ...runState })) {
-      return;
-    }
-
-    runState.updateWatchdogThisTurn = true;
-    sendSteer(
-      pi,
-      runState,
-      WATCHDOG_TYPE,
-      'Use sideroom_todo update to reflect this work before continuing to the next item.',
-    );
-  });
-}
-
-function createTodoRunState(): TodoRunState {
-  return {
-    proposeNudgedThisRun: false,
-    updateWatchdogThisTurn: false,
-    turnMutated: false,
-    turnCalledTodo: false,
-    steerFromUs: false,
-  };
-}
-
-function resetTurnState(runState: TodoRunState): void {
-  runState.turnMutated = false;
-  runState.turnCalledTodo = false;
-  runState.updateWatchdogThisTurn = false;
-  // A steer only silences the turn that sent it; later turns may steer again.
-  runState.steerFromUs = false;
-}
-
-function sendSteer(
-  pi: ExtensionAPI,
-  runState: TodoRunState,
-  customType: string,
-  content: string,
-): void {
-  runState.steerFromUs = true;
-  pi.sendMessage(
-    { customType, content, display: false },
-    { triggerTurn: true, deliverAs: 'steer' },
-  );
 }

@@ -14,7 +14,6 @@ if (issues.length > 0) {
   process.stdout.write('Conditional block formatting: OK\n');
 }
 
-/** Find all TypeScript implementation and test files without external glob dependencies. */
 function sourceFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const entryPath = path.join(directory, entry.name);
@@ -28,7 +27,6 @@ function sourceFiles(directory) {
   });
 }
 
-/** Require a braced, multiline body for every TypeScript conditional. */
 function checkSourceFile(file) {
   const source = ts.createSourceFile(
     file,

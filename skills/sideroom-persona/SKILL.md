@@ -89,12 +89,14 @@ dead-locked.
 
 ### What steering means
 
-The extension sends a corrective steer after a degraded artifact block or a
-prohibited assistant message. Both moments happen while the agent is working, so
-the steer travels through `pi.sendMessage` with `{ triggerTurn: true, deliverAs:
-'steer' }` and joins the current run. A steer sent after the run ended belongs
-to the guidelines review and the walkthrough offer, which append a
-`custom_message` entry on `agent_before_settle` instead.
+The extension retains a correction for the latest successful final response.
+A later clean response, tool-use response, error, or cancellation clears it.
+Corrections append a `custom_message` entry on a completed, quiet
+`agent_before_settle`: they join an existing review/check continuation when
+possible, and request a continuation only if the final response still needs
+correction. Aborts and queued work postpone corrections without consuming them.
+Degraded artifact warnings use `{ triggerTurn: false, deliverAs: 'steer' }`
+and wait for the next natural response.
 At most three steers are sent per agent run.
 
 ## Boundaries

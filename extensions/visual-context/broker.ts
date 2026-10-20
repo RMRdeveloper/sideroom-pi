@@ -176,17 +176,17 @@ export async function startBroker({
               delivery.browser,
               typeof message.error === 'string' || stale
                 ? {
-                    type: MESSAGE_TYPE.error,
-                    id: delivery.id,
-                    message: stale
-                      ? 'The session changed. Select the element again.'
-                      : String(message.error).slice(0, 500),
-                  }
+                  type: MESSAGE_TYPE.error,
+                  id: delivery.id,
+                  message: stale
+                    ? 'The session changed. Select the element again.'
+                    : String(message.error).slice(0, 500),
+                }
                 : {
-                    type: MESSAGE_TYPE.received,
-                    id: delivery.id,
-                    candidates: message.candidates,
-                  },
+                  type: MESSAGE_TYPE.received,
+                  id: delivery.id,
+                  candidates: message.candidates,
+                },
             );
             return;
           }

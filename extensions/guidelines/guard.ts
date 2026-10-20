@@ -46,7 +46,7 @@ export function registerGuidelineGuard(
   pi: ExtensionAPI,
   state: GuidelineReadState,
 ): void {
-  // This notification follows every tool_result handler, including redactors.
+
   pi.on('tool_execution_end', (event, ctx) => {
     if (event.toolName !== GUIDELINES_TOOL_NAME) {
       return;
@@ -78,7 +78,6 @@ export function registerGuidelineGuard(
       return;
     }
 
-    // SAFETY: Pi validates built-in read arguments before emitting tool_result.
     const input = event.input as unknown as ReadInput;
     if (
       input.offset !== undefined ||

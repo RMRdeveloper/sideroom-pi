@@ -3,7 +3,6 @@ import { areSkillsDisabled } from './flags.ts';
 import { appendMonorepoSkillsNote } from './prompt.ts';
 import { findMonorepoSkillPaths } from './scan.ts';
 
-// Pi loads extensions/*/index.ts through export default.
 export default function registerMonorepoSkills(pi: ExtensionAPI): void {
   let hasMonorepoSkills = false;
 

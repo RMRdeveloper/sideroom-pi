@@ -1,6 +1,3 @@
-// Formats the per-session cache facts into one text report. Pure: it takes what
-// parse.mjs produced, plus the session file path, and returns the text the
-// entry script prints.
 
 import { basename } from 'node:path';
 import { hitRateOf } from './parse.mjs';

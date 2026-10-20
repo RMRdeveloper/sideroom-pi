@@ -17,9 +17,6 @@ export function configPathFor(agentDirectory: string): string {
   return join(agentDirectory, SIDEROOM_CONFIG_FILE);
 }
 
-// The environment wins so containers and CI work with no file at all. A missing
-// or malformed config means "no key"; anything else about the file is a real
-// problem and surfaces instead of hiding.
 export function resolveApiKey(
   environment: Readonly<Record<string, string | undefined>>,
   configPath: string,

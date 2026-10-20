@@ -11,8 +11,6 @@ interface ProhibitionDetector {
   readonly pattern: RegExp;
 }
 
-// Each detector is a heuristic for one prohibition. The rule text in the
-// catalog stays authoritative; a detector never fires on its own judgement.
 const DETECTORS: readonly ProhibitionDetector[] = [
   {
     prohibitionId: 'decorative-symbols',
@@ -108,8 +106,6 @@ function countLines(content: string | undefined): Map<string, number> {
   return counts;
 }
 
-// Detector matches are short by construction; drop the bullet or indentation
-// they carry so the reason stays on one line.
 function excerptOf(match: string): string {
   const singleLine = match.replaceAll(/\s+/gu, ' ').trim();
   return singleLine.replace(/^[>*+-]+\s*/u, '');

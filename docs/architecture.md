@@ -80,14 +80,12 @@ Extensions subscribe through `pi.on(event, handler)`. The events Sideroom uses:
 
 | Event | Used by | Purpose |
 | --- | --- | --- |
-| `input` | todo, rules, done, explain, guidelines, jev | Reset per-turn state on a real user prompt (`source: 'interactive'` or `'rpc'`). `guidelines`, `explain`, and `jev` reset only when the prompt arrives while the agent is idle, so a message typed during a run does not re-arm them; `jev` clears its per-turn dedup set and its rate-limit pause; a steer or `session_start` does not re-arm. |
-| `turn_start` | todo, done | Reset per-turn state. |
+| `input` | todo, rules, done, explain, guidelines, jev | Reset per-turn state on a real user prompt (`source: 'interactive'` or `'rpc'`). `todo`, `guidelines`, `explain`, and `jev` reset only when the prompt arrives while the agent is idle, so a message typed during a run does not re-arm them; `jev` clears its per-turn dedup set and its rate-limit pause; a steer or `session_start` does not re-arm. |
 | `tool_call` | guidelines, rules, done, persona, jev | Inspect a call before it runs. Return `{ block: true, reason }` to reject it. `jev` records the added lines here, because a `write` erases the previous content, for project files in a supported language; deletion-only results invalidate cached completion evidence without requesting a code review. |
-| `tool_execution_start` | todo | Observe any tool starting; drives the propose nudge. |
-| `tool_result` | modified-files, guidelines, rules, done, explain, jev | Observe results. May append content for `rules` warnings, record reads, arm the `guidelines` review steer, count a mutated file for `explain`, note a successful mutation, or ask `jev` for a semantic review, whose findings go to the `guidelines` review on `sideroom:review-note` instead of the tool result. |
-| `turn_end` | todo, jev | Inspect the finished turn; drives the board watchdog. `jev` drops calls another extension blocked, which never reach `tool_result`. |
-| `message_end` | persona | Inspect the finished assistant message and steer on a persona violation. |
-| `agent_before_settle` | guidelines, done, explain | Quiet end-of-run boundary after retries and compaction recovery. The shared settle guard queries eligible stages through `sideroom:settle-priority`: review and late semantic notes first, checks and coverage notice second, walkthrough last. At most one stage appends a hidden `custom_message` with `continue: true`, preserving earlier entries. Aborts, errors, any pending message or an earlier continuation postpone the steer without consuming it. `agent_settled` is notification-only. |
+| `tool_result` | todo, modified-files, guidelines, rules, done, explain, jev | Observe results. May append content for `rules` warnings, record reads, arm the `guidelines` review steer, count a mutated file for `explain`, note a successful mutation, or ask `jev` for a semantic review, whose findings go to the `guidelines` review on `sideroom:review-note` instead of the tool result. |
+| `turn_end` | jev | Inspect the finished turn; `jev` drops calls another extension blocked, which never reach `tool_result`. |
+| `message_end` | persona | Retain a correction only for the latest successful final assistant response; clear superseded corrections. |
+| `agent_before_settle` | guidelines, persona, done | Quiet completed boundary after retries and compaction recovery. Priority is review, final-response style, then checks/coverage. One necessary stage requests continuation, preserving earlier entries; pending style and the optional walkthrough can join it through `sideroom:settle-supplement`. Aborts, errors, pending messages and earlier continuations postpone work without consuming it. |
 | `resources_discover` | monorepo-skills | Returns trusted child-folder skill paths before Pi rebuilds the system prompt. |
 | `before_agent_start` | todo, guidelines, monorepo-skills, persona | `todo` returns `{ message }` with the board block; the others return `{ systemPrompt }` with static reminders. |
 | `session_start`, `session_tree`, `session_compact` | todo, modified-files, guidelines, persona, explain, jev | Rebuild and redraw state after load, branch navigation, or compaction; `persona` publishes its footer status; `jev` resets its session call count, drops recorded calls and its dedup set, and republishes its status; `guidelines` clears its read state and its review-steer flags on `session_start`. |
@@ -151,7 +149,7 @@ and an inferred DOM origin.
 | modified-files | `sideroom-modified-files` |
 | visual-context | `sideroom-visual-context` |
 | visual project associations | `sideroom-visual-projects` |
-| todo steer types | `sideroom-todo-nudge`, `sideroom-todo-watchdog` |
+| todo reminder type | `sideroom-todo-reminder` |
 | done steer type | `sideroom-done-gate` |
 | persona steer type and status key | `sideroom-persona-steer`, `sideroom-persona` |
 | jev status key | `sideroom-jev` |
@@ -192,34 +190,37 @@ or sent to the model.
 
 ## Steering the agent
 
-Guards do not block mutations; they send private, hidden messages that nudge
-the agent back on track:
+Board reminders never block or request a model response. After a successful
+file mutation, at most once per idle user turn:
 
 ```ts
 pi.sendMessage(
-  { customType: 'sideroom-todo-nudge', content: '...', display: false },
-  { triggerTurn: true, deliverAs: 'steer' },
+  { customType: 'sideroom-todo-reminder', content: '...', display: false },
+  { triggerTurn: false, deliverAs: 'steer' },
 );
 ```
 
-Guards tag their own messages (`steerFromUs`) so the turn the steer triggers does
-not retrigger a nudge or watchdog, and the watchdog fires at most once per turn:
-`steerFromUs` resets on `turn_start` with the other per-turn counters, so a run
-that skips several updates is corrected more than once.
+Explicit `false` matters: while Pi is streaming, omitting `triggerTurn` queues
+an active steer that can extend the loop. With `false`, Pi appends the message
+at the end of the turn; the next natural response can see it. `bash`, reads,
+failed edits and closed boards do not trigger board reminders.
 
-A steer sent at the end of the run does not go through `sendMessage`. It is a
-hidden `custom_message` entry appended on `agent_before_settle` with
-`continue: true`, so Pi continues the same run instead of opening a second one
-after the user already saw the agent stop. `extensions/shared/settle.ts` holds
-the rules all three end-of-run stages share: the boundary accepts a steer only for a
-completed run with no queued messages or earlier continuation. Entries earlier
-handlers proposed are kept, and turn state resets only on input that arrives while the
-agent is idle. `guidelines` gates its review with `steeredThisTurn` and gives
-notes that arrive after it fired one follow-up per turn; `explain` gates its
-offer with `offeredThisTurn`. The synchronous `sideroom:settle-priority` event
-queries pending stages across distinct extension APIs: review, including semantic
-follow-ups, then checks, then the offer. This avoids load-order races and fixed
-boundary delays without sharing state across Pi sessions.
+Necessary end-of-run work appends hidden `custom_message` entries on
+`agent_before_settle` with `continue: true`. The shared settle guard accepts
+only completed runs with no queued messages or earlier continuation, waits
+for registered background reviews in every load order, then preserves
+earlier entries, and uses `sideroom:settle-priority` to select review, then
+pending final-response style, then checks/coverage. Review queries the done
+gate's current check through `sideroom:check-status` and reuses green results
+unless a later mutation makes them stale. Late semantic notes still
+receive their bounded review follow-up.
+
+Once a necessary continuation is selected, `sideroom:settle-supplement`
+collects pending style corrections, test-coverage notices and an eligible
+optional walkthrough offer into that same continuation. Explain cannot start a continuation by itself.
+Its instruction requires finishing implementation, review and checks before
+asking. The event bus handles every extension loading order and isolates Pi
+sessions. Turn state resets only on idle user input.
 
 ## Interactivity
 
@@ -246,16 +247,19 @@ to be unit testable with injected dependencies. Tests use the built-in
 
 ```bash
 npm run types          # tsc --noEmit
-npm run lint           # biome lint
-npm run format:check   # biome format
+npm run lint           # ESLint
+npm run format:check   # ESLint style checks
 npm test               # node --test extensions/**/*.test.ts
-npm run check          # types + check:if-blocks + biome check + tests
+npm run check          # types + check:if-blocks + ESLint + tests
 ```
 
 `scripts/check-if-blocks.mjs` parses every `extensions/**/*.ts` file and
 requires braced, multiline conditional bodies — the same rule `sideroom_rules`
-enforces on agent edits. Biome is the only linter and formatter; `style/useBlockStatements`
-is an error. Releases ship through Changesets on protected `main`; never publish
+enforces on agent edits. ESLint checks JavaScript/TypeScript and JSON; TypeScript ESLint supplies typed
+syntax rules and ESLint Stylistic supplies formatting rules. `curly` requires
+braces, and `no-comments/disallowComments` rejects code comments. Root and
+site configs share `scripts/lint/config.mjs` while installing dependencies
+independently. Releases ship through Changesets on protected `main`; never publish
 locally.
 
 ## Skills

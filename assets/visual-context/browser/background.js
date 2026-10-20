@@ -210,7 +210,7 @@ function scheduleReconnect(entry) {
   entry.retry = setTimeout(() => {
     void reconnect(entry);
   }, RETRY_MS);
-  // Alarms wake the worker after it has been suspended while Pi is closed.
+
   void chrome.alarms.create(RETRY_ALARM, { periodInMinutes: 1 });
 }
 
@@ -284,7 +284,7 @@ async function openConnection(entry) {
             });
             return;
           }
-          // Older brokers and connection failures can only identify the installation.
+
           for (const selectionId of [...receipts.keys()]) {
             await notifyReceipt({
               endpoint: entry.endpoint,

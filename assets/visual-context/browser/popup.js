@@ -6,8 +6,7 @@ const disconnect = document.querySelector('#disconnect');
 const forget = document.querySelector('#forget');
 const destination = document.querySelector('#destination');
 const connect = document.querySelector('#connect');
-// Edge keeps the Chromium shortcut page under its own scheme; every other
-// Chromium browser the companion supports answers on chrome://.
+
 const SHORTCUT_PAGE = navigator.userAgent.includes('Edg/')
   ? 'edge://extensions/shortcuts'
   : 'chrome://extensions/shortcuts';

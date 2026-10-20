@@ -26,8 +26,8 @@ function register(
   const bus = new EventEmitter();
   const api = {
     on(name: string, handler: EventHandler) {
-      handlers.set(name, (event, ctx) => {
-        const result = handler(event, ctx);
+      handlers.set(name, async (event, ctx) => {
+        const result = await handler(event, ctx);
         if (name === 'agent_before_settle') {
           const entries =
             (result as AgentBeforeSettleEventResult | undefined)?.entries ?? [];
@@ -104,7 +104,7 @@ function runCheck(handlers: Map<string, EventHandler>, cwd: string): void {
       toolCallId: 'b1',
       input: { command: 'npm run test' },
     } as never,
-    { cwd } as never,
+    { cwd, hasPendingMessages: () => false } as never,
   );
   toolResult({
     toolName: 'bash',
@@ -116,13 +116,13 @@ function runCheck(handlers: Map<string, EventHandler>, cwd: string): void {
   } as never);
 }
 
-test('steers when files changed without a green check', () => {
+test('steers when files changed without a green check', async () => {
   const { handlers, steers, cwd } = register();
   try {
     mutate(handlers);
     const settleRun = handlers.get('agent_before_settle');
     assert.ok(settleRun);
-    settleRun(boundary() as never, { cwd } as never);
+    await settleRun(boundary() as never, { cwd, hasPendingMessages: () => false } as never);
     assert.deepEqual(steers, [
       'Run `npm run check` and make it pass before finishing.',
     ]);
@@ -131,7 +131,7 @@ test('steers when files changed without a green check', () => {
   }
 });
 
-test('stops steering once the check command passes', () => {
+test('stops steering once the check command passes', async () => {
   const { handlers, steers, cwd } = register();
   try {
     mutate(handlers);
@@ -148,7 +148,7 @@ test('stops steering once the check command passes', () => {
         toolCallId: 'b1',
         input: { command: 'npm run check' },
       } as never,
-      { cwd } as never,
+      { cwd, hasPendingMessages: () => false } as never,
     );
     toolResult({
       toolName: 'bash',
@@ -159,46 +159,46 @@ test('stops steering once the check command passes', () => {
       details: {},
     } as never);
 
-    settleRun(boundary() as never, { cwd } as never);
+    await settleRun(boundary() as never, { cwd, hasPendingMessages: () => false } as never);
     assert.deepEqual(steers, []);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
 });
 
-test('caps steering to avoid an infinite loop', () => {
+test('caps steering to avoid an infinite loop', async () => {
   const { handlers, steers, cwd } = register();
   try {
     mutate(handlers);
     const settleRun = handlers.get('agent_before_settle');
     assert.ok(settleRun);
 
-    settleRun(boundary() as never, { cwd } as never);
-    settleRun(boundary() as never, { cwd } as never);
-    settleRun(boundary() as never, { cwd } as never);
+    await settleRun(boundary() as never, { cwd, hasPendingMessages: () => false } as never);
+    await settleRun(boundary() as never, { cwd, hasPendingMessages: () => false } as never);
+    await settleRun(boundary() as never, { cwd, hasPendingMessages: () => false } as never);
     assert.equal(steers.length, 2);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
 });
 
-test('notes a run that changed code without touching a test', () => {
+test('notes a run that changed code without touching a test', async () => {
   const { handlers, steers, cwd } = register({ test: 'node --test' });
   try {
     writePath(handlers, 'w1', 'src/user.ts');
     runCheck(handlers, cwd);
     const settleRun = handlers.get('agent_before_settle');
     assert.ok(settleRun);
-    settleRun(boundary() as never, { cwd } as never);
+    await settleRun(boundary() as never, { cwd, hasPendingMessages: () => false } as never);
     assert.deepEqual(steers, [
-      'This run changed code files and no test file. Check whether existing tests cover the changed behavior; add or update a test if coverage is missing, then rerun the relevant checks before finishing.',
+      'This run changed code files and no test file. Check whether existing tests cover the changed behavior; add or update a test if coverage is missing, reuse relevant checks that already passed after the latest mutation, and run missing, failed, or stale checks before finishing. Any code or test edit makes earlier checks stale.',
     ]);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
 });
 
-test('stays quiet when the run touched a test', () => {
+test('stays quiet when the run touched a test', async () => {
   const { handlers, steers, cwd } = register({ test: 'node --test' });
   try {
     writePath(handlers, 'w1', 'src/user.ts');
@@ -206,35 +206,35 @@ test('stays quiet when the run touched a test', () => {
     runCheck(handlers, cwd);
     const settleRun = handlers.get('agent_before_settle');
     assert.ok(settleRun);
-    settleRun(boundary() as never, { cwd } as never);
+    await settleRun(boundary() as never, { cwd, hasPendingMessages: () => false } as never);
     assert.deepEqual(steers, []);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
 });
 
-test('stays quiet when the run changed only documentation', () => {
+test('stays quiet when the run changed only documentation', async () => {
   const { handlers, steers, cwd } = register({ test: 'node --test' });
   try {
     writePath(handlers, 'w1', 'README.md');
     runCheck(handlers, cwd);
     const settleRun = handlers.get('agent_before_settle');
     assert.ok(settleRun);
-    settleRun(boundary() as never, { cwd } as never);
+    await settleRun(boundary() as never, { cwd, hasPendingMessages: () => false } as never);
     assert.deepEqual(steers, []);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
 });
 
-test('does nothing when no check command is detectable', () => {
+test('does nothing when no check command is detectable', async () => {
   const handlers = new Map<string, EventHandler>();
   const steers: string[] = [];
   const bus = new EventEmitter();
   const api = {
     on(name: string, handler: EventHandler) {
-      handlers.set(name, (event, ctx) => {
-        const result = handler(event, ctx);
+      handlers.set(name, async (event, ctx) => {
+        const result = await handler(event, ctx);
         if (name === 'agent_before_settle') {
           const entries =
             (result as AgentBeforeSettleEventResult | undefined)?.entries ?? [];
@@ -262,7 +262,7 @@ test('does nothing when no check command is detectable', () => {
     mutate(handlers);
     const settleRun = handlers.get('agent_before_settle');
     assert.ok(settleRun);
-    settleRun(boundary() as never, { cwd } as never);
+    await settleRun(boundary() as never, { cwd, hasPendingMessages: () => false } as never);
     assert.deepEqual(steers, []);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
@@ -280,7 +280,7 @@ function boundary(overrides: Record<string, unknown> = {}): unknown {
   };
 }
 
-test('does not steer at tool turn boundaries during implementation', () => {
+test('does not steer at tool turn boundaries during implementation', async () => {
   const { handlers, steers, cwd } = register();
   try {
     mutate(handlers);
@@ -289,9 +289,9 @@ test('does not steer at tool turn boundaries during implementation', () => {
     assert.deepEqual(steers, []);
     const settle = handlers.get('agent_before_settle');
     assert.ok(settle);
-    const result = settle(
+    const result = await settle(
       boundary() as never,
-      { cwd } as never,
+      { cwd, hasPendingMessages: () => false } as never,
     ) as AgentBeforeSettleEventResult;
     assert.equal(result.continue, true);
     assert.deepEqual(result.entries, [
@@ -307,7 +307,7 @@ test('does not steer at tool turn boundaries during implementation', () => {
   }
 });
 
-test('yields on abort, error, queued work and an existing continuation without spending its cap', () => {
+test('yields on abort, error, queued work and an existing continuation without spending its cap', async () => {
   const { handlers, steers, cwd } = register();
   try {
     mutate(handlers);
@@ -320,18 +320,18 @@ test('yields on abort, error, queued work and an existing continuation without s
       { context: { pendingMessages: [{ role: 'user' }] } },
       { context: { pendingMessages: [{ role: 'custom' }] } },
     ]) {
-      settle(boundary(overrides) as never, { cwd } as never);
+      await settle(boundary(overrides) as never, { cwd, hasPendingMessages: () => false } as never);
     }
     assert.deepEqual(steers, []);
-    settle(boundary() as never, { cwd } as never);
-    settle(boundary() as never, { cwd } as never);
+    await settle(boundary() as never, { cwd, hasPendingMessages: () => false } as never);
+    await settle(boundary() as never, { cwd, hasPendingMessages: () => false } as never);
     assert.equal(steers.length, 2);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
 });
 
-test('re-arms only on idle user input and clears state on session start', () => {
+test('re-arms only on idle user input and clears state on session start', async () => {
   const { handlers, steers, cwd } = register();
   try {
     mutate(handlers);
@@ -341,32 +341,32 @@ test('re-arms only on idle user input and clears state on session start', () => 
     assert.ok(settle);
     assert.ok(input);
     assert.ok(start);
-    settle(boundary() as never, { cwd } as never);
-    settle(boundary() as never, { cwd } as never);
+    await settle(boundary() as never, { cwd, hasPendingMessages: () => false } as never);
+    await settle(boundary() as never, { cwd, hasPendingMessages: () => false } as never);
     for (const event of [
       { source: 'interactive', streamingBehavior: 'steer' },
       { source: 'rpc', streamingBehavior: 'followUp' },
       { source: 'extension' },
     ]) {
       input(event as never);
-      settle(boundary() as never, { cwd } as never);
+      await settle(boundary() as never, { cwd, hasPendingMessages: () => false } as never);
     }
     assert.equal(steers.length, 2);
     input({ source: 'interactive' } as never);
-    settle(boundary() as never, { cwd } as never);
+    await settle(boundary() as never, { cwd, hasPendingMessages: () => false } as never);
     assert.equal(steers.length, 2);
     mutate(handlers);
-    settle(boundary() as never, { cwd } as never);
+    await settle(boundary() as never, { cwd, hasPendingMessages: () => false } as never);
     assert.equal(steers.length, 3);
     start({} as never);
-    settle(boundary() as never, { cwd } as never);
+    await settle(boundary() as never, { cwd, hasPendingMessages: () => false } as never);
     assert.equal(steers.length, 3);
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
 });
 
-test('invalidates a green check after a later successful mutation', () => {
+test('invalidates a green check after a later successful mutation', async () => {
   const { handlers, steers, cwd } = register({ test: 'node --test' });
   try {
     mutate(handlers);
@@ -374,7 +374,7 @@ test('invalidates a green check after a later successful mutation', () => {
     mutate(handlers);
     const settle = handlers.get('agent_before_settle');
     assert.ok(settle);
-    settle(boundary() as never, { cwd } as never);
+    await settle(boundary() as never, { cwd, hasPendingMessages: () => false } as never);
     assert.deepEqual(steers, [
       'Run `npm run test` and make it pass before finishing.',
     ]);
@@ -383,7 +383,7 @@ test('invalidates a green check after a later successful mutation', () => {
   }
 });
 
-test('clears a previous green check when a later check fails', () => {
+test('clears a previous green check when a later check fails', async () => {
   const { handlers, steers, cwd } = register({ test: 'node --test' });
   try {
     mutate(handlers);
@@ -400,7 +400,7 @@ test('clears a previous green check when a later check fails', () => {
         toolCallId: 'red',
         input: { command: 'npm run test' },
       } as never,
-      { cwd } as never,
+      { cwd, hasPendingMessages: () => false } as never,
     );
     toolResult({
       toolName: 'bash',
@@ -408,7 +408,7 @@ test('clears a previous green check when a later check fails', () => {
       input: {},
       isError: true,
     } as never);
-    settle(boundary() as never, { cwd } as never);
+    await settle(boundary() as never, { cwd, hasPendingMessages: () => false } as never);
     assert.deepEqual(steers, [
       'Run `npm run test` and make it pass before finishing.',
     ]);

@@ -73,13 +73,16 @@ nothing to select, so the tool has no action parameter.
   and subtracts a multiset of the previous lines, so pre-existing content is
   never re-flagged. A hit rejects the call with `{ block: true, reason }`;
   after degradation the mutation passes and a steer asks for a corrective edit.
-- **Prose.** `message_end` inspects the finished assistant message through
-  `assistantMessageText` and sends one corrective steer per violating message.
-  Steers pass `{ triggerTurn: true, deliverAs: 'steer' }`, which queues the
-  correction into the current run: `message_end` and a degraded block both happen
-  while the agent works. A steer sent after the run ended is a hidden
-  `custom_message` entry on `agent_before_settle` instead, the way the guidelines
-  review and the walkthrough offer steer.
+- **Prose.** `message_end` retains a correction only for the latest successful
+  final assistant response (`stopReason: 'stop'`). A later clean response,
+  tool-use response, error, or cancellation clears it. At a completed, quiet
+  `agent_before_settle`, the correction joins an existing review/check
+  continuation through the shared settle supplement event. If no other stage
+  continues and the final response still violates the rules, persona requests
+  its own bounded correction. Aborts and queued messages do not consume it.
+- **Degraded artifacts.** A correction travels with
+  `{ triggerTurn: false, deliverAs: 'steer' }`, so repeated blocked attempts do
+  not force an additional model response merely for style.
 
 ### Circuit breaker
 

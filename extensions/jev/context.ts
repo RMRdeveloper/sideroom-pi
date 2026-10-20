@@ -29,7 +29,6 @@ interface ScanResult {
   readonly partial: boolean;
 }
 
-// Keep the edited file complete. Other files are included whole or not at all.
 export function buildContextualState(
   cwd: string,
   path: string,
@@ -339,7 +338,6 @@ function matchesReference(names: ReadonlySet<string>, path: string): boolean {
   return false;
 }
 
-// Naming is evidence only for a sibling test, never for a repository-wide basename match.
 function isCompanionTest(source: string, candidate: string): boolean {
   if (
     isTestPath(source) ||

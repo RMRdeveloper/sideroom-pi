@@ -15,14 +15,9 @@ export const JEV_SHORTCUT = 'f10';
 const MASK_CHARACTER = '•';
 const CLEAR_KEY = Key.ctrl('u');
 
-// Pi wraps every paste in bracketed-paste markers before it reaches a component,
-// so the leading escape byte made the whole chunk look like a control sequence
-// and nothing landed in the field.
 const PASTE_START = '\x1b[200~';
 const PASTE_END = '\x1b[201~';
 
-// A pasted line usually carries a trailing newline, and no key holds
-// whitespace, so everything unprintable is dropped.
 export const MAX_KEY_LENGTH = 512;
 
 const STATUS_LABEL: Readonly<Record<JevStatus, string>> = {
@@ -102,8 +97,6 @@ export function createJevKeyController(
   };
 }
 
-// The packaged Input component has no masking, and a key must never render, so
-// this draws its own single masked field.
 export class JevKeyOverlay implements Component {
   private entry = '';
   private readonly tui: TUI;
@@ -236,9 +229,6 @@ export class JevKeyOverlay implements Component {
   }
 }
 
-// Pi re-wraps paste content as `ESC[200~ ... ESC[201~`, so the payload is read
-// between the markers. A paste split across chunks still contributes whatever
-// arrived after the opening marker.
 export function readPastedKey(keyData: string): string | undefined {
   const start = keyData.indexOf(PASTE_START);
   if (start === -1) {
@@ -250,14 +240,10 @@ export function readPastedKey(keyData: string): string | undefined {
   return printableOnly(body);
 }
 
-// C0 control bytes and DEL are the only boundaries that matter here, and they
-// live in one place so the two input paths cannot drift apart.
 function isControlCode(code: number): boolean {
   return code < 0x20 || code === 0x7f;
 }
 
-// Paste drops the space as well: no key holds one, and a pasted line carries a
-// trailing newline that would otherwise sit right before the closing marker.
 function printableOnly(text: string): string {
   let printable = '';
   for (const character of text) {

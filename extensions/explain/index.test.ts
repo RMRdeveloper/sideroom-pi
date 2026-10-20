@@ -92,13 +92,11 @@ function mutateTurn(
   }
 }
 
-// Mirrors Pi's boundary chaining: each handler sees the entries and the
-// continue flag the previous handlers returned.
-function settle(harness: Harness, options: SettleOptions = {}): void {
+async function settle(harness: Harness, options: SettleOptions = {}): Promise<void> {
   let entries: readonly CustomMessageDraft[] = [];
   let shouldContinue = false;
-  for (const handler of handlersOf(harness, 'agent_before_settle')) {
-    const boundary = handler(
+  for (const handler of harness.handlers.get('agent_before_settle') ?? []) {
+    const boundary = await handler(
       {
         type: 'agent_before_settle',
         outcome: options.outcome ?? 'completed',
@@ -106,7 +104,7 @@ function settle(harness: Harness, options: SettleOptions = {}): void {
         continue: shouldContinue,
         context: { pendingMessages: [] },
       } as never,
-      { mode: options.mode ?? 'tui' } as never,
+      { mode: options.mode ?? 'tui', hasPendingMessages: () => false } as never,
     ) as AgentBeforeSettleEventResult | undefined;
     if (boundary?.entries !== undefined) {
       entries = boundary.entries as unknown as CustomMessageDraft[];
@@ -124,157 +122,157 @@ function offers(harness: Harness): readonly CustomMessageDraft[] {
   );
 }
 
-test('offers at the file threshold when no review or check is pending', () => {
+test('never starts a continuation solely for a walkthrough offer', async () => {
   const harness = register(registerExplain);
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
-  settle(harness);
-  assert.equal(offers(harness).length, 1);
-  assert.match(offers(harness)[0]?.content ?? '', /sideroom_ask/);
+  await settle(harness);
+  assert.equal(offers(harness).length, 0);
+  assert.equal(harness.handlers.has('agent_before_settle'), false);
 });
 
-test('offers after a review continuation that crosses the threshold', () => {
-  const harness = register(registerExplain);
+test('does not open a new turn when later edits cross the threshold', async () => {
+  const harness = register(registerExplain, registerGuidelines);
   mutateFile(harness, 'src/a.ts');
   mutateFile(harness, 'src/b.ts');
-  settle(harness);
+  await settle(harness);
   assert.equal(offers(harness).length, 0);
 
   mutateFile(harness, 'src/c.ts');
   mutateFile(harness, 'src/d.ts');
   mutateFile(harness, 'src/e.ts');
-  settle(harness);
-  assert.equal(offers(harness).length, 1);
-});
-
-test('stays silent below the file threshold', () => {
-  const harness = register(registerExplain);
-  mutateTurn(harness, EXPLAIN_FILE_THRESHOLD - 1);
-  settle(harness);
-  settle(harness);
+  await settle(harness);
   assert.equal(offers(harness).length, 0);
 });
 
-test('counts a file mutated twice once', () => {
-  const harness = register(registerExplain);
+test('stays silent below the file threshold', async () => {
+  const harness = register(registerExplain, registerGuidelines);
+  mutateTurn(harness, EXPLAIN_FILE_THRESHOLD - 1);
+  await settle(harness);
+  await settle(harness);
+  assert.equal(offers(harness).length, 0);
+});
+
+test('counts a file mutated twice once', async () => {
+  const harness = register(registerExplain, registerGuidelines);
   for (let index = 0; index < EXPLAIN_FILE_THRESHOLD; index += 1) {
     mutateFile(harness, 'src/app.ts', 'edit');
   }
-  settle(harness);
-  settle(harness);
+  await settle(harness);
+  await settle(harness);
   assert.equal(offers(harness).length, 0);
 });
 
-test('treats an edit the same as a write', () => {
-  const harness = register(registerExplain);
+test('treats an edit the same as a write', async () => {
+  const harness = register(registerExplain, registerGuidelines);
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD - 1);
   mutateFile(harness, 'src/edited.ts', 'edit');
-  settle(harness);
-  settle(harness);
+  await settle(harness);
+  await settle(harness);
   assert.equal(offers(harness).length, 1);
 });
 
-test('counts one file once however the model spelled its path', () => {
-  const harness = register(registerExplain);
+test('counts one file once however the model spelled its path', async () => {
+  const harness = register(registerExplain, registerGuidelines);
   mutateFile(harness, 'src/app.ts');
   mutateFile(harness, '@src/app.ts');
   mutateFile(harness, './src/app.ts');
   mutateFile(harness, '/work/src/app.ts');
-  settle(harness);
-  settle(harness);
+  await settle(harness);
+  await settle(harness);
   assert.equal(offers(harness).length, 0);
 });
 
-test('stays silent without a mutation', () => {
-  const harness = register(registerExplain);
+test('stays silent without a mutation', async () => {
+  const harness = register(registerExplain, registerGuidelines);
   emit(harness, 'tool_result', {
     toolName: 'read',
     toolCallId: 't1',
     input: {},
     isError: false,
   });
-  settle(harness);
-  settle(harness);
+  await settle(harness);
+  await settle(harness);
   assert.equal(offers(harness).length, 0);
 });
 
-test('ignores a failed mutation', () => {
-  const harness = register(registerExplain);
+test('ignores a failed mutation', async () => {
+  const harness = register(registerExplain, registerGuidelines);
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD, 'write', true);
-  settle(harness);
-  settle(harness);
+  await settle(harness);
+  await settle(harness);
   assert.equal(offers(harness).length, 0);
 });
 
-test('stays silent outside the TUI', () => {
-  const harness = register(registerExplain);
+test('stays silent outside the TUI', async () => {
+  const harness = register(registerExplain, registerGuidelines);
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
-  settle(harness, { mode: 'print' });
-  settle(harness, { mode: 'print' });
+  await settle(harness, { mode: 'print' });
+  await settle(harness, { mode: 'print' });
   assert.equal(offers(harness).length, 0);
 });
 
-test('stays silent when the user aborted or the run errored', () => {
-  const harness = register(registerExplain);
+test('stays silent when the user aborted or the run errored', async () => {
+  const harness = register(registerExplain, registerGuidelines);
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
-  settle(harness, { outcome: 'aborted' });
-  settle(harness, { outcome: 'error' });
-  settle(harness, { outcome: 'aborted' });
+  await settle(harness, { outcome: 'aborted' });
+  await settle(harness, { outcome: 'error' });
+  await settle(harness, { outcome: 'aborted' });
   assert.equal(offers(harness).length, 0);
 });
 
-test('offers at most once per turn and re-arms on the next idle prompt', () => {
-  const harness = register(registerExplain);
+test('offers at most once per turn and re-arms on the next idle prompt', async () => {
+  const harness = register(registerExplain, registerGuidelines);
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
 
-  settle(harness);
-  settle(harness);
+  await settle(harness);
+  await settle(harness);
   assert.equal(offers(harness).length, 1);
 
-  settle(harness);
-  settle(harness);
+  await settle(harness);
+  await settle(harness);
   assert.equal(offers(harness).length, 1);
 
   emit(harness, 'input', { source: 'interactive' });
-  settle(harness);
+  await settle(harness);
   assert.equal(offers(harness).length, 1);
 
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
-  settle(harness);
-  settle(harness);
+  await settle(harness);
+  await settle(harness);
   assert.equal(offers(harness).length, 2);
 });
 
-test('does not re-arm on a message typed while the run is active', () => {
-  const harness = register(registerExplain);
+test('does not re-arm on a message typed while the run is active', async () => {
+  const harness = register(registerExplain, registerGuidelines);
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
-  settle(harness);
-  settle(harness);
+  await settle(harness);
+  await settle(harness);
 
   emit(harness, 'input', { source: 'interactive', streamingBehavior: 'steer' });
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
-  settle(harness);
-  settle(harness);
+  await settle(harness);
+  await settle(harness);
   assert.equal(offers(harness).length, 1);
 });
 
-test('clears the turn state when a session starts', () => {
-  const harness = register(registerExplain);
+test('clears the turn state when a session starts', async () => {
+  const harness = register(registerExplain, registerGuidelines);
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
   emit(harness, 'session_start', {});
-  settle(harness);
-  settle(harness);
+  await settle(harness);
+  await settle(harness);
   assert.equal(offers(harness).length, 0);
 });
 
-test('ignores a non-user input source when re-arming', () => {
-  const harness = register(registerExplain);
+test('ignores a non-user input source when re-arming', async () => {
+  const harness = register(registerExplain, registerGuidelines);
   mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
-  settle(harness);
-  settle(harness);
+  await settle(harness);
+  await settle(harness);
 
   emit(harness, 'input', { source: 'extension' });
-  settle(harness);
-  settle(harness);
+  await settle(harness);
+  await settle(harness);
   assert.equal(offers(harness).length, 1);
 });
 
@@ -282,13 +280,13 @@ for (const [order, extensions] of [
   ['explain first', [registerExplain, registerGuidelines]],
   ['guidelines first', [registerGuidelines, registerExplain]],
 ] as const) {
-  test(`runs the review before the offer with ${order}`, () => {
+  test(`attaches the offer to the review continuation with ${order}`, async () => {
     const harness = register(...extensions);
     mutateTurn(harness, EXPLAIN_FILE_THRESHOLD);
 
-    settle(harness);
-    settle(harness);
-    settle(harness);
+    await settle(harness);
+    await settle(harness);
+    await settle(harness);
 
     assert.deepEqual(
       harness.steers.map((steer) => steer.customType),

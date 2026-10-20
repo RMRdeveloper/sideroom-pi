@@ -1,4 +1,3 @@
-// Panel geometry and SVG serialization for the preview assets.
 
 import { parseAnsiLine } from './ansi.mjs';
 import { PALETTE, SURFACE } from './theme.mjs';
@@ -6,7 +5,7 @@ import { PALETTE, SURFACE } from './theme.mjs';
 export const CANVAS = Object.freeze({ width: 1600, height: 1000 });
 
 const FONT_FAMILY = 'DejaVu Sans Mono';
-const CELL_RATIO = 1233 / 2048; // DejaVu Sans Mono advance width, in em.
+const CELL_RATIO = 1233 / 2048;
 const LINE_RATIO = 1.45;
 const PANEL_RADIUS = 20;
 const PANEL_MARGIN = 40;
@@ -27,10 +26,6 @@ export function padLines(lines, lineCount) {
   return [...lines, ...padding];
 }
 
-// Panels stack top-aligned and the whole stack is centred. Measuring is a
-// separate step so an animation can reserve one geometry for every frame, and
-// renderColumns is the width the widgets were rendered at, which is what each
-// panel centres inside its box.
 export function measurePanels(entries, renderColumns) {
   if (!Number.isInteger(renderColumns) || renderColumns <= 0) {
     throw new Error(`Invalid render columns: ${renderColumns}`);

@@ -284,16 +284,13 @@ nothing is detectable, the gate does nothing.
 
 ### Explain — the walkthrough offer
 
-When an implementation settles, `explain` steers the agent to offer a
-walkthrough through `sideroom_ask`: explain the changes only, how to test them
-only, both, or nothing. It fires on `agent_before_settle`, after every retry
-and compaction recovery, so the offer never lands on work that is about to be
-redone, and it stays inside the same run. It waits one boundary so the
-guidelines review runs first; both use the same event, and Pi would otherwise
-order them by extension load. It stays quiet after Escape, after an error, and
-while a message you typed is waiting. Once per turn, only when the turn touched at least five distinct
-files, and only in the TUI, because `sideroom_ask` cannot run anywhere else. No
-tool, no widget, no persisted state.
+When a review, style correction, or check already requires a closing
+continuation, `explain` can add a walkthrough offer through `sideroom_ask`:
+changes only, test steps only, both, or nothing. The instruction asks the agent
+to finish the work, review and checks before offering. It never opens a turn
+solely for an offer. Once per user turn, only after at least five distinct
+files changed, and only in the TUI. Aborts, errors and queued messages postpone
+it. No tool, widget or persisted state.
 
 ## Quick path
 
@@ -466,14 +463,13 @@ itself.
   since the last idle user prompt, in TUI mode, on a completed run with no user
   message pending. File identity follows Pi's path aliases and canonicalizes
   existing paths.
-- One boundary of delay: the guidelines review steers on the same event, and Pi
-  runs both handlers in extension load order, so `explain` offers at the next
-  boundary.
+- Delivery: joins an existing necessary settle continuation through the shared
+  supplement event, in any extension load order. If none is needed, stays silent.
 - The steer names the intent; the agent writes the question in the user's
   language with four options, one of them a decline, and one recommendation.
   `sideroom_ask` still adds *Out of scope* and the custom answer.
-- At most one offer per turn. The flag is set before the steer, so the turn the
-  offer triggers cannot re-trigger it.
+- At most one offer per turn. The flag is set only when the supplement is
+  appended; the offer never triggers its own continuation.
 - No green-check requirement: red checks still produce the offer.
 
 ### Grill contract

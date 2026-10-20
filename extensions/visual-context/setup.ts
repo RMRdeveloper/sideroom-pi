@@ -63,15 +63,15 @@ export function prepareSetup(cwd: string, project: string) {
       args:
         inspected.manager === 'npm'
           ? [
-              'install',
-              '--save-dev',
-              `${compilerPackage(inspected.kind)}@${INSPECTOR_VERSION}`,
-            ]
+            'install',
+            '--save-dev',
+            `${compilerPackage(inspected.kind)}@${INSPECTOR_VERSION}`,
+          ]
           : [
-              'add',
-              '--dev',
-              `${compilerPackage(inspected.kind)}@${INSPECTOR_VERSION}`,
-            ],
+            'add',
+            '--dev',
+            `${compilerPackage(inspected.kind)}@${INSPECTOR_VERSION}`,
+          ],
     },
     checkScripts: Object.keys(manifest.scripts ?? {}).filter((script) =>
       ['check', 'typecheck', 'lint', 'test', 'build'].includes(script),

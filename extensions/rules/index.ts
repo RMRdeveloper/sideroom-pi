@@ -5,7 +5,6 @@ import {
   resetRulesState,
 } from './guard.ts';
 
-// Pi loads extensions/*/index.ts through export default.
 export default function registerRules(pi: ExtensionAPI): void {
   const state = createRulesState();
   registerRulesGuard(pi, state);

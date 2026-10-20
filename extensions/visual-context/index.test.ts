@@ -341,10 +341,10 @@ test('F7 ignores source choices from another session and preserves pending eleme
 test('keeps the browser connected across tree navigation and joins again on Pi restart without another pairing dialog', async (t) => {
   const root = mkdtempSync(join(tmpdir(), 'sideroom-visual-lifecycle-'));
   const harness = createHarness(root);
-  let restarted: ReturnType<typeof createHarness> | undefined;
+  const restartedSession: { current?: ReturnType<typeof createHarness> } = {};
   t.after(async () => {
     await harness.dispatch('session_shutdown');
-    await restarted?.dispatch('session_shutdown');
+    await restartedSession.current?.dispatch('session_shutdown');
     rmSync(root, { recursive: true, force: true });
   });
   await harness.dispatch('session_start');
@@ -385,7 +385,8 @@ test('keeps the browser connected across tree navigation and joins again on Pi r
   const closed = once(initial.socket, 'close');
   await harness.dispatch('session_shutdown');
   await closed;
-  restarted = createHarness(root);
+  const restarted = createHarness(root);
+  restartedSession.current = restarted;
   await restarted.dispatch('session_start');
   assert.equal(restarted.pairingAddress(), '');
   const next = await browser();

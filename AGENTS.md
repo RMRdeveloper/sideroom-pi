@@ -41,7 +41,9 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
 - `extensions/guidelines/execute.ts` loads complete packaged documents;
   `catalog.ts` owns their paths and shared language selection; `guard.ts`
   accepts complete final tool deliveries or full reads and blocks missing
-  documents. The tool is `model-only`, requiring Pi 1.2.0 or later.
+  documents. The tool sends only missing complete documents within a run and
+  acknowledges an already loaded target without repeating the text. The tool
+  is `model-only`, requiring Pi 1.2.0 or later.
 - `extensions/guidelines/prompt.ts` owns the reminder text and idempotent append.
 - `extensions/guidelines/review.ts` owns the end-of-turn review steer: arms on a
   successful `write`/`edit`, fires once on `agent_before_settle`, and resets on
@@ -70,6 +72,12 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   filters, dedup, the circuit breaker, the rate-limit pause, the session call
   count, and the fail-open paths; `extensions/jev/ui.ts` owns the masked
   capture screen and the footer labels.
+- `extensions/jev/queue.ts` owns one active HTTP review, the bounded backlog,
+  replacement/cancellation, and draining before the settle review.
+- `extensions/shared/check-status.ts` exposes the done gate's current check
+  result to review through Pi's synchronous event bus.
+- `scripts/lint/config.mjs` builds the shared ESLint rules used by root and site
+  configs; both install their own lint dependencies.
 - `extensions/shared/review-note.ts` owns the `sideroom:review-note` event Jev
   emits and the guidelines review collects.
 - `extensions/rules/index.ts` composes the guidelines rule gate;
@@ -146,6 +154,9 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
 - `extensions/persona/execute.ts` returns that complete packaged guide;
   `extensions/shared/skills.test.ts` checks packaged discovery with Pi's loader.
 - `docs/skills.md` owns skill selection boundaries and manual behavior checks.
+- `skills/sideroom-user-stories/SKILL.md` owns story drafting, review, and
+  splitting; its references own templates and acceptance review. Drafting
+  does not authorize ticket publication, metadata changes, or implementation.
 - `skills/sideroom-visual-setup/SKILL.md` owns the requested compiler-context setup
   workflow, portable runtime paths, and browser verification. It reuses the
   configuration plan from `sideroom_visual_setup` without duplicating compiler code.
@@ -201,7 +212,7 @@ npm run changeset:status
 npm run version-packages
 ```
 
-Use Biome; do not add ESLint or Prettier. Conventional Commits. Node 22.19 or
+Use ESLint with TypeScript ESLint, ESLint Stylistic, and no-comments; do not add Prettier. Conventional Commits. Node 22.19 or
 later. Release only through Changesets on protected `main`. Never publish
 locally.
 
@@ -209,8 +220,9 @@ The site in `site/` has its own `package.json`: `cd site && npm install`, then
 `npm run check` for its own gate, `npm run dev` to serve it locally, and
 `npm run build` for the published files.
 
-Biome requires braces around every `if` body. Do not disable
-`style/useBlockStatements`. Follow `assets/artifacts/GUIDELINES_TEMPLATE.md`.
+ESLint requires braces around every `if` body through `curly: [error, all]`.
+Do not disable it. `no-comments/disallowComments` is an error for repository
+JavaScript and TypeScript; put rationale in documentation rather than code comments. Follow `assets/artifacts/GUIDELINES_TEMPLATE.md`.
 
 ## Design rules
 
@@ -244,6 +256,9 @@ Biome requires braces around every `if` body. Do not disable
   TUI-only; `update` patches ids in every mode. Persist snapshots with
   `appendEntry`, reconstruct from `getBranch()`, and never take over
   `session_before_compact` or add `/todos`.
+- Todo reminders follow only successful `write`/`edit`, at most once per idle
+  user turn, with explicit `triggerTurn: false`. There is no per-model-turn
+  watchdog. Do not infer task completion from a file mutation or a `bash` call.
 - `modified-files` tracks only successful Pi `write` and `edit` results in the
   current session. Its compact widget shows at most five paths and must
   reapply after `sideroom:todo-widget-refreshed` so it remains below the board.
@@ -274,7 +289,10 @@ Biome requires braces around every `if` body. Do not disable
   sensitive-named and out-of-project paths are excluded. It uses conservative
   32,000-byte state-plus-question and 64,000-byte request limits, keeps files
   whole, and omits questions without the evidence they require. It follows the
-  run's abort signal, pauses on `429` until the next idle prompt, stops calling
+  run's abort signal. HTTP reviews run in a queue with one active request and
+  at most sixteen queued snapshots, drained before settle guards select review
+  in every load order; replaced/source-stale/cancelled responses cannot emit
+  notes. It pauses on `429` until the next idle prompt, stops calling
   on quota or a rejected key, and does nothing at all without a key. The key
   comes from `TYPESAFE_API_KEY` or from `getAgentDir()/sideroom.json` at mode
   `0600`, captured through `F10` and never written to the session. The call
@@ -283,14 +301,20 @@ Biome requires braces around every `if` body. Do not disable
   persisted profile state. A `write`/`edit` whose added lines contain a decorative symbol
   is blocked and degrades after repeated fires; the other prohibitions are
   steered, capped per run. The footer shows the run's block and steer counts and
-  drops back to `persona: direct` on the next `before_agent_start`.
+  drops back to `persona: direct` on the next `before_agent_start`. Prose
+  corrections retain only the latest successful final response and join a
+  necessary settle continuation when possible; superseded/tool-use/error
+  responses do not cause correction turns. Degraded artifact warnings use
+  explicit `triggerTurn: false`.
 - `explain` offers a walkthrough through `sideroom_ask` at most once per turn,
   only after successful `write`/`edit` results touched at least five distinct
   files, and only in the TUI. It fires on `agent_before_settle`, never
   `agent_end`, so the offer never lands on work that a retry or a compaction is
   about to redo. The shared settle guard gives review and checks priority over
-  the offer in every extension load order, including late semantic notes. It
-  has no tool and no persisted state.
+  the offer in every extension load order, including late semantic notes. The
+  offer joins an already necessary continuation through the shared settle supplement event, asks the agent to
+  finish work/review/checks first, and never starts a turn by itself. It has no
+  tool and no persisted state.
 - End-of-run steers go on `agent_before_settle` as `custom_message` entries
   with `continue: true`, never through `sendMessage` on `agent_settled`.
   `agent_settled` is notification-only: a steer there opens a second run after
@@ -305,4 +329,6 @@ Biome requires braces around every `if` body. Do not disable
   is detected. It clears green after any later successful mutation, asks once
   per user turn whether existing tests cover code-only changes, and caps its
   steering.
-  State resets only on idle user input and `session_start`.
+  Coverage notices join an existing settle continuation when possible without
+  spending the forced-continuation budget. State resets only on idle user input
+  and `session_start`.

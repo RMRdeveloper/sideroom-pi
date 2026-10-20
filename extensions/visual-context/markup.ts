@@ -12,9 +12,9 @@ export type SourceNode =
   | SourceElement
   | { readonly kind: 'text'; readonly value: string }
   | {
-      readonly kind: 'group' | 'dynamic';
-      readonly children: readonly SourceNode[];
-    };
+    readonly kind: 'group' | 'dynamic';
+    readonly children: readonly SourceNode[];
+  };
 
 export interface ParsedMarkup {
   readonly nodes: readonly SourceNode[];
@@ -81,8 +81,6 @@ interface ElementRangeInput {
   readonly tag: string;
 }
 
-// Parsers may recover malformed syntax or omit locations. Such nodes must not
-// silently become source claims, even if their descriptors look convincing.
 export function verifiedElementRange({
   source,
   start,

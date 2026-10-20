@@ -154,7 +154,7 @@ _Avoid: child skill, nested skill, workspace skill._
 
 ## Steer
 
-A private, hidden message a guard sends to correct the agent's behavior, carrying `display: false` so the user never sees it. It never blocks a mutation on its own. A steer sent while the agent works travels through `pi.sendMessage` with `triggerTurn: true`; one sent at the end of the run is appended as a `custom_message` entry at the settle boundary with `continue: true`, so it stays inside the same run.
+A private, hidden message a guard sends to correct the agent's behavior, carrying `display: false` so the user never sees it. It never blocks a mutation on its own. Non-urgent reminders sent while the agent works use `pi.sendMessage` with explicit `triggerTurn: false`, so they wait for a natural response. Necessary closing work appends `custom_message` entries with `continue: true` at the settle boundary; optional instructions join that continuation without starting their own.
 
 _Avoid: reminder, warning, system message._
 
@@ -166,13 +166,13 @@ _Avoid: end of run, finish point, settle event._
 
 ## Review steer
 
-The `guidelines` steer appended at the settle boundary after a successful mutation, asking the agent to re-check every changed file against the loaded language guide and run the project checks. It fires at most once per turn, carries the turn's review notes, and gets one follow-up per turn for notes that arrive after it fired. It is separate from the work-board nudge and watchdog.
+The `guidelines` steer appended at the settle boundary after a successful mutation, asking the agent to re-check every changed file against the loaded language guide and run the project checks. It fires at most once per turn, carries the turn's review notes, and gets one follow-up per turn for notes that arrive after it fired. It is separate from the non-triggering work-board reminder.
 
 _Avoid: review reminder, quality gate message._
 
 ## Walkthrough offer
 
-The `explain` steer that asks the agent to offer a walkthrough through `sideroom_ask` after a substantial settle. It waits one settle boundary behind the review steer so the review always runs first.
+The `explain` supplement asks the agent to offer a walkthrough through `sideroom_ask` after finishing the work, review and checks. It joins an existing necessary settle continuation and never starts one by itself.
 
 _Avoid: summary offer, explanation prompt._
 

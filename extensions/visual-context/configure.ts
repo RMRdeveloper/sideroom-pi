@@ -102,8 +102,8 @@ function staticObject(expression: unknown, document: Document): ConfigObject {
             entry.type === 'ExportNamedDeclaration' ? entry.declaration : entry;
           return statement?.type === 'VariableDeclaration'
             ? statement.declarations.flatMap((item) =>
-                item === declaration ? [] : [item.init],
-              )
+              item === declaration ? [] : [item.init],
+            )
             : [];
         });
         if (
@@ -338,7 +338,7 @@ export function configureSource({
     if (value.start === null || value.start === undefined) {
       throw new Error('The plugin array location is unavailable.');
     }
-    // Inspect original markup before framework plugins erase its source positions.
+
     replacements.push({
       start: value.start + 1,
       end: value.start + 1,
@@ -415,7 +415,7 @@ export function configureSource({
       replacement.text +
       configured.slice(replacement.end);
   }
-  // Reject a broken patch before the parent agent receives a configuration edit.
+
   parse(configured, { sourceType: 'unambiguous', plugins: ['typescript'] });
   return { source: configured };
 }

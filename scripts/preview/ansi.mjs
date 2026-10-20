@@ -1,5 +1,3 @@
-// Turns one TUI line into styled runs. The widgets hand back truecolor SGR
-// sequences, and the edited-files widget also wraps paths in OSC 8 hyperlinks.
 
 export const ESCAPE = '\u001b';
 export const RESET = `${ESCAPE}[0m`;
@@ -19,8 +17,6 @@ const FOREGROUND_OFF_CODE = 39;
 const BACKGROUND_OFF_CODE = 49;
 const TRUECOLOR_PARAMETER_COUNT = 4;
 
-// RegExp objects rather than literals: the linter rejects a control range
-// written inline in a pattern, and its autofix rewrites the literal back.
 const SGR_PATTERN = new RegExp(`${ESCAPE}\\[([0-9;]*)m`, 'g');
 const OSC_PATTERN = new RegExp(
   `${ESCAPE}\\][^${BELL}${ESCAPE}]*(?:${BELL}|${ESCAPE}\\\\)?`,
@@ -48,8 +44,6 @@ function stripControlCharacters(text) {
   return cleaned;
 }
 
-// A hyperlink ends with BEL or with the string terminator, and the text between
-// them must not reach the SVG.
 function stripTerminalEscapes(line) {
   return line
     .replace(OSC_PATTERN, '')
@@ -109,7 +103,6 @@ function hasSameStyle(run, segment) {
   );
 }
 
-// The column of a run is its visible offset, so escapes must not count.
 function mergeAdjacentRuns(segments) {
   const runs = [];
   let column = 0;

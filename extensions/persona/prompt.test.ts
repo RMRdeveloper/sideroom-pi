@@ -37,8 +37,7 @@ test('restates the catalog instead of duplicating it', () => {
   }
   assert.equal(PERSONA_REMINDER.includes(PERSONA_TOOL_NAME), true);
   assert.equal(PERSONA_REMINDER.includes(PERSONA_SKILL_PATH), true);
-  // Static examples plus the catalog restatement. The budget guards against
-  // unbounded growth; prompt caching cares about byte-stability, not length.
+
   assert.equal(
     PERSONA_REMINDER.length - PERSONA_SKILL_PATH.length < 2000,
     true,
@@ -69,7 +68,7 @@ test("ships both static Do/Don't example pairs with no per-turn data", () => {
     PERSONA_EXAMPLES[1],
     /Don't: Disable the cache invalidation pipeline/,
   );
-  // Reminder must not pick up session-specific values.
+
   assert.doesNotMatch(PERSONA_REMINDER, /\d{4}-\d{2}-\d{2}/);
 });
 
@@ -95,7 +94,7 @@ test('ships a skill that fits one read and stays in sync', () => {
   assert.match(skill, /Plain means everyday words, not more words/);
   assert.match(skill, /fires three times degrades to a steer/);
   assert.match(skill, /three steers are sent per\s+agent run/);
-  assert.match(skill, /triggerTurn: true/);
+  assert.match(skill, /triggerTurn: false/);
   assert.match(skill, /Where is the session-scoped work board\?/);
   assert.match(skill, /Your work list stays with this conversation/);
   assert.match(skill, /Replace a user's unnecessary technical term/);
