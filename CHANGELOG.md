@@ -1,5 +1,17 @@
 # Changelog
 
+## 9.1.0
+
+### Minor Changes
+
+- 234b797: Add sideroom-user-stories to draft, review, and split user stories with observable acceptance criteria, project-specific conventions, and explicit handling of unanswered questions. Writing a story does not authorize ticket publication or implementation.
+
+### Patch Changes
+
+- 234b797: Avoid model turns caused solely by work-board bookkeeping and walkthrough offers. Board reminders follow successful file mutations at most once per user turn without triggering a response. Coalesce test-coverage notices, walkthrough offers and pending final-response style corrections into existing settle continuations, and discard superseded prose corrections. Keep necessary guideline review and check gates.
+- 234b797: Reuse successful checks until a later mutation makes them stale, and return only missing complete guideline documents within a run. Run Jev HTTP reviews in a bounded background queue, replacing stale snapshots and collecting notes before final review without delaying each tool result.
+- 234b797: Replace Biome with ESLint, TypeScript ESLint and ESLint Stylistic in the package and site. Enforce braces and disallow code comments, removing existing comments while keeping executable behavior and string fixtures intact.
+
 ## 9.0.1
 
 ### Patch Changes
