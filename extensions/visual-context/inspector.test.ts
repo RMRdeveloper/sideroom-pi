@@ -56,7 +56,7 @@ function loadInspector() {
         listener: EventListener,
         capture = false,
       ) {
-        // Node does not match capture listeners when removal uses a boolean.
+
         window.removeEventListener(type, listener, { capture });
       },
     },

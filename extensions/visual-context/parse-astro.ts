@@ -40,8 +40,6 @@ function byteOffsets(source: string): Int32Array {
   return offsets;
 }
 
-// Astro's self-closing node end may precede its attributes. Find only the end
-// of its original opening tag, respecting quoted and braced attribute values.
 function openingTagEnd(source: string, start: number): number {
   let quote = '';
   let braces = 0;
@@ -87,16 +85,16 @@ export function parseAstro(source: string): ParsedMarkup {
           : undefined;
       const value =
         expression === undefined ? undefined : literalText(expression);
-      // Expression text is JS source, not rendered text. Visit only real tags.
+
       return value === undefined
         ? [
-            {
-              kind: 'dynamic',
-              children: node.children
-                .filter((child) => child.type !== 'text')
-                .flatMap(convert),
-            },
-          ]
+          {
+            kind: 'dynamic',
+            children: node.children
+              .filter((child) => child.type !== 'text')
+              .flatMap(convert),
+          },
+        ]
         : [{ kind: 'text', value }];
     }
     if (node.type === 'root' || node.type === 'fragment') {
@@ -117,8 +115,7 @@ export function parseAstro(source: string): ParsedMarkup {
     const closingTag = reportedRange
       .slice(reportedRange.lastIndexOf('</'))
       .replace(/\s+>$/u, '>');
-    // When the compiler's closing position is wrong, the verified opening tag
-    // is still a valid source range; never extend it to a guessed closing tag.
+
     const end =
       isClosed || closingTag !== `</${node.name}>` ? openingEnd : reportedEnd;
     if (!node.position?.end && !isClosed) {

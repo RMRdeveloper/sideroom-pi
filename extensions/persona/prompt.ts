@@ -15,8 +15,6 @@ const PROHIBITION_SUMMARY = PROHIBITIONS.map(
 const ENFORCEMENT_SUMMARY =
   'A write/edit adding a decorative symbol is blocked; other violations trigger a steer.';
 
-// Static Do/Don't pairs. Literals only: no per-turn data, so the reminder
-// stays byte-identical across turns and the provider prompt cache holds.
 export const PERSONA_EXAMPLES = [
   "Do: Your work list stays with this conversation, not in project files. Don't: Session-scoped board state persists outside the repository.",
   "Do: To get a fresh answer, turn off the cache (stored results). Don't: Disable the cache invalidation pipeline.",

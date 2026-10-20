@@ -170,8 +170,7 @@ test('validates final delivery after later tool_result handlers run', async () =
       ...(gate.handlers.get('tool_result') ?? []),
       laterHandler,
     ]);
-    // SAFETY: This runner only dispatches handlers; no registry methods or
-    // unrelated extension fields are used by these notification paths.
+
     const runner = new ExtensionRunner(
       [
         {
@@ -267,4 +266,32 @@ test('full reads still load the skill when the new tool is unused', () => {
     isError: false,
   });
   assert.equal(gate.blocked('README.md'), undefined);
+});
+
+test('additional languages deliver only missing complete documents', async () => {
+  const gate = harness();
+  const first = await gate.load('new.ts');
+  gate.deliver(first);
+  const additional = await gate.load('new.py', { id: 'python' });
+  assert.deepEqual(additional.details, { paths: [languageGuideFor('new.py')] });
+  assert.equal(additional.content.length, 1);
+  assert.ok(gate.blocked('new.py'));
+  gate.deliver(additional, { id: 'python' });
+  assert.equal(gate.blocked('new.py'), undefined);
+  const repeated = await gate.load('another.ts');
+  assert.deepEqual(repeated.details, { paths: [] });
+  assert.match(JSON.stringify(repeated.content), /already loaded/);
+});
+
+test('a shortened additional guide does not authorize that language', async () => {
+  const gate = harness();
+  gate.deliver(await gate.load('new.ts'));
+  const additional = await gate.load('new.py', { id: 'python' });
+  additional.content = [{ type: 'text', text: 'partial document' }];
+  gate.deliver(additional, { id: 'python' });
+  assert.ok(gate.blocked('new.py'));
+  assert.equal(gate.blocked('new.ts'), undefined);
+  gate.emit('session_compact');
+  const reloaded = await gate.load('new.py');
+  assert.deepEqual(reloaded.details, { paths: [GUIDELINE_SKILL_PATH, languageGuideFor('new.py')] });
 });

@@ -1,6 +1,3 @@
-// Turns Pi's session JSONL lines into the two facts the cache report needs:
-// how many tokens each assistant call re-sent, and whether the turn before it
-// moved the work board.
 
 const MESSAGE_ENTRY = 'message';
 const USER_ROLE = 'user';
@@ -19,8 +16,7 @@ export function parseSessionLines(lines) {
     try {
       entries.push(JSON.parse(line));
     } catch {
-      // Pi appends JSONL while the session runs, so a torn last line is
-      // expected: count it and keep going instead of failing the report.
+
       skippedLines += 1;
     }
   }

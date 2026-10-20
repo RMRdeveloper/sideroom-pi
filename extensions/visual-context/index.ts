@@ -71,7 +71,7 @@ export default function registerVisualContext(
     commitPending({ store, pi, pending });
     refresh(ctx);
   };
-  // An async dialog may only act while it still belongs to the active session.
+
   const dialogIsCurrent = (ctx: ExtensionContext, epoch: number): boolean =>
     epoch === generation && activeContext === ctx;
   async function activate(ctx: ExtensionContext): Promise<void> {
@@ -191,8 +191,7 @@ export default function registerVisualContext(
       images: event.images,
     };
   });
-  // Input precedes model/auth validation in Pi. Keep the pending snapshot until
-  // the run actually starts so a failed submission cannot lose the attachment.
+
   pi.on('before_agent_start', (event, ctx) => {
     const attachment = preparedContext;
     preparedContext = undefined;
@@ -304,13 +303,13 @@ export default function registerVisualContext(
         const pending =
           selected.action === 'remove'
             ? store.pending.filter(
-                (item) => item.selection.id !== entry.selection.id,
-              )
+              (item) => item.selection.id !== entry.selection.id,
+            )
             : store.pending.map((item) =>
-                item.selection.id === entry.selection.id
-                  ? { ...item, chosen: candidate }
-                  : item,
-              );
+              item.selection.id === entry.selection.id
+                ? { ...item, chosen: candidate }
+                : item,
+            );
         savePending(ctx, pending);
       } finally {
         opening = false;

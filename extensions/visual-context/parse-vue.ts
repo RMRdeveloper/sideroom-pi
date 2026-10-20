@@ -96,7 +96,7 @@ export function parseVue(source: string): ParsedMarkup {
         prop.arg.type !== NodeTypes.SIMPLE_EXPRESSION ||
         !prop.arg.isStatic
       ) {
-        // An unknown key or object binding may replace a static id.
+
         attributes.id = undefined;
         attributes.hidden = undefined;
         attributes.contenteditable = undefined;

@@ -65,7 +65,6 @@ function assertUniqueIgnoreReads(paths: readonly string[]): void {
   assert.equal(new Set(ignores).size, ignores.length);
 }
 
-// Read the real filesystem; only observe calls, without supplying file contents.
 test('nested directory patterns and negation apply at every depth, while anchored patterns stay local', (t) => {
   const root = fixture(t);
   for (const path of ['app/cache', 'app/src/cache', 'app/shared/src/cache']) {

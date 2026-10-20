@@ -1,8 +1,6 @@
 import { PERSONA_TOOL_NAME, PROHIBITIONS, VOICE_RULES } from './catalog.ts';
 import type { ProhibitionViolation } from './checks.ts';
 
-// Pi narrows these blocks before handing the message over; the shape is
-// structural so no runtime decoding is needed here.
 export interface TextBlock {
   readonly type: string;
   readonly text?: string;

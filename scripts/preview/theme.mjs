@@ -1,5 +1,3 @@
-// Snapshot of pi's own dark theme, taken from
-// pi-coding-agent/dist/modes/interactive/theme/dark.json.
 
 import { ESCAPE, RESET } from './ansi.mjs';
 
@@ -38,7 +36,6 @@ function resolveColor(name, table) {
   return value;
 }
 
-// The subset of pi's Theme that the rendered widgets call.
 export function createTheme() {
   return {
     fg: (name, text) =>

@@ -1,9 +1,5 @@
 import type { AskAnswer, AskQuestion, AskSelection } from './model.ts';
 
-/**
- * Sorted ascending so the answer and its rendering stay stable no matter the
- * order the user toggled the options in.
- */
 export function toggleSelection(
   selected: readonly number[],
   optionIndex: number,

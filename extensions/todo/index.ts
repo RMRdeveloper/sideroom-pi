@@ -29,13 +29,12 @@ export const TODO_PROMPT_SNIPPET =
 export const TODO_PROMPT_GUIDELINES = [
   'Use sideroom_todo to maintain a live work board when implementation has more than one step.',
   'While any item is pending, exactly one must be in_progress.',
-  'Complete the current item and start the next item in the same update call.',
+  'Update at task milestones, not after each tool call. Complete the current item and start the next item in the same update call.',
   'propose is interactive-TUI-only; update also works in print, JSON, and RPC modes.',
 ];
 
 const BOARD_SHORTCUT = 'f9';
 
-// Pi loads extensions/*/index.ts through export default.
 export default function registerTodo(pi: ExtensionAPI): void {
   const store = createTodoStore();
   const overlay = createTodoBoardOverlayController(() => store.items);

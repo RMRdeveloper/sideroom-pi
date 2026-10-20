@@ -49,8 +49,6 @@ export interface JevAttempt {
   readonly failure: JevFailure | undefined;
 }
 
-// The endpoint is a package constant, never a value from the environment or the
-// session, so the outbound URL cannot be steered by the repository being edited.
 export function createFetchTransport(
   timeoutMs: number = JEV_REQUEST_TIMEOUT_MS,
 ): JevTransport {
@@ -68,8 +66,6 @@ export function createFetchTransport(
   };
 }
 
-// Pi waits for every tool_result handler before the result reaches the model,
-// so the user's Escape has to cut the request, not only the timeout.
 function requestSignal(
   timeoutMs: number,
   runSignal: AbortSignal | undefined,
@@ -97,9 +93,6 @@ export function classifyStatus(status: number): JevFailure | undefined {
   return undefined;
 }
 
-// A Jev failure is a missing note, never an error: the mutation already
-// succeeded and the mechanical rules already ran. So this returns a value
-// instead of throwing, and the caller only decides whether to keep calling.
 export async function askJev(
   transport: JevTransport,
   apiKey: string,

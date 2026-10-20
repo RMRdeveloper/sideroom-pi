@@ -72,16 +72,19 @@ headless runs fail fast by design.
 | Command | What it does |
 | --- | --- |
 | `npm run types` | `tsc --noEmit` over the whole package. |
-| `npm run lint` | Biome lint. `npm run lint:fix` writes fixes. |
-| `npm run format` | Biome format. `npm run format:check` verifies without writing. |
+| `npm run lint` | ESLint lint. `npm run lint:fix` writes fixes. |
+| `npm run format` | ESLint Stylistic fixes. `npm run format:check` verifies without writing. |
 | `npm test` | `node --test` over `extensions/**/*.test.ts` and `scripts/**/*.test.mjs`. |
-| `npm run check` | The gate: types, braces check, Biome check, tests. Run it before every PR. |
+| `npm run check` | The gate: types, braces check, ESLint, tests. Run it before every PR. |
 | `npm run preview` | Rebuilds `media/preview.png` and `media/preview.mp4`. Needs ffmpeg; maintainer tool. |
 | `npm run cache:report` | Reads this project's Pi session files and prints prompt-cache totals. Maintainer tool. |
 | `npm run changeset` | Creates a changeset (see [Changesets](#changesets)). |
 | `npm run changeset:status` | Shows which packages and bumps the pending changesets produce. |
 
-Use Biome. Do not add ESLint, Prettier, or a competing formatter.
+Use ESLint with TypeScript ESLint and ESLint Stylistic. Do not add Prettier or
+a competing formatter. `no-comments/disallowComments` rejects code comments;
+keep explanations in documentation. The same shared rules run in `site/`,
+which installs its own development dependencies.
 
 ## Layout
 

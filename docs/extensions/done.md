@@ -32,27 +32,37 @@ only `npm run check` or `make check` has a gate but no detected test setup.
   low-level tool loop, retries and compaction recovery. They never interrupt
   implementation at `turn_end`.
 - The shared settle guard gives guidelines review and its late semantic notes
-  priority over `done`, and gives `done` priority over the walkthrough offer.
+  priority over `done`. Pending final-response style corrections also precede
+  `done`; the walkthrough offer only supplements an existing continuation.
   The order does not depend on extension loading order.
 - An aborted or errored run, any queued message, or an earlier handler's
   continuation postpones the gate without spending its steering budget.
 - A steer is a hidden `custom_message` entry returned with `continue: true`,
   preserving earlier entries and continuing the same run.
-- Checks and the coverage notice share `MAX_DONE_STEERS = 2` per user turn.
+- Forced check/coverage continuations share `MAX_DONE_STEERS = 2` per user turn.
+  A coverage notice added to another continuation does not spend that budget.
 - State resets on idle interactive/RPC input and `session_start`. Input queued
   while the agent runs does not reset the cap or a green check.
+
+The gate exposes its current detected command and green flag through the
+synchronous `sideroom:check-status` event. Guidelines review uses this result
+to avoid rerunning successful checks when its review changes no files. The
+coverage notice also asks to reuse valid checks. No check is executed by an
+extension, and later mutations still invalidate green.
 
 ## Missing-test notice
 
 A successful `write`/`edit` records source and test paths by convention. A run
-that changes code but no test file receives one coverage notice when checks are
-green and a test setup is detected. Existing tests may already cover the change;
-the notice asks the agent to inspect that coverage and add or update a meaningful
-test only when needed, then rerun the checks.
+that changes code but no test file receives one coverage notice when a test
+setup is detected. The notice joins an existing review, style or check
+continuation, before a separate notice could require another model response.
+If no continuation exists, it retains its bounded standalone behavior.
 
-Documentation and configuration alone do not activate the notice. With checks
-red, the check gate wins and the notice waits. Path recognition never proves
-that the right test exists. Both messages share the same two-steer cap.
+Existing tests may already cover the change; the notice asks the agent to
+inspect coverage, add or update a meaningful test only when needed, and run
+relevant checks. Documentation/configuration changes alone do not activate it.
+Path recognition never proves that the right test exists. A successful later
+mutation still invalidates green checks.
 
 ## Files
 

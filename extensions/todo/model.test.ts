@@ -5,8 +5,6 @@ import {
   formatBoardBlock,
   parseTodoParams,
   prepareTodoArguments,
-  shouldNudgePropose,
-  shouldWatchdogUpdate,
   type TodoItem,
   type TodoParams,
   TodoToolParametersSchema,
@@ -183,7 +181,7 @@ test('rejects invalid patches without partially changing the board', () => {
   }
 });
 
-test('formats the compact board and only nudges the applicable skipped workflow', () => {
+test('formats the complete board and its workflow instructions', () => {
   assert.equal(
     formatBoardBlock([
       { id: 'auth', content: 'Add login route', status: 'in_progress' },
@@ -200,26 +198,6 @@ test('formats the compact board and only nudges the applicable skipped workflow'
       '',
       'Call sideroom_todo update before the next item. While any item is pending, exactly one must be in_progress. Complete the current item and start the next in the same update. propose replaces the list; update patches by id.',
     ].join('\n'),
-  );
-
-  const base = {
-    turnMutated: true,
-    turnCalledTodo: false,
-    proposeNudgedThisRun: false,
-    updateWatchdogThisTurn: false,
-    steerFromUs: false,
-  };
-  assert.equal(shouldNudgePropose({ ...base, items: [] }), true);
-  assert.equal(shouldWatchdogUpdate({ ...base, items: [] }), false);
-  assert.equal(shouldNudgePropose({ ...base, items: board }), false);
-  assert.equal(shouldWatchdogUpdate({ ...base, items: board }), true);
-  assert.equal(
-    shouldWatchdogUpdate({ ...base, items: board, turnCalledTodo: true }),
-    false,
-  );
-  assert.equal(
-    shouldNudgePropose({ ...base, items: [], steerFromUs: true }),
-    false,
   );
 });
 

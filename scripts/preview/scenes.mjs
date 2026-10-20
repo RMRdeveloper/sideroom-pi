@@ -1,6 +1,3 @@
-// The demo scene: what the previews show, and the code that drives the real
-// widgets through it. The widgets are rendered offline with a stub host, so
-// nothing here opens a terminal.
 
 import { join } from 'node:path';
 import { runAskUi } from '../../extensions/ask/ui.ts';
@@ -123,7 +120,6 @@ const EDITED_FILES = [
   { path: 'extensions/rules/checks.ts', toolName: 'write' },
 ];
 
-// input: null holds the current frame while the previous key stays on screen.
 const TIMELINE = [
   { input: null, frames: LONG_HOLD + 2 },
   { input: KEY.down, frames: LONG_HOLD },

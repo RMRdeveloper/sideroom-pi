@@ -93,108 +93,20 @@ test('registers a sequential tool that snapshots and injects the live board', as
   assert.match(injected.message?.content ?? '', /sideroom_todo \(live board/);
   assert.equal(injected.message?.display, false);
 
-  const input = handlers.get('input');
-  const turnStart = handlers.get('turn_start');
-  const toolStart = handlers.get('tool_execution_start');
-  const turnEnd = handlers.get('turn_end');
-  assert.ok(input);
-  assert.ok(turnStart);
-  assert.ok(toolStart);
-  assert.ok(turnEnd);
-  input({ source: 'interactive' } as never, ctx);
-  turnStart({} as never, ctx);
-  toolStart({ toolName: 'write' } as never, ctx);
-  turnEnd({} as never, ctx);
-  assert.deepEqual(steers, [
-    {
-      message: {
-        customType: 'sideroom-todo-watchdog',
-        content:
-          'Use sideroom_todo update to reflect this work before continuing to the next item.',
-        display: false,
-      },
-      options: { triggerTurn: true, deliverAs: 'steer' },
-    },
-  ]);
+  assert.equal(handlers.has('turn_end'), false);
+  const toolResult = handlers.get('tool_result');
+  assert.ok(toolResult);
+  toolResult({ toolName: 'write', isError: false } as never, ctx);
+  assert.equal(steers.length, 1);
+  assert.deepEqual(steers[0]?.options, {
+    triggerTurn: false,
+    deliverAs: 'steer',
+  });
 });
 
-test('resets the steer guard each turn so a nudge cannot silence the run', async () => {
-  const registered: { tool?: RegisteredTool } = {};
+function guardHarness(items: readonly TodoItem[] = initialItems, mode = 'tui') {
   const handlers = new Map<string, EventHandler>();
-  const snapshots: unknown[] = [];
-  const steers: string[] = [];
-  const api = {
-    registerTool(tool: RegisteredTool) {
-      registered.tool = tool;
-    },
-    registerShortcut() {},
-    on(name: string, handler: EventHandler) {
-      handlers.set(name, handler);
-    },
-    appendEntry(_customType: string, data: unknown) {
-      snapshots.push(data);
-    },
-    sendMessage(message: unknown) {
-      steers.push((message as { customType?: string }).customType ?? '');
-    },
-    events: { emit() {} },
-  } as unknown as ExtensionAPI;
-  const ctx = {
-    mode: 'tui',
-    sessionManager: {
-      getBranch: () =>
-        snapshots.map((snapshot) => customEntry(snapshot)) as never,
-    },
-    ui: { setWidget() {} },
-  } as unknown as ExtensionContext;
-
-  registerTodo(api);
-  const tool = registered.tool;
-  assert.ok(tool);
-  const input = handlers.get('input');
-  const turnStart = handlers.get('turn_start');
-  const toolStart = handlers.get('tool_execution_start');
-  const turnEnd = handlers.get('turn_end');
-  assert.ok(input);
-  assert.ok(turnStart);
-  assert.ok(toolStart);
-  assert.ok(turnEnd);
-
-  input({ source: 'interactive' } as never, ctx);
-  turnStart({} as never, ctx);
-  toolStart({ toolName: 'write' } as never, ctx);
-  assert.deepEqual(steers, ['sideroom-todo-nudge']);
-
-  turnStart({} as never, ctx);
-  toolStart({ toolName: 'sideroom_todo' } as never, ctx);
-  await tool.execute(
-    'call-1',
-    propose(initialItems),
-    undefined,
-    undefined,
-    ctx,
-  );
-  turnEnd({} as never, ctx);
-  assert.deepEqual(steers, ['sideroom-todo-nudge']);
-
-  turnStart({} as never, ctx);
-  toolStart({ toolName: 'write' } as never, ctx);
-  turnEnd({} as never, ctx);
-  assert.deepEqual(steers, ['sideroom-todo-nudge', 'sideroom-todo-watchdog']);
-
-  turnStart({} as never, ctx);
-  toolStart({ toolName: 'write' } as never, ctx);
-  turnEnd({} as never, ctx);
-  assert.deepEqual(steers, [
-    'sideroom-todo-nudge',
-    'sideroom-todo-watchdog',
-    'sideroom-todo-watchdog',
-  ]);
-});
-
-test('nudges only once when mutating an empty board', () => {
-  const handlers = new Map<string, EventHandler>();
-  const steers: unknown[] = [];
+  const steers: Array<{ content: string; options: unknown }> = [];
   const api = {
     registerTool() {},
     registerShortcut() {},
@@ -202,36 +114,66 @@ test('nudges only once when mutating an empty board', () => {
       handlers.set(name, handler);
     },
     appendEntry() {},
-    sendMessage(message: unknown) {
-      steers.push(message);
+    sendMessage(message: { content: string }, options: unknown) {
+      steers.push({ content: message.content, options });
     },
     events: { emit() {} },
   } as unknown as ExtensionAPI;
   const ctx = {
-    sessionManager: { getBranch: () => [] },
+    mode,
+    sessionManager: { getBranch: () => [customEntry({ items })] },
     ui: { setWidget() {} },
   } as unknown as ExtensionContext;
-
   registerTodo(api);
-  const input = handlers.get('input');
-  const turnStart = handlers.get('turn_start');
-  const toolStart = handlers.get('tool_execution_start');
-  assert.ok(input);
-  assert.ok(turnStart);
-  assert.ok(toolStart);
-  input({ source: 'interactive' } as never, ctx);
-  turnStart({} as never, ctx);
-  toolStart({ toolName: 'write' } as never, ctx);
-  toolStart({ toolName: 'edit' } as never, ctx);
+  function emit(name: string, event: unknown) {
+    handlers.get(name)?.(event as never, ctx);
+  }
+  return { emit, steers };
+}
 
-  assert.deepEqual(steers, [
-    {
-      customType: 'sideroom-todo-nudge',
-      content:
-        'Use sideroom_todo propose now to create the live board before continuing implementation.',
-      display: false,
-    },
+test('reminds once per idle user turn without scheduling a model turn', () => {
+  const run = guardHarness();
+  for (let index = 0; index < 100; index += 1) {
+    run.emit('turn_start', {});
+    run.emit('tool_result', { toolName: 'write', isError: false });
+    run.emit('turn_end', {});
+  }
+  assert.equal(run.steers.length, 1);
+  assert.match(run.steers[0]?.content ?? '', /when a task changes status/);
+  assert.deepEqual(run.steers[0]?.options, {
+    triggerTurn: false,
+    deliverAs: 'steer',
+  });
+  run.emit('input', { source: 'interactive', streamingBehavior: 'steer' });
+  run.emit('tool_result', { toolName: 'edit', isError: false });
+  assert.equal(run.steers.length, 1);
+  run.emit('input', { source: 'rpc' });
+  run.emit('tool_result', { toolName: 'edit', isError: false });
+  assert.equal(run.steers.length, 2);
+  run.emit('session_start', {});
+  run.emit('tool_result', { toolName: 'write', isError: false });
+  assert.equal(run.steers.length, 3);
+});
+
+test('ignores reads, bash and failed edits, and only suggests supported proposals', () => {
+  const run = guardHarness([]);
+  for (const toolName of ['bash', 'read', 'sideroom_todo']) {
+    run.emit('tool_execution_start', { toolName });
+    run.emit('tool_result', { toolName, isError: false });
+  }
+  run.emit('tool_result', { toolName: 'edit', isError: true });
+  assert.equal(run.steers.length, 0);
+  run.emit('tool_result', { toolName: 'write', isError: false });
+  assert.equal(run.steers.length, 1);
+  assert.match(run.steers[0]?.content ?? '', /propose if.*multiple steps/);
+  const print = guardHarness([], 'print');
+  print.emit('tool_result', { toolName: 'write', isError: false });
+  assert.equal(print.steers.length, 0);
+  const closed = guardHarness([
+    { id: 'done', content: 'Finished work', status: 'completed' },
   ]);
+  closed.emit('tool_result', { toolName: 'write', isError: false });
+  assert.equal(closed.steers.length, 0);
 });
 
 test('prepares stringified items before execute sees native arrays', () => {

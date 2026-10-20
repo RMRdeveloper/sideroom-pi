@@ -20,7 +20,6 @@ export const PERSONA_DESCRIPTION =
 export const PERSONA_PROMPT_SNIPPET =
   'Load the complete writing guide before substantial user-facing prose.';
 
-// Pi loads extensions/*/index.ts through export default.
 export default function registerPersona(pi: ExtensionAPI): void {
   const state = createPersonaGuardState();
   const publishStatus = (ctx: ExtensionContext): void => {
@@ -34,7 +33,10 @@ export default function registerPersona(pi: ExtensionAPI): void {
   };
   registerPersonaGuard(pi, state, publishStatus);
 
-  pi.on('session_start', (_event, ctx) => publishStatus(ctx));
+  pi.on('session_start', (_event, ctx) => {
+    resetPersonaRun(state);
+    publishStatus(ctx);
+  });
 
   pi.on('before_agent_start', (event, ctx) => {
     resetPersonaRun(state);

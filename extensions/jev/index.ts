@@ -26,13 +26,10 @@ import {
   statusLabel,
 } from './ui.ts';
 
-// Pi loads extensions/*/index.ts through export default.
 export default function registerJev(pi: ExtensionAPI): void {
   const configPath = configPathFor(getAgentDir());
   const guardState = createJevGuardState();
 
-  // The key is read on each use instead of cached at load time, so a key stored
-  // during a running session takes effect without a restart.
   const readKey = () => resolveApiKey(process.env, configPath);
 
   const currentStatus = (): JevStatus => {

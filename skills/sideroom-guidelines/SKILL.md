@@ -11,7 +11,7 @@ metadata:
 
 ## Activation Contract
 
-Before `write` or `edit`, call `sideroom_guidelines` with the target file's `path`. It returns this whole skill and the matching complete language guide, or only this skill for unsupported languages. Reuse loaded guides during the same agent run; load any additional target language before editing it. Reload after compaction or a new run.
+Before `write` or `edit`, call `sideroom_guidelines` with the target file's `path`. On first load it returns this whole skill and the matching complete language guide, or only this skill for unsupported languages. Later calls return only missing complete documents; an already loaded target receives a short acknowledgement. Reuse loaded guides during the same agent run; load any additional target language before editing it. Reload after compaction or a new run.
 
 Alternatively, load this whole skill with `read`, without `offset` or `limit`, using the absolute packaged path shown in Available Skills. For each supported target language, also fully load its exact guide from `references/languages/`. Both routes satisfy the same gate only on successful, complete delivery.
 

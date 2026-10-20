@@ -2,8 +2,6 @@ import { resolveFileToolPath } from '../shared/file-path.ts';
 
 export const EXPLAIN_OFFER_TYPE = 'sideroom-explain-offer';
 
-// Five is the point where a turn stopped being an adjustment and became work
-// worth walking the user through.
 export const EXPLAIN_FILE_THRESHOLD = 5;
 
 const TUI_MODE = 'tui';
@@ -36,8 +34,6 @@ export function resetExplainTurn(state: ExplainState): void {
   state.offeredThisTurn = false;
 }
 
-// Pi reports the path as the model wrote it, so use the built-in file-tool
-// semantics and canonicalize existing aliases before counting the file.
 export function mutationPathKey(cwd: string, path: string): string | undefined {
   return resolveFileToolPath(cwd, path);
 }
@@ -46,7 +42,6 @@ export function recordMutation(state: ExplainState, pathKey: string): void {
   state.mutatedFilesThisTurn.add(pathKey);
 }
 
-// The shared settle guard gives review and checks priority over the offer.
 export function decideOffer(
   state: ExplainState,
   mode: string,

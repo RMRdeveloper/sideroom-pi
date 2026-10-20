@@ -10,7 +10,6 @@ const MISSING_PATH_ERROR_CODE = {
 } as const;
 const UNICODE_SPACES = /[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g;
 
-// File guards must resolve the model's path exactly as Pi's built-in tools do.
 export function resolveFileToolPath(
   cwd: string,
   path: string,
@@ -29,8 +28,6 @@ export function resolveFileToolPath(
   return realpathOr(absolutePath);
 }
 
-// A file that does not exist yet keeps its unresolved path, so it is matched
-// against the literal working directory as well as the canonical one.
 export function projectRelativePath(
   cwd: string,
   absolutePath: string,

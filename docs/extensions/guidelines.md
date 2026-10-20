@@ -10,7 +10,10 @@ supported target, the matching complete language guide.
 `{ "path": "src/example.ts" }` before editing. The target file need not exist;
 only its extension selects a guide. `execute.ts` reads the complete packaged
 skill and matching guide using `catalog.ts`; unsupported extensions return only
-the general skill. It never reads or writes the target file.
+the general skill. Only missing documents are returned in later calls: a
+second language does not repeat the general skill, and a fully loaded target
+gets a short acknowledgement. Only completed, verified deliveries count; the
+acknowledgement authorizes nothing new. It never reads or writes the target file.
 
 The tool requires Pi 1.2.0 or later and uses `model-only` exposure: nested
 callers cannot load documents and discard them before the agent sees them.
@@ -77,7 +80,10 @@ quiet `agent_before_settle` boundary. It asks the agent to finish any remaining
 requested implementation, then review only the changes introduced by this run
 against the loaded language guide. It fixes demonstrated violations caused by
 the change, preserves required behavior, and avoids unrelated refactors. The
-agent then runs the relevant formatter, linter, type checks, and tests. If the
+agent reuses successful relevant checks performed after the latest mutation
+and runs only missing, failed or stale checks. The done gate shares its actual
+green status and detected command through `sideroom:check-status`; after a
+corrective edit, earlier checks are stale again. If the
 guide has left context, the steer asks for a fresh full read.
 
 The steer explicitly includes rule 20, Decomposition by intent (structural):
@@ -112,8 +118,8 @@ check. This criterion applies only to changes introduced by the run.
 - `agent_settled` is not used: Pi documents it as notification-only, and a
   steer sent there opens a second run after the user saw the agent stop.
 - The shared settle guard gives review and semantic follow-ups priority over
-  checks and the walkthrough offer in every extension loading order. Each
-  boundary appends at most one Sideroom finish steer.
+  checks and the walkthrough offer in every extension loading order. Necessary background Jev reviews are drained first, so their notes are
+  present before any stage selects its steer, regardless of load order.
 
 ### Semantic notes from Jev
 

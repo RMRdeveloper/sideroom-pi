@@ -74,6 +74,7 @@ function createHarness(): Harness {
       harness.handlers.set(name, handler);
     },
     events: {
+      on() {},
       emit(channel: string, payload: unknown) {
         if (channel === REVIEW_NOTE_EVENT && isReviewNote(payload)) {
           harness.notes.push(payload.text);
@@ -97,7 +98,9 @@ function createHarness(): Harness {
 
 function withHarness(run: (harness: Harness) => Promise<void>): Promise<void> {
   const harness = createHarness();
-  return run(harness).finally(() => {
+  return run(harness).finally(async () => {
+    harness.guardState.queue.cancel();
+    await harness.guardState.queue.drain();
     rmSync(harness.cwd, { recursive: true, force: true });
   });
 }
@@ -120,13 +123,13 @@ function callTool(
   );
 }
 
-function finishTool(
+async function finishTool(
   harness: Harness,
   toolName: string,
   toolCallId: string,
   path: string,
 ): Promise<unknown> {
-  return handlerOf(harness, 'tool_result')(
+  const outcome = handlerOf(harness, 'tool_result')(
     {
       toolName,
       toolCallId,
@@ -135,7 +138,9 @@ function finishTool(
       isError: false,
     } as never,
     harness.ctx as never,
-  ) as Promise<unknown>;
+  );
+  await harness.guardState.queue.drain();
+  return outcome;
 }
 
 async function writeFile(
@@ -337,8 +342,9 @@ test('passes the run signal and does not count an Escape as a failure', async ()
       const controller = new AbortController();
       harness.signal = controller.signal;
       harness.transport = async (request) => {
-        assert.equal(request.signal, controller.signal);
+        assert.equal(request.signal?.aborted, false);
         controller.abort();
+        assert.equal(request.signal?.aborted, true);
         throw new Error('aborted');
       };
       await writeFile(harness, { toolCallId: `w${String(index)}` });
@@ -497,7 +503,7 @@ async function workflowResult(
     isError?: boolean;
   },
 ): Promise<unknown> {
-  return handlerOf(harness, 'tool_result')(
+  const outcome = handlerOf(harness, 'tool_result')(
     {
       toolName,
       toolCallId: 'workflow',
@@ -508,6 +514,8 @@ async function workflowResult(
     } as never,
     harness.ctx as never,
   );
+  await harness.guardState.queue.drain();
+  return outcome;
 }
 
 const askInput = {
@@ -651,5 +659,86 @@ test('deletion-only edits invalidate cached file evidence and passed checks with
     assert.equal(harness.guardState.evidence.files.size, 0);
     assert.equal(harness.guardState.evidence.checks, 'stale');
     assert.equal(harness.requests.length, 1);
+  });
+});
+
+test('does not await HTTP in tool_result and collects the result at settle', async () => {
+  await withHarness(async (harness) => {
+    let release: () => void = () => { throw new Error('response gate missing'); };
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    harness.transport = async () => {
+      await pending;
+      return { status: 200, text: '{"answers":{"question-options":{"noul":0.95}}}' };
+    };
+    const outcome = handlerOf(harness, 'tool_result')({
+      toolName: 'sideroom_ask', toolCallId: 'ask', input: askInput,
+      details: { cancelled: false }, isError: false,
+    } as never, harness.ctx as never);
+    assert.equal(outcome, undefined);
+    await Promise.resolve();
+    assert.equal(harness.requests.length, 1);
+    assert.equal(harness.notes.length, 0);
+    const boundary = handlerOf(harness, 'agent_before_settle')({
+      outcome: 'completed', continue: false, context: { pendingMessages: [] },
+    } as never, harness.ctx as never);
+    release();
+    await boundary;
+    assert.equal(harness.notes.length, 1);
+  });
+});
+
+test('a session reset discards a late HTTP result even when transport ignores cancellation', async () => {
+  await withHarness(async (harness) => {
+    let release: () => void = () => { throw new Error('response gate missing'); };
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    harness.transport = async () => {
+      await pending;
+      return { status: 200, text: '{"answers":{"question-options":{"noul":0.95}}}' };
+    };
+    handlerOf(harness, 'tool_result')({
+      toolName: 'sideroom_ask', toolCallId: 'ask', input: askInput,
+      details: { cancelled: false }, isError: false,
+    } as never, harness.ctx as never);
+    await Promise.resolve();
+    assert.equal(harness.requests.length, 1);
+    resetJevSession(harness.guardState);
+    assert.equal(harness.requests[0]?.signal?.aborted, true);
+    release();
+    await harness.guardState.queue.drain();
+    assert.deepEqual(harness.notes, []);
+    assert.equal(harness.guardState.calls, 0);
+  });
+});
+
+test('superseding a file review cancels the old response and keeps surviving added lines', async () => {
+  await withHarness(async (harness) => {
+    let release: () => void = () => { throw new Error('response gate missing'); };
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    let requestNumber = 0;
+    harness.transport = async () => {
+      requestNumber += 1;
+      if (requestNumber === 1) {
+        await pending;
+        return { status: 200, text: '{"answers":{"guard-clauses":{"noul":0.99}}}' };
+      }
+      return { status: 200, text: '{"answers":{}}' };
+    };
+    const path = 'app.ts';
+    const first = 'export const first = 1;\n';
+    callTool(harness, 'write', 'first', { path, content: first });
+    writeFileSync(join(harness.cwd, path), first);
+    handlerOf(harness, 'tool_result')({ toolName: 'write', toolCallId: 'first', input: { path }, isError: false } as never, harness.ctx as never);
+    await Promise.resolve();
+    const second = first + 'export const second = 2;\n';
+    callTool(harness, 'write', 'second', { path, content: second });
+    writeFileSync(join(harness.cwd, path), second);
+    handlerOf(harness, 'tool_result')({ toolName: 'write', toolCallId: 'second', input: { path }, isError: false } as never, harness.ctx as never);
+    assert.equal(harness.requests[0]?.signal?.aborted, true);
+    release();
+    await harness.guardState.queue.drain();
+    assert.deepEqual(harness.notes, []);
+    assert.equal(harness.requests.length, 2);
+    const latest = JSON.parse(harness.requests[1]?.body ?? '{}') as { state: { change: { addedLines: string[] } } };
+    assert.deepEqual(latest.state.change.addedLines, ['export const first = 1;', 'export const second = 2;']);
   });
 });

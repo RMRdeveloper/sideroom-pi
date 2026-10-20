@@ -15,8 +15,6 @@ export const MISSING_TEST_NOTICE_TYPE = 'sideroom-missing-test-notice';
 
 const TEST_DIRECTORY = /(?:^|\/)(?:__tests__|tests?|specs?)(?:\/|$)/;
 
-// Test paths are recognised by name only: the notice never claims the right
-// test exists, so a missed convention only costs a nudge, never a false pass.
 const TEST_FILE =
   /(?:^|\/)(?:test_[\w.-]*\.py|[\w.-]*[._](?:test|spec)\.[\w.-]+|[\w.-]*(?:Test|Tests)\.java)$/;
 
@@ -82,5 +80,5 @@ export function formatDoneSteer(display: string): string {
 }
 
 export function formatMissingTestNotice(): string {
-  return 'This run changed code files and no test file. Check whether existing tests cover the changed behavior; add or update a test if coverage is missing, then rerun the relevant checks before finishing.';
+  return 'This run changed code files and no test file. Check whether existing tests cover the changed behavior; add or update a test if coverage is missing, reuse relevant checks that already passed after the latest mutation, and run missing, failed, or stale checks before finishing. Any code or test edit makes earlier checks stale.';
 }

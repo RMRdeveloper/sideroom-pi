@@ -1,7 +1,5 @@
 import { DEFAULT_LANGUAGE_TAG, LOCALES, type Locale } from '../i18n/index.ts';
 
-// Every indexable page, as its two language variants. src/pages holds the
-// routes; this list has to follow them.
 export const SITE_PAGES: ReadonlyArray<Record<Locale, string>> = [
   { en: '/', es: '/es/' },
   { en: '/policy/', es: '/es/politica/' },
@@ -17,8 +15,6 @@ export interface SitemapEntry {
   readonly alternates: ReadonlyArray<AlternateLink>;
 }
 
-// One entry per page and language, each carrying the links that tell a crawler
-// these are translations of one another.
 export function sitemapEntries(
   toAbsoluteUrl: (sitePath: string) => string,
 ): ReadonlyArray<SitemapEntry> {

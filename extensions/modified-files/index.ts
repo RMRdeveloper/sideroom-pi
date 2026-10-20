@@ -13,7 +13,6 @@ import { createModifiedFilesOverlayController } from './ui.ts';
 
 const SHORTCUT = 'f8';
 
-// Pi loads extensions/*/index.ts through export default.
 export default function registerModifiedFiles(pi: ExtensionAPI): void {
   const store = createModifiedFilesStore();
   const overlay = createModifiedFilesOverlayController(

@@ -1,6 +1,3 @@
-// Page text. Board ids and statuses stay in English in both languages: they are
-// the tokens the agent writes, printed the way the tool prints them. Everything
-// a person reads is translated.
 
 export const en = {
   lang: 'en',

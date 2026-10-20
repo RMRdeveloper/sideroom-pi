@@ -18,7 +18,7 @@ test('detects npm check script from package.json', () => {
   withDir((dir) => {
     writeFileSync(
       join(dir, 'package.json'),
-      JSON.stringify({ scripts: { check: 'biome check' } }),
+      JSON.stringify({ scripts: { check: 'eslint .' } }),
     );
     assert.equal(detectCheckCommand(dir)?.display, 'npm run check');
   });

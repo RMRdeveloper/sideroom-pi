@@ -45,6 +45,7 @@ function register(): Registered {
   } as unknown as ExtensionContext;
 
   const api = {
+    events: { on() {}, emit() {} },
     on(name: string, handler: EventHandler) {
       handlers.set(name, handler);
     },

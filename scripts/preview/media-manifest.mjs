@@ -1,6 +1,3 @@
-// The contract between this generator and the published manifest: the gallery
-// resolves pi.image and pi.video from npm, so those URLs have to keep pointing
-// at the files the script writes.
 
 export const IMAGE_FILE_NAME = 'preview.png';
 export const VIDEO_FILE_NAME = 'preview.mp4';
