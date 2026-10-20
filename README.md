@@ -1,4 +1,4 @@
-# Sideroom Pi — the side room your agent was missing
+# Sideroom Pi: make "done" mean done
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/RMRdeveloper/sideroom-pi/main/media/logo.png" alt="The Sideroom Pi mark" width="640">
@@ -8,8 +8,9 @@
 [![npm monthly downloads](https://img.shields.io/npm/dm/@rmrdeveloper/sideroom-pi?label=downloads&logo=npm)](https://www.npmjs.com/package/@rmrdeveloper/sideroom-pi)
 [![npm license](https://img.shields.io/npm/l/@rmrdeveloper/sideroom-pi?label=license)](https://www.npmjs.com/package/@rmrdeveloper/sideroom-pi)
 
-**Asks before it guesses. Shows the plan. Enforces the style. Refuses to
-call it done in red.**
+**The open-source quality layer for Pi.** Your agent asks before it guesses,
+follows your code rules on the lines it writes, and cannot call a task
+finished while your project's own checks are still red.
 
 ```bash
 pi install npm:@rmrdeveloper/sideroom-pi
@@ -17,18 +18,16 @@ pi install npm:@rmrdeveloper/sideroom-pi
 
 ![Sideroom asking a multi-question batch and keeping the live board below it](https://raw.githubusercontent.com/RMRdeveloper/sideroom-pi/main/media/preview.png)
 
-> Coding agents fail in predictable ways: they guess instead of asking, they
-> bury progress in chat scroll, they litter your repo with `TODO.md` files,
-> every session writes code in a slightly different style, and they declare
-> victory while the project checks are still red.
+> "Done, everything works." You open the project. The tests are red.
 >
-> **Sideroom fixes all of it — without touching your repository.**
+> Sideroom is for people who use Pi on real work and are tired of reviewing
+> and redoing what the agent delivered. Same freedom and price as Pi; the
+> discipline you expect from a senior review.
 
-Sideroom Pi is a global [Pi package](https://pi.dev/docs/latest/packages)
-that gives the parent agent a *side room* next to your code: a place to ask
-sharp questions, show live progress, track what changed, and stay honest
-about code quality. The room lives in the Pi session, not in your repo. No
-`.pi` config, no task graph, no Sideroom files left behind.
+For developers who chose Pi for control or cost and need the result to be
+actually ready: Sideroom is the quality layer that makes Pi follow your
+rules, ask when there are two reasonable paths, and not say "done" until
+your project passes its own checks.
 
 ## Why Sideroom exists
 
