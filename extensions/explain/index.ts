@@ -1,10 +1,8 @@
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
-import { registerExplainGuard } from './guard.ts';
-import { createExplainState, resetExplainTurn } from './model.ts';
+import { appendExplainReminder } from './prompt.ts';
 
 export default function registerExplain(pi: ExtensionAPI): void {
-  const state = createExplainState();
-  registerExplainGuard(pi, state);
-
-  pi.on('session_start', () => resetExplainTurn(state));
+  pi.on('before_agent_start', (event) => ({
+    systemPrompt: appendExplainReminder(event.systemPrompt),
+  }));
 }

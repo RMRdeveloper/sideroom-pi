@@ -1,55 +1,35 @@
-# Walkthrough offer (`explain`)
+# Walkthrough invitation (`explain`)
 
-The walkthrough offer joins an already necessary end-of-work continuation.
-It never requests a model response by itself. There is no tool, widget, or
-persisted state.
+After meaningful changes are complete, including review and checks, the agent
+may end its final response with one short sentence offering to explain the
+changes or how to test them, in the user's language.
 
-## Trigger
+The invitation is optional. Omit it for trivial work, when the requested
+explanation is already provided, or when the user asks for no follow-up.
+There is no file-count threshold, automatic questionnaire, closing steer,
+widget, tool, or persisted state.
 
-Successful `write`/`edit` results count distinct paths using Pi's aliases and
-canonical file identity. At least five files must have changed in the user
-turn, and the mode must be `tui` because the offer uses `sideroom_ask`.
+## Timing and interaction
 
-At a completed, quiet `agent_before_settle`, the shared settle guard selects
-necessary work: review and late semantic notes, then a pending persona
-correction, then checks/coverage. Through `sideroom:settle-supplement`, explain
-can append its instruction to that same continuation, regardless of extension
-load order. The instruction says to finish the implementation, review and
-checks before asking the question. The offer cannot claim that checks passed.
+`before_agent_start` appends a fixed, idempotent reminder to the system prompt.
+The reminder contains no session state, so the composed prompt stays
+byte-identical across turns. The model decides whether the invitation adds
+value and includes it in the final response; the extension does not rewrite
+responses or guarantee that an invitation appears.
 
-If no stage needs to continue, explain stays silent. This also applies when
-explain runs alone or the five-file threshold is reached after the last
-necessary continuation. The extension does not wake the model just to offer
-an optional explanation.
+`explain` registers no settle handler and requests no continuation. It works
+without another extension scheduling a review or checks, and cannot open an
+extra model turn or interrupt work with an automatic question.
 
-## Limits
-
-- Once per user turn, marked only when the supplement is actually appended.
-- Only successful file mutations count; aliases of one file count once.
-- Aborts, errors, queued messages and earlier continuations do not consume the
-  offer. It does not run on `agent_end` or `agent_settled`.
-- Idle interactive/RPC input re-arms it; input typed during a run does not.
-- `session_start` clears its in-memory state.
-
-## The offer
-
-After finishing the requested work, review, and checks:
-
-> Use sideroom_ask for one question in the user's language with four parallel
-> options: changes only, test steps only, both, or no explanation. Recommend
-> changes only.
-
-The agent writes the wording in the user's language. `sideroom_ask` owns the
-recommendation, Out of scope and custom-answer rows.
+Only after the user explicitly accepts, the agent may use `sideroom_ask` in
+the TUI if it needs to clarify whether to explain changes, test steps, or
+both. If the scope is already clear, it explains directly. Outside the TUI,
+any necessary clarification stays in ordinary conversation.
 
 ## Files and tests
 
-`index.ts` initializes session state; `model.ts` owns file counting, the TUI
-gate, the threshold and the offer text; `guard.ts` records mutations and
-registers the supplement. `extensions/shared/settle.ts` owns necessary
-continuations and supplement collection through Pi's synchronous event bus.
-
-`model.test.ts` covers the threshold, aliases and re-arming. `index.test.ts`
-covers non-triggering standalone behavior, load order, successful mutations,
-input timing, resets, and abort/error paths. `shared/settle.test.ts` verifies
-coalescing with review, persona and checks without an extra closing turn.
+`index.ts` registers the fixed reminder; `prompt.ts` owns its wording and
+idempotent append. Tests verify prompt preservation, stable composition, and
+that the extension registers no tools or closing hooks. The shared prompt
+cache tests keep the system prompt stable after work-board updates, while
+the settle tests verify that loading explain adds no closing continuation.

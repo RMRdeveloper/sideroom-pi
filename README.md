@@ -9,8 +9,8 @@
 [![npm license](https://img.shields.io/npm/l/@rmrdeveloper/sideroom-pi?label=license)](https://www.npmjs.com/package/@rmrdeveloper/sideroom-pi)
 
 **The open-source quality layer for Pi.** Your agent asks before it guesses,
-follows your code rules on the lines it writes, and cannot call a task
-finished while your project's own checks are still red.
+follows your code rules on the lines it writes, and reviews its changes
+before finishing.
 
 ```bash
 pi install npm:@rmrdeveloper/sideroom-pi
@@ -26,8 +26,8 @@ pi install npm:@rmrdeveloper/sideroom-pi
 
 For developers who chose Pi for control or cost and need the result to be
 actually ready: Sideroom is the quality layer that makes Pi follow your
-rules, ask when there are two reasonable paths, and not say "done" until
-your project passes its own checks.
+rules, ask when there are two reasonable paths, and review its changes
+against the loaded guide before finishing.
 
 ## Why Sideroom exists
 
@@ -61,8 +61,8 @@ Sideroom answers each one with a small, opinionated surface:
 | Unapplied guidelines | `sideroom_rules` — mechanical checks that block or flag the lines you add |
 | Unchecked judgment rules | `jev` — asks a decision model about guide rules with visible evidence |
 | Unclear answers | `sideroom_persona` — one voice: direct, plain, and free of unnecessary technical words |
-| Premature completion | `sideroom_done` — steers back to the project's check command before finishing |
-| Work left unexplained | `explain` — offers a walkthrough and how to test it once the work settles |
+| Premature completion | Guidelines review — asks for relevant checks and reuses valid results |
+| Work left unexplained | `explain` — invites a walkthrough in the final response after meaningful work |
 
 ## What it feels like
 
@@ -101,9 +101,9 @@ wall of tool calls, it:
   conditionals and swallowed errors block the mutation; vague names, stale
   `TODO`s, commented-out code, and debug output are appended as notes to the
   result. A rule that keeps firing degrades instead of trapping the agent.
-- **Does not call it done in red.** When files changed and the project's own
-  check command has not passed, the agent is steered back to run it before
-  finishing. If no check command is detectable, the gate stays out of the way.
+- **Reviews before finishing.** The guidelines review asks for missing,
+  failed or stale checks and reuses valid results. Check observation never
+  forces another response just to run a command.
 
 ## What's inside
 
@@ -273,24 +273,25 @@ symbols in the lines a `write`/`edit` adds block the mutation; flattering
 openers, hedging, automatic apologies, and AI meta-commentary are answered
 with a capped steer. No profiles to switch and no profile selection to store.
 
-### Done — done means green
+### Done — passive check observation
 
 `sideroom_done` detects the project's check command — `package.json` scripts
 (`check` → `test` → `lint` → `typecheck` → `types`) with the right
 package manager, `pytest`, `go test ./...`, `cargo test`, or a `make check`
-target — and watches for it to pass. If files changed without a green run, the
-agent is steered once per turn, up to a cap, to run it before finishing. When
-nothing is detectable, the gate does nothing.
+target — and observes checks the agent chooses to run. It shares successful
+results with guidelines review, so that review can reuse them. It never requests
+a continuation to run checks. A coverage notice can join an existing review or
+style continuation, but never opens one on its own.
 
-### Explain — the walkthrough offer
+### Explain — the walkthrough invitation
 
-When a review, style correction, or check already requires a closing
-continuation, `explain` can add a walkthrough offer through `sideroom_ask`:
-changes only, test steps only, both, or nothing. The instruction asks the agent
-to finish the work, review and checks before offering. It never opens a turn
-solely for an offer. Once per user turn, only after at least five distinct
-files changed, and only in the TUI. Aborts, errors and queued messages postpone
-it. No tool, widget or persisted state.
+After meaningful changes, review and checks are complete, `explain` lets the
+agent end its final response with a short invitation to explain the changes
+or how to test them. It skips trivial work and explanations already given.
+There is no automatic questionnaire, file-count threshold or extra model turn.
+Only after you accept, the agent may clarify the scope through `sideroom_ask`
+in the TUI; if your request is clear, it explains directly. A fixed reminder
+keeps the system prompt stable across turns. No tool, widget or persisted state.
 
 ## Quick path
 
@@ -455,22 +456,20 @@ itself.
   `cargo test`, or `make check`. Detection is cached per working directory.
 - Green means that command ran with a zero exit in this run. A later
   successful `write`/`edit` clears green again.
-- Steering: once per turn, at most twice per run, then it stops.
+- Observation only: no standalone check or coverage continuation. Coverage
+  notices join another necessary continuation at most once per user turn.
 
 ### Explain contract
 
-- Trigger: `agent_before_settle` with at least five distinct files mutated
-  since the last idle user prompt, in TUI mode, on a completed run with no user
-  message pending. File identity follows Pi's path aliases and canonicalizes
-  existing paths.
-- Delivery: joins an existing necessary settle continuation through the shared
-  supplement event, in any extension load order. If none is needed, stays silent.
-- The steer names the intent; the agent writes the question in the user's
-  language with four options, one of them a decline, and one recommendation.
-  `sideroom_ask` still adds *Out of scope* and the custom answer.
-- At most one offer per turn. The flag is set only when the supplement is
-  appended; the offer never triggers its own continuation.
-- No green-check requirement: red checks still produce the offer.
+- Delivery: a fixed, idempotent reminder on `before_agent_start`; no per-turn
+  state is interpolated into the system prompt.
+- After meaningful work, review and checks, the agent may include one short
+  invitation in the final response, in the user's language. Trivial work,
+  explanations already provided and requests for no follow-up skip it.
+- No file-count threshold, automatic questionnaire, closing hook or extra turn.
+- After explicit acceptance, clarify scope through `sideroom_ask` only when
+  needed in the TUI. Otherwise explain directly, or clarify in ordinary
+  conversation outside the TUI.
 
 ### Grill contract
 

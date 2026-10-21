@@ -22,7 +22,7 @@ import registerVisualContext from '../visual-context/index.ts';
 
 const BASE_SYSTEM_PROMPT = 'base system prompt';
 
-const SYSTEM_PROMPT_MUTATORS = ['guidelines', 'persona'];
+const SYSTEM_PROMPT_MUTATORS = ['explain', 'guidelines', 'persona'];
 
 const EXTENSIONS: readonly ExtensionEntry[] = [
   ['ask', registerAsk],
