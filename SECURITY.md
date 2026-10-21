@@ -49,9 +49,9 @@ Include what you have:
   access. Review the source before installing, as Pi itself advises.
 - Behavior of your own project's check commands, hooks, or linters.
 - Vulnerabilities in Pi, in `pi-tui`, or in `typebox`. Report those upstream.
-- The `sideroom_rules` and `sideroom_done` checks being heuristics that a
-  determined agent could route around. They reduce accidents; they are not a
-  sandbox.
+- The `sideroom_rules` checks being heuristics that a determined agent could
+  route around. They reduce accidents; they are not a sandbox. Done only observes
+  check results and does not enforce verification.
 
 ## What to expect
 

@@ -1,15 +1,9 @@
 export interface DoneState {
-  mutated: boolean;
   checksGreen: boolean;
-  steerCount: number;
   mutatedSource: boolean;
   mutatedTest: boolean;
   noticedMissingTest: boolean;
 }
-
-export const MAX_DONE_STEERS = 2;
-
-export const DONE_GATE_TYPE = 'sideroom-done-gate';
 
 export const MISSING_TEST_NOTICE_TYPE = 'sideroom-missing-test-notice';
 
@@ -22,9 +16,7 @@ const SOURCE_FILE = /\.(?:[cm]?js|jsx|ts|tsx|go|java|php|py|rs)$/i;
 
 export function createDoneState(): DoneState {
   return {
-    mutated: false,
     checksGreen: false,
-    steerCount: 0,
     mutatedSource: false,
     mutatedTest: false,
     noticedMissingTest: false,
@@ -32,9 +24,7 @@ export function createDoneState(): DoneState {
 }
 
 export function resetDoneRun(state: DoneState): void {
-  state.mutated = false;
   state.checksGreen = false;
-  state.steerCount = 0;
   state.mutatedSource = false;
   state.mutatedTest = false;
   state.noticedMissingTest = false;
@@ -50,18 +40,6 @@ export function isSourcePath(path: string): boolean {
   return SOURCE_FILE.test(normalized);
 }
 
-export function shouldSteerDone(
-  state: DoneState,
-  hasCommand: boolean,
-): boolean {
-  return (
-    hasCommand &&
-    state.mutated &&
-    !state.checksGreen &&
-    state.steerCount < MAX_DONE_STEERS
-  );
-}
-
 export function shouldNoticeMissingTest(
   state: DoneState,
   hasTests: boolean,
@@ -70,13 +48,8 @@ export function shouldNoticeMissingTest(
     hasTests &&
     state.mutatedSource &&
     !state.mutatedTest &&
-    !state.noticedMissingTest &&
-    state.steerCount < MAX_DONE_STEERS
+    !state.noticedMissingTest
   );
-}
-
-export function formatDoneSteer(display: string): string {
-  return `Run \`${display}\` and make it pass before finishing.`;
 }
 
 export function formatMissingTestNotice(): string {

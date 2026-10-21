@@ -106,7 +106,7 @@ _Avoid: child session, parent/child session._
 
 ## Turn
 
-The stretch of agent work between two user prompts, from the prompt until the agent settles. The `explain` offer, the review steer, and Jev's dedup set belong to one turn and reset when the next user prompt arrives while the agent is idle; a message typed during a run joins that run instead of opening a turn.
+The stretch of agent work between two user prompts, from the prompt until the agent settles. The review steer and Jev's dedup set belong to one turn and reset when the next user prompt arrives while the agent is idle; a message typed during a run joins that run instead of opening a turn.
 
 _Avoid: run, prompt window._
 
@@ -136,7 +136,7 @@ _Avoid: technical decision, design decision._
 
 ## Detected check command
 
-The single project command that the done extension watches to decide whether the session is green, chosen from package manager scripts and known ecosystem defaults. It is detected from the working directory, not configured.
+The single project command that the done extension observes to share successful results with review, chosen from package manager scripts and known ecosystem defaults. It is detected from the working directory, not configured. Observation never forces a continuation to run checks.
 
 _Avoid: test command, build command._
 
@@ -172,7 +172,7 @@ _Avoid: review reminder, quality gate message._
 
 ## Walkthrough offer
 
-The `explain` supplement asks the agent to offer a walkthrough through `sideroom_ask` after finishing the work, review and checks. It joins an existing necessary settle continuation and never starts one by itself.
+The `explain` reminder allows a short invitation in the final response after meaningful work, review and checks. It has no closing continuation or file-count threshold. Only after explicit user acceptance may the agent clarify walkthrough scope through `sideroom_ask` in the TUI; a clear request receives the explanation directly.
 
 _Avoid: summary offer, explanation prompt._
 

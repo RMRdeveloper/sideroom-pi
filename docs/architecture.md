@@ -35,10 +35,10 @@ extensions/
   guidelines/     sideroom_guidelines, pre-edit gate and review steer
   monorepo-skills/ trusted child-folder skill discovery
   rules/          added-line rule checks
-  done/           green-before-finish steer
+  done/           passive check observation and coverage supplements
   persona/        single built-in voice
   jev/            optional Jev semantic review
-  explain/        end-of-work walkthrough offer
+  explain/        final-response walkthrough invitation
   shared/         file-tool paths, end-of-run steer rules, the review-note event, prompt-cache test
 assets/artifacts/GUIDELINES_TEMPLATE.md   canonical rule seed
 skills/           packaged agent skills and language guides
@@ -80,19 +80,19 @@ Extensions subscribe through `pi.on(event, handler)`. The events Sideroom uses:
 
 | Event | Used by | Purpose |
 | --- | --- | --- |
-| `input` | todo, rules, done, explain, guidelines, jev | Reset per-turn state on a real user prompt (`source: 'interactive'` or `'rpc'`). `todo`, `guidelines`, `explain`, and `jev` reset only when the prompt arrives while the agent is idle, so a message typed during a run does not re-arm them; `jev` clears its per-turn dedup set and its rate-limit pause; a steer or `session_start` does not re-arm. |
+| `input` | todo, rules, done, guidelines, jev | Reset per-turn state on a real user prompt (`source: 'interactive'` or `'rpc'`). `todo`, `guidelines`, and `jev` reset only when the prompt arrives while the agent is idle, so a message typed during a run does not re-arm them; `jev` clears its per-turn dedup set and its rate-limit pause; a steer or `session_start` does not re-arm. |
 | `tool_call` | guidelines, rules, done, persona, jev | Inspect a call before it runs. Return `{ block: true, reason }` to reject it. `jev` records the added lines here, because a `write` erases the previous content, for project files in a supported language; deletion-only results invalidate cached completion evidence without requesting a code review. |
-| `tool_result` | todo, modified-files, guidelines, rules, done, explain, jev | Observe results. May append content for `rules` warnings, record reads, arm the `guidelines` review steer, count a mutated file for `explain`, note a successful mutation, or ask `jev` for a semantic review, whose findings go to the `guidelines` review on `sideroom:review-note` instead of the tool result. |
+| `tool_result` | todo, modified-files, guidelines, rules, done, jev | Observe results. May append content for `rules` warnings, record reads, arm the `guidelines` review steer, note a successful mutation, or ask `jev` for a semantic review, whose findings go to the `guidelines` review on `sideroom:review-note` instead of the tool result. |
 | `turn_end` | jev | Inspect the finished turn; `jev` drops calls another extension blocked, which never reach `tool_result`. |
 | `message_end` | persona | Retain a correction only for the latest successful final assistant response; clear superseded corrections. |
-| `agent_before_settle` | guidelines, persona, done | Quiet completed boundary after retries and compaction recovery. Priority is review, final-response style, then checks/coverage. One necessary stage requests continuation, preserving earlier entries; pending style and the optional walkthrough can join it through `sideroom:settle-supplement`. Aborts, errors, pending messages and earlier continuations postpone work without consuming it. |
+| `agent_before_settle` | guidelines, persona | Quiet completed boundary after retries and compaction recovery. Priority is review, then final-response style. One necessary stage requests continuation, preserving earlier entries; pending style and coverage notices can join it through `sideroom:settle-supplement`. Done never requests continuation. Aborts, errors, pending messages and earlier continuations postpone work without consuming it. |
 | `resources_discover` | monorepo-skills | Returns trusted child-folder skill paths before Pi rebuilds the system prompt. |
-| `before_agent_start` | todo, guidelines, monorepo-skills, persona | `todo` returns `{ message }` with the board block; the others return `{ systemPrompt }` with static reminders. |
-| `session_start`, `session_tree`, `session_compact` | todo, modified-files, guidelines, persona, explain, jev | Rebuild and redraw state after load, branch navigation, or compaction; `persona` publishes its footer status; `jev` resets its session call count, drops recorded calls and its dedup set, and republishes its status; `guidelines` clears its read state and its review-steer flags on `session_start`. |
+| `before_agent_start` | todo, guidelines, monorepo-skills, persona, explain | `todo` returns `{ message }` with the board block; the others return `{ systemPrompt }` with static reminders. |
+| `session_start`, `session_tree`, `session_compact` | todo, modified-files, guidelines, persona, jev | Rebuild and redraw state after load, branch navigation, or compaction; `persona` publishes its footer status; `jev` resets its session call count, drops recorded calls and its dedup set, and republishes its status; `guidelines` clears its read state and its review-steer flags on `session_start`. |
 
-`before_agent_start` appends a reminder to `systemPrompt` for `guidelines` and
-`persona`, plus a location-preference note when `monorepo-skills` found child
-skills, and returns a session message for the board block. The board changes
+`before_agent_start` appends a reminder to `systemPrompt` for `guidelines`,
+`persona`, and `explain`, plus a location-preference note when `monorepo-skills`
+found child skills, and returns a session message for the board block. The board changes
 while the agent works, and a system prompt that changes invalidates the cached
 prefix of the whole request, so `todo` sends the block as a `custom` message
 and only when it differs from the last one it sent. The guidelines guard also
@@ -150,10 +150,9 @@ and an inferred DOM origin.
 | visual-context | `sideroom-visual-context` |
 | visual project associations | `sideroom-visual-projects` |
 | todo reminder type | `sideroom-todo-reminder` |
-| done steer type | `sideroom-done-gate` |
+| coverage supplement type | `sideroom-missing-test-notice` |
 | persona steer type and status key | `sideroom-persona-steer`, `sideroom-persona` |
 | jev status key | `sideroom-jev` |
-| explain offer type | `sideroom-explain-offer` |
 | guidelines review steer type | `sideroom-guidelines-review` |
 
 ## Widgets and ordering
@@ -210,17 +209,21 @@ Necessary end-of-run work appends hidden `custom_message` entries on
 only completed runs with no queued messages or earlier continuation, waits
 for registered background reviews in every load order, then preserves
 earlier entries, and uses `sideroom:settle-priority` to select review, then
-pending final-response style, then checks/coverage. Review queries the done
-gate's current check through `sideroom:check-status` and reuses green results
+pending final-response style. Done never selects a continuation. Review queries
+its observed check through `sideroom:check-status` and reuses green results
 unless a later mutation makes them stale. Late semantic notes still
 receive their bounded review follow-up.
 
 Once a necessary continuation is selected, `sideroom:settle-supplement`
-collects pending style corrections, test-coverage notices and an eligible
-optional walkthrough offer into that same continuation. Explain cannot start a continuation by itself.
-Its instruction requires finishing implementation, review and checks before
-asking. The event bus handles every extension loading order and isolates Pi
-sessions. Turn state resets only on idle user input.
+collects pending style corrections and test-coverage notices into that same
+continuation; coverage notices never open one on their own. The event bus handles
+every extension loading order and isolates Pi sessions. Turn state resets only
+on idle user input.
+
+Explain uses a fixed system-prompt reminder instead of the settle mechanism.
+After meaningful work, review and checks, the agent may append a short invitation
+to its final response. There is no file threshold, automatic questionnaire or
+extra continuation. Only explicit user acceptance permits scope clarification.
 
 ## Interactivity
 
@@ -232,8 +235,9 @@ steering stay active where there is no UI, and only the footer status is
 skipped; `jev` reviews in every mode, and only its `F10` key screen needs the
 terminal.
 
-`explain` also runs in every mode, but it only sends its offer in the TUI: it is
-wrapped around `sideroom_ask`, which rejects every other mode.
+`explain` works in every mode. Its optional invitation is ordinary final-response
+text. After explicit acceptance, scope clarification uses `sideroom_ask` only
+in the TUI; otherwise the agent clarifies in ordinary conversation.
 
 Tool parameters arrive as decoded JSON. `prepareArguments` runs before schema
 validation and unwraps nested arrays that some hosts serialise as JSON strings

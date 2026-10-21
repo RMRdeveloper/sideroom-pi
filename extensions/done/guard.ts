@@ -7,23 +7,15 @@ import {
   isWriteToolResult,
 } from '@earendil-works/pi-coding-agent';
 import { registerCheckStatus } from '../shared/check-status.ts';
-import {
-  registerSettleGuard,
-  registerSettleSupplement,
-  SETTLE_PRIORITY,
-  withHiddenSteer,
-} from '../shared/settle.ts';
+import { registerSettleSupplement } from '../shared/settle.ts';
 import { type CheckCommand, commandMatches } from './detect.ts';
 import {
-  DONE_GATE_TYPE,
   type DoneState,
-  formatDoneSteer,
   formatMissingTestNotice,
   isSourcePath,
   isTestPath,
   MISSING_TEST_NOTICE_TYPE,
   shouldNoticeMissingTest,
-  shouldSteerDone,
 } from './model.ts';
 
 export type ResolveCommand = (
@@ -82,7 +74,6 @@ export function registerDoneGuard({
       if (event.isError) {
         return;
       }
-      state.mutated = true;
       state.checksGreen = false;
       recordMutationPath(state, path);
       return;
@@ -104,34 +95,6 @@ export function registerDoneGuard({
       customType: MISSING_TEST_NOTICE_TYPE,
       content: formatMissingTestNotice(),
     };
-  });
-
-  registerSettleGuard(pi, {
-    priority: SETTLE_PRIORITY.done,
-    pending: (ctx) =>
-      shouldSteerDone(state, resolveCommand(ctx) !== undefined) ||
-      shouldNoticeMissingTest(state, resolveTestSetup(ctx)),
-    handle: (event, ctx) => {
-      const check = resolveCommand(ctx);
-      if (check !== undefined && shouldSteerDone(state, true)) {
-        state.steerCount += 1;
-        return withHiddenSteer({
-          event,
-          customType: DONE_GATE_TYPE,
-          content: formatDoneSteer(check.display),
-        });
-      }
-      if (!shouldNoticeMissingTest(state, resolveTestSetup(ctx))) {
-        return;
-      }
-      state.noticedMissingTest = true;
-      state.steerCount += 1;
-      return withHiddenSteer({
-        event,
-        customType: MISSING_TEST_NOTICE_TYPE,
-        content: formatMissingTestNotice(),
-      });
-    },
   });
 }
 

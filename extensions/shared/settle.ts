@@ -39,7 +39,7 @@ async function waitForSettle(pi: ExtensionAPI, ctx: ExtensionContext): Promise<v
   await Promise.all(request.waits);
 }
 
-export const SETTLE_PRIORITY = { review: 0, persona: 1, done: 2 } as const;
+export const SETTLE_PRIORITY = { review: 0, persona: 1 } as const;
 
 interface SettleSupplement {
   readonly customType: string;

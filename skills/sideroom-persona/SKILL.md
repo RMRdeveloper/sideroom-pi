@@ -104,7 +104,7 @@ At most three steers are sent per agent run.
 - No persisted profile state, no profiles, no switching: the persona ships with the package.
 - Nothing is written to the target repository.
 - The persona governs wording. It never relaxes the coding guidelines, the
-  added-line rules, or the check-before-finish gate.
+  added-line rules, or the project's verification requirements.
 
 ## References
 

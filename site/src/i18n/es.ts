@@ -5,7 +5,7 @@ export const es: typeof en = {
   meta: {
     homeTitle: 'Sideroom Pi — pregunta antes de suponer',
     homeDescription:
-      'Un paquete de Pi que pregunta antes de suponer, mantiene el tablero de trabajo sobre el editor, revisa tus propias reglas en cada escritura y no da nada por terminado mientras tus comprobaciones estén en rojo.',
+      'Un paquete de Pi que pregunta antes de suponer, mantiene el tablero de trabajo sobre el editor, revisa tus propias reglas en cada escritura y revisa los cambios antes de terminar.',
     policyTitle: 'Términos y política de uso — Sideroom Pi',
     policyDescription:
       'Qué hace Sideroom con tu código, qué no hace nunca por su cuenta y qué dice ya la licencia.',
@@ -85,7 +85,7 @@ export const es: typeof en = {
       {
         symptom: 'Declara la victoria.',
         seen: 'El agente dice que terminó mientras el formateador, el linter, los tipos o las pruebas nunca se ejecutaron.',
-        tool: 'done',
+        tool: 'guidelines',
       },
     ],
   },
@@ -418,7 +418,7 @@ export const es: typeof en = {
       {
         term: 'Comando de comprobación detectado',
         href: '#close',
-        body: 'El único comando del proyecto que decide si la sesión está en verde.',
+        body: 'El comando del proyecto observado para compartir resultados válidos con la revisión.',
       },
     ],
   },
@@ -458,7 +458,7 @@ export const es: typeof en = {
       },
       {
         name: 'done',
-        does: 'Vigila el comando de comprobación del proyecto y devuelve al agente a él mientras esté en rojo.',
+        does: 'Comparte con la revisión los resultados observados sin forzar otra respuesta.',
       },
       {
         name: 'explain',
@@ -527,8 +527,8 @@ export const es: typeof en = {
   },
 
   close: {
-    title: 'El turno no termina mientras tus comprobaciones estén en rojo.',
-    note: 'Sideroom lee el comando de comprobación del propio proyecto y devuelve al agente a él, en vez de aceptar un resumen. Nada se da por terminado antes de que ese comando pase.',
+    title: 'Revisa los cambios antes de terminar.',
+    note: 'Sideroom pide al agente revisar los cambios y ejecutar las comprobaciones pendientes, fallidas o desactualizadas. Los resultados válidos se reutilizan; observar las comprobaciones nunca fuerza otra respuesta.',
     stepTitle: 'Apunta a tus propias reglas.',
     stepBody:
       'El paquete incluye la semilla del archivo de guías. Cópiala y escribe tus propias reglas dentro; las guías se leen antes de la primera edición de un turno, no después.',

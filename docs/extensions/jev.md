@@ -220,4 +220,4 @@ rates have not been measured.
 
 `extensions/jev/queue.ts` owns bounded background scheduling; its tests cover
 replacement, dependency invalidation, cancellation, backlog limits and errors.
-Shared settle tests verify that delayed notes join review before checks.
+Shared settle tests verify that delayed notes reach review before settling.

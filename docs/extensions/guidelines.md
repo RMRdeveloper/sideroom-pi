@@ -81,9 +81,10 @@ requested implementation, then review only the changes introduced by this run
 against the loaded language guide. It fixes demonstrated violations caused by
 the change, preserves required behavior, and avoids unrelated refactors. The
 agent reuses successful relevant checks performed after the latest mutation
-and runs only missing, failed or stale checks. The done gate shares its actual
+and runs only missing, failed or stale checks. The done observer shares its actual
 green status and detected command through `sideroom:check-status`; after a
-corrective edit, earlier checks are stale again. If the
+corrective edit, earlier checks are stale again. Done never forces a continuation
+to run checks. If the
 guide has left context, the steer asks for a fresh full read.
 
 The steer explicitly includes rule 20, Decomposition by intent (structural):
@@ -118,8 +119,9 @@ check. This criterion applies only to changes introduced by the run.
 - `agent_settled` is not used: Pi documents it as notification-only, and a
   steer sent there opens a second run after the user saw the agent stop.
 - The shared settle guard gives review and semantic follow-ups priority over
-  checks and the walkthrough offer in every extension loading order. Necessary background Jev reviews are drained first, so their notes are
-  present before any stage selects its steer, regardless of load order.
+  checks in every extension loading order. Necessary background Jev reviews
+  are drained first, so their notes are present before any stage selects its
+  steer. Explain has no settle hook or continuation.
 
 ### Semantic notes from Jev
 

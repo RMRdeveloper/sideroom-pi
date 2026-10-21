@@ -4,7 +4,7 @@ export const en = {
   meta: {
     homeTitle: 'Sideroom Pi — it asks before it guesses',
     homeDescription:
-      'A Pi package that asks before it guesses, keeps the work board above the editor, checks your own rules on every write, and refuses to finish while your checks are red.',
+      'A Pi package that asks before it guesses, keeps the work board above the editor, checks your own rules on every write, and reviews changes before finishing.',
     policyTitle: 'Terms and usage policy — Sideroom Pi',
     policyDescription:
       'What Sideroom does with your code, what it never does on its own, and what the licence already says.',
@@ -84,7 +84,7 @@ export const en = {
       {
         symptom: 'It declares victory.',
         seen: 'The agent says the work is done while the formatter, the linter, the types or the tests were never run.',
-        tool: 'done',
+        tool: 'guidelines',
       },
     ],
   },
@@ -415,7 +415,7 @@ export const en = {
       {
         term: 'Detected check command',
         href: '#close',
-        body: 'The one project command that decides whether the session is green.',
+        body: 'The project command observed to share successful results with review.',
       },
     ],
   },
@@ -455,7 +455,7 @@ export const en = {
       },
       {
         name: 'done',
-        does: 'Watches the project’s own check command and steers back while it is red.',
+        does: 'Shares observed check results with review without forcing another response.',
       },
       {
         name: 'explain',
@@ -524,8 +524,8 @@ export const en = {
   },
 
   close: {
-    title: 'The run is not over while your checks are red.',
-    note: 'Sideroom reads the project’s own check command and steers the agent back to it, instead of accepting a summary. Nothing is called done before that command passes.',
+    title: 'Review the changes before finishing.',
+    note: 'Sideroom asks the agent to review its changes and run missing, failed or stale checks. Valid results can be reused; check observation never forces another response.',
     stepTitle: 'Point it at your own rules.',
     stepBody:
       'The package ships the seed for the guidelines file. Copy it, then write your own rules into it; the guides are read before the first edit of a run, not after.',
