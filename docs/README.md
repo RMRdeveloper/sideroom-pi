@@ -17,8 +17,8 @@ Maintainable documentation for the Sideroom Pi package. Start here.
 | [extensions/rules.md](./extensions/rules.md) | Added-line rule checks, blocking, warnings, and the circuit breaker. |
 | [extensions/jev.md](./extensions/jev.md) | The optional Jev review: evidence-based questions, bounded related source, the request budget, fail-open behavior, and the `F10` key screen. |
 | [extensions/persona.md](./extensions/persona.md) | The single built-in voice, its prohibitions, injection, and enforcement. |
-| [extensions/explain.md](./extensions/explain.md) | The end-of-work walkthrough offer, its trigger, and its limits. |
-| [extensions/done.md](./extensions/done.md) | Check-command detection and the green-before-finish steer. |
+| [extensions/explain.md](./extensions/explain.md) | The optional final-response walkthrough invitation and explicit acceptance. |
+| [extensions/done.md](./extensions/done.md) | Passive check observation and coverage supplements. |
 
 ## Decisions
 

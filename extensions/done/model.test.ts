@@ -4,7 +4,6 @@ import {
   createDoneState,
   isSourcePath,
   isTestPath,
-  MAX_DONE_STEERS,
   shouldNoticeMissingTest,
 } from './model.ts';
 
@@ -74,9 +73,5 @@ test('notices a code-only run once and never without a test setup', () => {
 
   state.mutatedTest = false;
   state.noticedMissingTest = true;
-  assert.equal(shouldNoticeMissingTest(state, true), false);
-
-  state.noticedMissingTest = false;
-  state.steerCount = MAX_DONE_STEERS;
   assert.equal(shouldNoticeMissingTest(state, true), false);
 });

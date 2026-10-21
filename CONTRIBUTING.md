@@ -128,8 +128,8 @@ These are not style preferences; a change that breaks one is rejected.
   `sideroom_guidelines` or full packaged `read` calls.
 - `sideroom_rules` checks only the lines a mutation adds, and a repeatedly
   firing block degrades to a warning instead of dead-locking the agent.
-- `sideroom_done` steers, never blocks, and stays silent when it cannot detect a
-  check command.
+- `sideroom_done` observes check results for review without blocking or requesting
+  continuation. Coverage notices only join another necessary continuation.
 - An end-of-run steer is a hidden `custom_message` entry appended on
   `agent_before_settle` with `continue: true`, never a `sendMessage` on
   `agent_settled`. It is skipped when the run did not complete or a user message

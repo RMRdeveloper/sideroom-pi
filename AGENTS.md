@@ -48,8 +48,8 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
 - `extensions/guidelines/review.ts` owns the end-of-turn review steer: arms on a
   successful `write`/`edit`, fires once on `agent_before_settle`, and resets on
   idle interactive `input` and `session_start`.
-- `extensions/shared/settle.ts` owns the end-of-run rules review, checks, and the
-  walkthrough offer share: stage priority through Pi's synchronous event bus, when a settle boundary accepts a steer, how to
+- `extensions/shared/settle.ts` owns coordination of end-of-run review and style
+  continuations and their supplements: stage priority through Pi's synchronous event bus, when a settle boundary accepts a steer, how to
   append a hidden steer without dropping another handler's entries, and which
   `input` opens a new user turn.
 - `extensions/monorepo-skills/index.ts` composes trusted child-folder skill
@@ -74,7 +74,7 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   capture screen and the footer labels.
 - `extensions/jev/queue.ts` owns one active HTTP review, the bounded backlog,
   replacement/cancellation, and draining before the settle review.
-- `extensions/shared/check-status.ts` exposes the done gate's current check
+- `extensions/shared/check-status.ts` exposes done's observed check
   result to review through Pi's synchronous event bus.
 - `scripts/lint/config.mjs` builds the shared ESLint rules used by root and site
   configs; both install their own lint dependencies.
@@ -86,16 +86,17 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   `extensions/rules/checks.ts` owns the per-rule detectors;
   `extensions/rules/guard.ts` owns blocking, warning notes, and the circuit
   breaker.
-- `extensions/done/index.ts` composes the finish gate; `extensions/done/detect.ts`
-  owns per-ecosystem check-command detection; `extensions/done/guard.ts` owns
-  run state and steering.
+- `extensions/done/index.ts` composes passive check observation;
+  `extensions/done/detect.ts` owns per-ecosystem check-command detection;
+  `extensions/done/guard.ts` observes results and contributes coverage notices
+  only to existing settle continuations.
 - `extensions/persona/index.ts` composes the single built-in voice and the
   footer's per-run counts; `extensions/persona/catalog.ts` owns the voice rules and hard
   prohibitions, `extensions/persona/checks.ts` owns the detectors,
   `extensions/persona/guard.ts` owns artifact blocking and the prose steer.
-- `extensions/explain/index.ts` composes the end-of-work walkthrough offer;
-  `extensions/explain/model.ts` owns its turn state, file threshold, offer
-  decision, and trigger, `extensions/explain/guard.ts` owns the event wiring.
+- `extensions/explain/index.ts` appends the fixed final-response invitation
+  reminder; `extensions/explain/prompt.ts` owns its wording and idempotent
+  append. It has no per-turn state or closing hooks.
 - `extensions/shared/file-path.ts` owns file-tool path resolution shared by
   guards that must match Pi's built-in `write` and `edit` semantics;
   `extensions/shared/read-file.ts` owns the missing-file read those guards share.
@@ -306,15 +307,14 @@ JavaScript and TypeScript; put rationale in documentation rather than code comme
   necessary settle continuation when possible; superseded/tool-use/error
   responses do not cause correction turns. Degraded artifact warnings use
   explicit `triggerTurn: false`.
-- `explain` offers a walkthrough through `sideroom_ask` at most once per turn,
-  only after successful `write`/`edit` results touched at least five distinct
-  files, and only in the TUI. It fires on `agent_before_settle`, never
-  `agent_end`, so the offer never lands on work that a retry or a compaction is
-  about to redo. The shared settle guard gives review and checks priority over
-  the offer in every extension load order, including late semantic notes. The
-  offer joins an already necessary continuation through the shared settle supplement event, asks the agent to
-  finish work/review/checks first, and never starts a turn by itself. It has no
-  tool and no persisted state.
+- `explain` appends a fixed reminder on `before_agent_start`. After meaningful
+  work, review and checks, the agent may add one short invitation to explain
+  changes or test steps to the final response, in the user's language. Omit
+  trivial or already explained work and respect requests for no follow-up.
+  There is no file-count threshold, automatic questionnaire, settle hook,
+  extra continuation, tool or persisted state. Only after explicit acceptance
+  may the agent clarify scope through `sideroom_ask` in the TUI; otherwise
+  explain directly or clarify in ordinary conversation outside the TUI.
 - End-of-run steers go on `agent_before_settle` as `custom_message` entries
   with `continue: true`, never through `sendMessage` on `agent_settled`.
   `agent_settled` is notification-only: a steer there opens a second run after
@@ -324,11 +324,9 @@ JavaScript and TypeScript; put rationale in documentation rather than code comme
   entries earlier handlers proposed, and reset turn state only on `input` that
   arrives while the agent is idle. The package requires Pi 1.2.0 or later,
   including `model-only` tool exposure for guidelines.
-- `sideroom_done` steers only at `agent_before_settle` after pending review,
-  never at `turn_end`; it never blocks, and does nothing when no check command
-  is detected. It clears green after any later successful mutation, asks once
-  per user turn whether existing tests cover code-only changes, and caps its
-  steering.
-  Coverage notices join an existing settle continuation when possible without
-  spending the forced-continuation budget. State resets only on idle user input
+- `sideroom_done` observes detected check results and shares them with review;
+  it never registers a settle guard or forces a continuation to run checks.
+  Later successful mutations clear green. Coverage notices for code-only changes
+  join an existing necessary settle continuation at most once per user turn;
+  they never request a standalone response. State resets only on idle user input
   and `session_start`.

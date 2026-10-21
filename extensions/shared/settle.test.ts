@@ -10,11 +10,9 @@ import {
 import { registerDoneGuard } from '../done/guard.ts';
 import {
   createDoneState,
-  DONE_GATE_TYPE,
   MISSING_TEST_NOTICE_TYPE,
 } from '../done/model.ts';
-import { registerExplainGuard } from '../explain/guard.ts';
-import { createExplainState, EXPLAIN_OFFER_TYPE } from '../explain/model.ts';
+import registerExplain from '../explain/index.ts';
 import {
   createReviewState,
   REVIEW_STEER_TYPE,
@@ -48,7 +46,6 @@ function harness(order: readonly Stage[], hasTests = false) {
   const handlers = new Map<string, Handler[]>();
   const review = createReviewState();
   const done = createDoneState();
-  const explain = createExplainState();
   const persona = createPersonaGuardState();
   let pendingMessages = false;
   const ctx = { cwd: '/work', mode: 'tui', hasPendingMessages: () => pendingMessages } as ExtensionContext;
@@ -84,7 +81,7 @@ function harness(order: readonly Stage[], hasTests = false) {
       registerPersonaGuard(pi, persona, async () => {});
     }
     if (stage === 'explain') {
-      registerExplainGuard(pi, explain);
+      registerExplain(pi);
     }
   }
   function emit(name: string, event: unknown): void {
@@ -130,7 +127,6 @@ function harness(order: readonly Stage[], hasTests = false) {
     assert.ok(
       types.filter(
         (type) =>
-          type !== EXPLAIN_OFFER_TYPE &&
           type !== PERSONA_STEER_TYPE &&
           type !== MISSING_TEST_NOTICE_TYPE,
       ).length <= 1,
@@ -150,7 +146,7 @@ function harness(order: readonly Stage[], hasTests = false) {
       },
     } as unknown as ExtensionAPI, wait);
   }
-  return { review, done, explain, persona, bus, steers, contents, emit, mutate, settle, addWait, setPendingMessages: (pending: boolean) => { pendingMessages = pending; } };
+  return { review, done, persona, bus, steers, contents, emit, mutate, settle, addWait, setPendingMessages: (pending: boolean) => { pendingMessages = pending; } };
 }
 
 const ORDERS: readonly (readonly Stage[])[] = [
@@ -163,17 +159,16 @@ const ORDERS: readonly (readonly Stage[])[] = [
 ];
 
 for (const order of ORDERS) {
-  test(`reviews, checks and offers in order with ${order.join(', ')}`, async () => {
+  test(`reviews without a forced check or walkthrough continuation with ${order.join(', ')}`, async () => {
     const run = harness(order);
     for (let index = 0; index < 5; index += 1) {
       run.mutate(`src/file-${index}.ts`);
     }
     assert.deepEqual(await run.settle({ continue: true }), []);
     assert.equal(run.review.steeredThisTurn, false);
-    assert.equal(run.done.steerCount, 0);
-    assert.equal(run.explain.offeredThisTurn, false);
-    assert.deepEqual(await run.settle(), [REVIEW_STEER_TYPE, EXPLAIN_OFFER_TYPE]);
-    assert.deepEqual(await run.settle(), [DONE_GATE_TYPE]);
+    assert.equal(run.done.checksGreen, false);
+    assert.deepEqual(await run.settle(), [REVIEW_STEER_TYPE]);
+    assert.deepEqual(await run.settle(), []);
     run.emit('tool_call', {
       toolName: 'bash',
       toolCallId: 'check',
@@ -189,22 +184,20 @@ for (const order of ORDERS) {
     assert.deepEqual(await run.settle(), []);
     assert.deepEqual(run.steers, [
       REVIEW_STEER_TYPE,
-      EXPLAIN_OFFER_TYPE,
-      DONE_GATE_TYPE,
     ]);
   });
 
-  test(`keeps late semantic notes ahead of the offer with ${order.join(', ')}`, async () => {
+  test(`reviews late semantic notes without a walkthrough continuation with ${order.join(', ')}`, async () => {
     const run = harness(order);
     for (let index = 0; index < 5; index += 1) {
       run.mutate(`src/file-${index}.ts`);
     }
-    assert.deepEqual(await run.settle(), [REVIEW_STEER_TYPE, EXPLAIN_OFFER_TYPE]);
-    assert.deepEqual(await run.settle(), [DONE_GATE_TYPE]);
+    assert.deepEqual(await run.settle(), [REVIEW_STEER_TYPE]);
+    assert.deepEqual(await run.settle(), []);
     run.mutate();
     run.bus.emit(REVIEW_NOTE_EVENT, { text: 'late semantic finding' });
     assert.deepEqual(await run.settle(), [REVIEW_STEER_TYPE]);
-    assert.deepEqual(await run.settle(), [DONE_GATE_TYPE]);
+    assert.deepEqual(await run.settle(), []);
     assert.deepEqual(await run.settle(), []);
     assert.deepEqual(await run.settle(), []);
   });
@@ -244,10 +237,9 @@ for (const order of ORDERS) {
         [],
       );
       assert.equal(run.persona.steersThisRun, 0);
-      assert.equal(run.explain.offeredThisTurn, false);
       assert.deepEqual(
         (await run.settle()).sort(),
-        [REVIEW_STEER_TYPE, PERSONA_STEER_TYPE, EXPLAIN_OFFER_TYPE].sort(),
+        [REVIEW_STEER_TYPE, PERSONA_STEER_TYPE].sort(),
       );
       assert.equal(run.persona.steersThisRun, 1);
       run.emit('tool_call', {
@@ -276,7 +268,7 @@ for (const order of ORDERS) {
 }
 
 for (const order of ORDERS) {
-  test(`reviews test coverage before the final check with ${order.join(', ')}`, async () => {
+  test(`adds test coverage only to an existing review with ${order.join(', ')}`, async () => {
     const run = harness(order, true);
     run.emit('tool_call', {
       toolName: 'write',
@@ -295,7 +287,7 @@ for (const order of ORDERS) {
       REVIEW_STEER_TYPE,
       MISSING_TEST_NOTICE_TYPE,
     ]);
-    assert.equal(run.done.steerCount, 0);
+    assert.equal(run.done.checksGreen, false);
     run.emit('tool_call', {
       toolName: 'bash',
       toolCallId: 'check',
@@ -311,7 +303,7 @@ for (const order of ORDERS) {
   });
 }
 
-test('combines a check request and coverage notice when review is disabled', async () => {
+test('never requests checks or standalone coverage when review is disabled', async () => {
   const run = harness(['done'], true);
   run.emit('tool_call', {
     toolName: 'write',
@@ -324,8 +316,9 @@ test('combines a check request and coverage notice when review is disabled', asy
     input: { path: 'src/app.ts' },
     isError: false,
   });
-  assert.deepEqual(await run.settle(), [DONE_GATE_TYPE, MISSING_TEST_NOTICE_TYPE]);
-  assert.equal(run.done.steerCount, 1);
+  assert.deepEqual(await run.settle(), []);
+  assert.deepEqual(await run.settle(), []);
+  assert.equal(run.done.noticedMissingTest, false);
 });
 
 for (const order of ORDERS) {
@@ -339,7 +332,7 @@ for (const order of ORDERS) {
     assert.match(run.contents.join('\n'), /Reuse that result if this review changes no files/);
     assert.deepEqual(await run.settle(), []);
     run.mutate();
-    assert.deepEqual(await run.settle(), [DONE_GATE_TYPE]);
+    assert.deepEqual(await run.settle(), []);
   });
 }
 
@@ -374,7 +367,7 @@ test('postpones review without spending its budget when user input arrives durin
   release();
   assert.deepEqual(await boundary, []);
   assert.equal(run.review.steeredThisTurn, false);
-  assert.equal(run.done.steerCount, 0);
+  assert.equal(run.done.checksGreen, false);
   run.setPendingMessages(false);
   assert.deepEqual(await run.settle(), [REVIEW_STEER_TYPE]);
 });
