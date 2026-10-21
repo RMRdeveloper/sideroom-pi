@@ -1,6 +1,6 @@
 {
   "name": "@rmrdeveloper/sideroom-pi",
-  "version": "9.1.0",
+  "version": "9.2.0",
   "description": "Make \"done\" mean done for Pi. Asks before it guesses, enforces your coding rules, and reviews changes before finishing.",
   "type": "module",
   "files": [
