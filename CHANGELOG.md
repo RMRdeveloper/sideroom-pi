@@ -1,5 +1,15 @@
 # Changelog
 
+## 9.2.0
+
+### Minor Changes
+
+- 7d40648: Remove forced check continuations from done. Keep passive check-result sharing so guidelines review can reuse valid results, and allow coverage notices only inside another necessary continuation. Missing, failed, or unrecognised checks no longer force another model response. Update the documentation and site copy to describe the observation behavior.
+
+### Patch Changes
+
+- 7d40648: Replace the automatic walkthrough questionnaire with an optional short invitation in the final response after meaningful work. Remove the file-count threshold and closing supplement; only clarify walkthrough scope after the user explicitly accepts. The fixed reminder keeps the system prompt stable across turns and never requests another model turn.
+
 ## 9.1.0
 
 ### Minor Changes
