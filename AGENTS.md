@@ -12,6 +12,16 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
 
 ## Source of truth
 
+- `extensions/research/index.ts` registers the `sideroom_research`
+  tool, rejects duplicate active requests, and cancels active work on session
+  start, branch navigation and shutdown. `delivery.ts` owns report delivery,
+  acknowledgement and retry. `agent.ts` builds its restricted in-memory agent; `reader.ts`, `search.ts`, and `git.ts` own its read-only
+  operations; `git-client.ts` owns the fixed Git process boundary. `model.ts`
+  validates requests and results; `workflow.ts` owns cancellation and limits;
+  `partial.ts` and `report.ts` recover reports; `evidence.ts` and `reconcile.ts`
+  check file fingerprints and references; `revision.ts`, `usage.ts`, `limits.ts`,
+  and `output.ts` own their respective metadata and bounds; `execute.ts` composes
+  them. `docs/extensions/research.md` records its limits and evaluation.
 - `extensions/ask/index.ts` registers `sideroom_ask`.
 - `extensions/ask/execute.ts` runs one questionnaire batch.
 - `extensions/ask/model.ts` owns the schema, answer contract, and selection
@@ -94,6 +104,7 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   footer's per-run counts; `extensions/persona/catalog.ts` owns the voice rules and hard
   prohibitions, `extensions/persona/checks.ts` owns the detectors,
   `extensions/persona/guard.ts` owns artifact blocking and the prose steer.
+  `catalog.ts` also owns `VOICE_SCOPE` and the shared `TOOL_TEXT_VOICE_NOTE`.
 - `extensions/explain/index.ts` appends the fixed final-response invitation
   reminder; `extensions/explain/prompt.ts` owns its wording and idempotent
   append. It has no per-turn state or closing hooks.
@@ -148,10 +159,16 @@ it into the system prompt. `extensions/guidelines/` injects a short reminder;
   reads Pi's session JSONL, `report.mjs` formats the totals and the per-session
   rows. Pure modules carry `*.test.mjs`. It reads session files and writes
   nothing; it is a maintainer tool.
+- `stryker.config.json` owns mutation testing over `extensions/**/*.ts`: the
+  `tap` runner with `perTest` coverage, four workers, reports under `reports/`,
+  and `thresholds.break` at `null` because a 100% gate would fail on equivalent
+  mutants. `CONTRIBUTING.md` owns the command, the measurement that justifies
+  `tap` over the bundled `command` runner, and the list of equivalents.
 - `skills/sideroom-guidelines/SKILL.md` owns the Do/Don't table and language map;
   `skills/sideroom-guidelines/references/languages/` owns complete per-language guides.
 - `skills/sideroom-persona/SKILL.md` owns the persona Do/Don't table, the
-  plain-language bar, and the enforcement boundaries.
+  plain-language bar, the scope that includes tool-written text, the
+  fixed-message rule, and the enforcement boundaries.
 - `extensions/persona/execute.ts` returns that complete packaged guide;
   `extensions/shared/skills.test.ts` checks packaged discovery with Pi's loader.
 - `docs/skills.md` owns skill selection boundaries and manual behavior checks.
@@ -227,12 +244,21 @@ JavaScript and TypeScript; put rationale in documentation rather than code comme
 
 ## Design rules
 
+- `sideroom_research` is `model-only`. For non-trivial work requiring code
+  exploration, instruct the parent to use it proactively without asking the user;
+  skip trivial work and respect explicit user restrictions. It uses the current model
+  registry and never launches nested agents, runs project scripts, or changes
+  files. It is Linux/WSL-only, has no web access, and leaves file sensitivity
+  judgments to the model as documented. Results stay on the originating session
+  branch. No research gate is allowed. Research may notify and resume the parent
+  when a background result is ready, without resuming after cancellation.
 - `sideroom_ask` is a normal parent-agent tool. One call is one 1–N batch.
 - Each question requires `recommendationIndex`, or `recommendedIndices` when it
   declares `selectionMode: "multiple"`. The UI always adds Out of scope and a
   custom answer; callers must not send those rows.
 - Write `sideroom_ask` prompts, tab labels, and option labels or descriptions
-  in the language the user is speaking. Keep ids, option values, and source in
+  in the language the user is speaking, in Sideroom's voice: everyday words,
+  enough detail to decide. Keep ids, option values, and source in
   English. TUI chrome stays English.
 - Non-TUI calls fail with an explicit UI-not-available error.
 - The tool must not write Sideroom state into the target repository.
@@ -240,6 +266,13 @@ JavaScript and TypeScript; put rationale in documentation rather than code comme
   returns edits and installation commands without applying them; the parent agent
   uses normal file and shell tools. Origin-to-project associations live only on
   the Pi session branch, including when Pi runs in a parent folder.
+- `npm run mutation` is the only mutation entry: Stryker over `extensions/`,
+  one area per run, never two runs at once because they share `.stryker-tmp` and
+  the report files. `thresholds.break` stays `null`: equivalent mutants exist
+  and are listed in `CONTRIBUTING.md`, never silenced with `// Stryker disable`
+  comments or line exclusions, which would hide the real mutants on those lines.
+  The bundled `command` runner is not used; the `tap` runner with `perTest` was
+  measured seven times faster here.
 - No extension may make the system prompt depend on per-turn session state.
   Per-turn context travels as a session message, so the composed system prompt
   stays byte-identical while a session runs and the provider's cached prefix
@@ -256,7 +289,8 @@ JavaScript and TypeScript; put rationale in documentation rather than code comme
   an interrupted turn. `propose` replaces the board and is
   TUI-only; `update` patches ids in every mode. Persist snapshots with
   `appendEntry`, reconstruct from `getBranch()`, and never take over
-  `session_before_compact` or add `/todos`.
+  `session_before_compact` or add `/todos`. Each item says in everyday words
+  what will be done and which result it serves, in the user's language.
 - Todo reminders follow only successful `write`/`edit`, at most once per idle
   user turn, with explicit `triggerTurn: false`. There is no per-model-turn
   watchdog. Do not infer task completion from a file mutation or a `bash` call.
@@ -299,7 +333,13 @@ JavaScript and TypeScript; put rationale in documentation rather than code comme
   `0600`, captured through `F10` and never written to the session. The call
   count is per session, resets on `session_start`, and is never persisted.
 - `sideroom_persona` is a single built-in voice: no profiles, no switching, no
-  persisted profile state. A `write`/`edit` whose added lines contain a decorative symbol
+  persisted profile state. Its scope covers agent prose, user-facing
+  documentation, the questions, options, recommendations and task wording the
+  agent writes inside Sideroom tools, and the package's fixed messages.
+  `catalog.ts` states that scope once (`VOICE_SCOPE`) and exports the shared
+  `TOOL_TEXT_VOICE_NOTE` that `sideroom_ask` and `sideroom_todo` add to their
+  guidelines. Tool-argument text stays instruction-only: no detector reads it,
+  so the change adds no block, steer, model call or continuation. A `write`/`edit` whose added lines contain a decorative symbol
   is blocked and degrades after repeated fires; the other prohibitions are
   steered, capped per run. The footer shows the run's block and steer counts and
   drops back to `persona: direct` on the next `before_agent_start`. Prose
@@ -307,6 +347,10 @@ JavaScript and TypeScript; put rationale in documentation rather than code comme
   necessary settle continuation when possible; superseded/tool-use/error
   responses do not cause correction turns. Degraded artifact warnings use
   explicit `triggerTurn: false`.
+- Fixed package messages follow the same voice and are written here, not left
+  for the model to correct: each one says what happened and the next step, and
+  they stay in English like the rest of the fixed text. Rewording them must
+  keep ids, values, schemas, contracts and behavior unchanged.
 - `explain` appends a fixed reminder on `before_agent_start`. After meaningful
   work, review and checks, the agent may add one short invitation to explain
   changes or test steps to the final response, in the user's language. Omit

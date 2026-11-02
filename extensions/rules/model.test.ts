@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { languageForPath } from './catalog.ts';
 import { evaluateAddedLines } from './checks.ts';
-import { addedLines, formatBlockReason, type RuleViolation } from './model.ts';
+import {
+  addedLines,
+  formatBlockReason,
+  formatWarnings,
+  type RuleViolation,
+} from './model.ts';
 
 function evaluate(path: string, previous: string | undefined, next: string) {
   return evaluateAddedLines(languageForPath(path), addedLines(previous, next));
@@ -198,4 +203,18 @@ test('formatBlockReason lists each violation', () => {
   ]);
   assert.match(reason, /Blocked src\/a\.ts/);
   assert.match(reason, /braced-conditionals/);
+  assert.match(reason, /Fix them and save again\./);
+});
+
+test('formatWarnings names the file and keeps each finding', () => {
+  const warnings = formatWarnings('src/a.ts', [
+    {
+      ruleId: 'debug-artifacts',
+      severity: 'warn',
+      message: '[debug-artifacts] Remove the debug output before finishing.',
+      line: 1,
+    },
+  ]);
+  assert.match(warnings, /^Sideroom rules found these in src\/a\.ts:/);
+  assert.match(warnings, /Remove the debug output/);
 });

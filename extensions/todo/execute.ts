@@ -50,11 +50,15 @@ export function executeTodo(
 function successMessage(action: TodoAction, itemCount: number): string {
   if (action === TODO_ACTION.propose) {
     if (itemCount === 0) {
-      return 'Board cleared';
+      return 'Board cleared: no items left.';
     }
-    return `Board proposed with ${String(itemCount)} item${itemCount === 1 ? '' : 's'}`;
+    return `Board proposed: ${itemCountLabel(itemCount)}.`;
   }
-  return `Board updated (${String(itemCount)} item${itemCount === 1 ? '' : 's'})`;
+  return `Board updated: ${itemCountLabel(itemCount)}.`;
+}
+
+function itemCountLabel(count: number): string {
+  return `${String(count)} item${count === 1 ? '' : 's'}`;
 }
 
 function errorResult(

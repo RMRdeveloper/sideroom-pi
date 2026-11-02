@@ -29,6 +29,7 @@ in `extensions/`, because Pi loads every top-level `.ts` file there.
 ```text
 extensions/
   ask/            sideroom_ask
+  research/       optional focused read-only research
   todo/           sideroom_todo
   modified-files/ edited-file tracking
   visual-context/ F7 browser pairing, local source candidates and pending input context
@@ -74,6 +75,16 @@ single HTTP call, `workflow.ts` bounded questionnaire/completion requests and
 observed evidence, `key.ts` the owner-only key file, and `ui.ts` the masked `F10`
 screen.
 
+`research` registers one optional parent tool. `agent.ts` creates an in-memory
+agent with the parent model registry and only bounded project and Git tools.
+`reader.ts` owns Linux path opening, `evidence.ts` file fingerprints,
+`reconcile.ts` unverified findings, and `workflow.ts` the cooperative deadline
+and partial results. `execute.ts` combines the report, Git revision and usage;
+`output.ts` bounds what the tool returns. Its result details travel with the
+session branch. Session start, branch navigation and shutdown cancel active
+research; there is no research settle continuation or project state file.
+See [research](extensions/research.md) for security and platform limits.
+
 ## Lifecycle events
 
 Extensions subscribe through `pi.on(event, handler)`. The events Sideroom uses:
@@ -81,11 +92,11 @@ Extensions subscribe through `pi.on(event, handler)`. The events Sideroom uses:
 | Event | Used by | Purpose |
 | --- | --- | --- |
 | `input` | todo, rules, done, guidelines, jev | Reset per-turn state on a real user prompt (`source: 'interactive'` or `'rpc'`). `todo`, `guidelines`, and `jev` reset only when the prompt arrives while the agent is idle, so a message typed during a run does not re-arm them; `jev` clears its per-turn dedup set and its rate-limit pause; a steer or `session_start` does not re-arm. |
-| `tool_call` | guidelines, rules, done, persona, jev | Inspect a call before it runs. Return `{ block: true, reason }` to reject it. `jev` records the added lines here, because a `write` erases the previous content, for project files in a supported language; deletion-only results invalidate cached completion evidence without requesting a code review. |
+| `tool_call` | guidelines, rules, done, persona, jev | Inspect a call before it runs. Return `{ block: true, reason }` to reject it. `persona` reads only added artifact lines, never tool arguments. `jev` records the added lines here, because a `write` erases the previous content, for project files in a supported language; deletion-only results invalidate cached completion evidence without requesting a code review. |
 | `tool_result` | todo, modified-files, guidelines, rules, done, jev | Observe results. May append content for `rules` warnings, record reads, arm the `guidelines` review steer, note a successful mutation, or ask `jev` for a semantic review, whose findings go to the `guidelines` review on `sideroom:review-note` instead of the tool result. |
 | `turn_end` | jev | Inspect the finished turn; `jev` drops calls another extension blocked, which never reach `tool_result`. |
 | `message_end` | persona | Retain a correction only for the latest successful final assistant response; clear superseded corrections. |
-| `agent_before_settle` | guidelines, persona | Quiet completed boundary after retries and compaction recovery. Priority is review, then final-response style. One necessary stage requests continuation, preserving earlier entries; pending style and coverage notices can join it through `sideroom:settle-supplement`. Done never requests continuation. Aborts, errors, pending messages and earlier continuations postpone work without consuming it. |
+| `agent_before_settle` | guidelines, persona | Quiet completed boundary after retries and compaction recovery. Priority is review, then final-reply style. One necessary stage requests continuation, preserving earlier entries; pending style and coverage notices can join it through `sideroom:settle-supplement`. Done never requests continuation. Aborts, errors, pending messages and earlier continuations postpone work without consuming it. |
 | `resources_discover` | monorepo-skills | Returns trusted child-folder skill paths before Pi rebuilds the system prompt. |
 | `before_agent_start` | todo, guidelines, monorepo-skills, persona, explain | `todo` returns `{ message }` with the board block; the others return `{ systemPrompt }` with static reminders. |
 | `session_start`, `session_tree`, `session_compact` | todo, modified-files, guidelines, persona, jev | Rebuild and redraw state after load, branch navigation, or compaction; `persona` publishes its footer status; `jev` resets its session call count, drops recorded calls and its dedup set, and republishes its status; `guidelines` clears its read state and its review-steer flags on `session_start`. |
@@ -228,9 +239,10 @@ extra continuation. Only explicit user acceptance permits scope clarification.
 ## Interactivity
 
 `ask` and `todo propose` need a terminal. They check `ctx.mode === 'tui'` and
-otherwise return the explicit error `Error: UI not available (running in
-non-interactive mode)`. `todo update`, `guidelines`, `monorepo-skills`,
-`rules`, `done`, `persona`, and `jev` work in every mode. Persona blocking and
+otherwise return an explicit error that names the missing interactive window
+and the next step: ask in ordinary conversation, or use `todo update`.
+`todo update`, `guidelines`, `monorepo-skills`, `rules`, `done`, `persona`, and
+`jev` work in every mode. Persona blocking and
 steering stay active where there is no UI, and only the footer status is
 skipped; `jev` reviews in every mode, and only its `F10` key screen needs the
 terminal.
@@ -276,7 +288,7 @@ are also part of the published package.
 | Skill | Role |
 | --- | --- |
 | `sideroom-guidelines` | The 20-rule contract and per-language guides. |
-| `sideroom-persona` | The single voice contract: Do/Don't table, plain-language bar, and enforcement boundaries. |
+| `sideroom-persona` | The single voice contract: Do/Don't table, plain-language bar, the scope that includes tool-written text and fixed package messages, and enforcement boundaries. |
 | `sideroom-grill` | Interviews a fuzzy plan in `sideroom_ask` rounds. |
 | `sideroom-architecture` | Surfaces the architectural decisions a change forces so they are asked, not assumed. |
 | `sideroom-codebase-design` | Surveys codebase friction, designs module improvements, and plans growth and migration in text. |

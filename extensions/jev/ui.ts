@@ -69,7 +69,7 @@ export function createJevKeyController(
       }
       if (ctx.mode !== 'tui') {
         ctx.ui.notify(
-          `Set ${JEV_KEY_ENV_VAR} in the environment: capturing a key needs the terminal.`,
+          `Set ${JEV_KEY_ENV_VAR} in the environment: this run has no terminal to capture a key.`,
           'warning',
         );
         return;
@@ -201,13 +201,13 @@ export class JevKeyOverlay implements Component {
       return;
     }
     this.actions.store(apiKey);
-    this.finish('Jev API key stored.');
+    this.finish('Jev key stored. Reviews can run now.');
   }
 
   private clearStored(): void {
     this.entry = '';
     this.actions.clear();
-    this.finish('Jev API key cleared.');
+    this.finish('Jev key cleared. Reviews stay off until you set a new one.');
   }
 
   private finish(message: string): void {

@@ -37,3 +37,24 @@ test('prepares propose only in the TUI, and update works headlessly', () => {
     { id: 'tests', content: 'Cover login', status: 'in_progress' },
   ]);
 });
+
+test('confirms what changed on the board', () => {
+  const proposed = executeTodo(propose(initialItems), { mode: 'tui' }, []);
+  assert.equal(proposed.content[0]?.text, 'Board proposed: 2 items.');
+
+  const updated = executeTodo(
+    {
+      action: 'update',
+      patches: [
+        { id: 'auth', status: 'completed' },
+        { id: 'tests', status: 'in_progress' },
+      ],
+    },
+    { mode: 'print' },
+    proposed.details.items,
+  );
+  assert.equal(updated.content[0]?.text, 'Board updated: 2 items.');
+
+  const cleared = executeTodo(propose([]), { mode: 'tui' }, []);
+  assert.equal(cleared.content[0]?.text, 'Board cleared: no items left.');
+});

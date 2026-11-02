@@ -39,11 +39,11 @@ test('formats the artifact block and its degraded steer', () => {
   assert.match(reason, /^Blocked src\/icon\.ts/);
   assert.match(reason, /No emojis or decorative symbols/);
   assert.match(reason, /\u{1F525}/u);
-  assert.match(reason, /retry the mutation/);
+  assert.match(reason, /save again/);
 
   const steer = formatArtifactSteer('src/icon.ts', violations);
-  assert.match(steer, /stopped blocking src\/icon\.ts/);
-  assert.match(steer, /still forbidden/);
+  assert.match(steer, /src\/icon\.ts still has blocked content/);
+  assert.match(steer, /blocking is off/);
   assert.match(steer, /next edit/);
 });
 
@@ -55,7 +55,7 @@ test('formats a steer that asks for a rewrite', () => {
   assert.match(steer, /Great question!/);
   assert.match(steer, /Rewrite in plain words/);
   assert.match(steer, /everyday terms/);
-  assert.match(steer, /no concept jargon/);
+  assert.match(steer, /jargon the user did not ask for/);
 });
 
 test('reads only text blocks out of a message', () => {

@@ -7,7 +7,9 @@ import {
   PERSONA_SKILL_PATH,
   PERSONA_TOOL_NAME,
   PROHIBITIONS,
+  TOOL_TEXT_VOICE_NOTE,
   VOICE_RULES,
+  VOICE_SCOPE,
 } from './catalog.ts';
 import {
   appendPersonaReminder,
@@ -79,6 +81,21 @@ test('requires a reason to use technical terms, even when the user used one', ()
   assert.match(plainRule.instruction, /only when needed to understand or act/);
   assert.match(plainRule.instruction, /explain it at first use/);
   assert.doesNotMatch(plainRule.instruction, /unless the user used them/);
+});
+
+test('names the tool text in the reminder and in the packaged guide', () => {
+  assert.equal(PERSONA_REMINDER.includes(VOICE_SCOPE), true);
+  assert.match(VOICE_SCOPE, /inside Sideroom tools/);
+  assert.match(TOOL_TEXT_VOICE_NOTE, /everyday words/);
+  assert.match(TOOL_TEXT_VOICE_NOTE, /enough detail for the user to decide/);
+
+  const skill = readFileSync(PERSONA_SKILL_PATH, 'utf8');
+  assert.match(
+    skill,
+    /Apply the voice to everything the user reads: progress messages, final\s+answers, user-facing documentation, and the questions, options,\s+recommendations and task wording you write inside Sideroom tools\./,
+  );
+  assert.match(skill, /## Fixed package messages/);
+  assert.match(skill, /Nothing blocks a question, an option label or a task description/);
 });
 
 test('ships a skill that fits one read and stays in sync', () => {

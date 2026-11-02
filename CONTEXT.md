@@ -196,13 +196,13 @@ _Avoid: Jev note, semantic warning, annotation._
 
 ## Voice rule
 
-One of the persona's six rules for user-facing prose, from `plain-language` to `user-language`. A voice rule is corrected with a steer; it does not block a mutation.
+One of the persona's six rules for what the user reads: agent prose, user-facing documentation, and the wording the agent writes inside Sideroom tools. The fixed messages the package prints follow the same voice. A voice rule is corrected with a steer; it does not block a mutation.
 
 _Avoid: style rule, tone rule._
 
 ## Prohibition
 
-One of the persona's four hard restrictions. An artifact prohibition blocks a `write`/`edit` that adds the forbidden content, degrading to a steer after repeated fires; a prose prohibition steers only.
+One of the persona's four hard restrictions. An artifact prohibition blocks a `write`/`edit` that adds the forbidden content, degrading to a steer after repeated fires; a prose prohibition steers only. Text inside tool arguments is guided by the instruction and lies outside both scopes.
 
 _Avoid: ban, hard rule._
 

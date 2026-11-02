@@ -55,8 +55,8 @@ export function registerGuardEvents(
         customType: REMINDER_TYPE,
         content:
           store.items.length === 0
-            ? 'Use sideroom_todo propose if this implementation has multiple steps. Maintain the board at task milestones, not after every tool call.'
-            : 'Update sideroom_todo when a task changes status, combining completion and the next task in one call. Do not update merely because a tool ran.',
+            ? 'This change has more than one step. Use sideroom_todo propose to show the plan, then update it at each task milestone, not after every tool call.'
+            : 'Update sideroom_todo when a task changes status: mark the finished one and start the next in the same call. A tool that ran is not a status change.',
         display: false,
       },
       { triggerTurn: false, deliverAs: 'steer' },

@@ -79,7 +79,7 @@ test('rejects an oversized batch before opening the UI', async () => {
   assert.equal(toolResult.details.cancelled, true);
   assert.equal(
     toolResult.content[0]?.text,
-    'Error: A questionnaire batch may include at most 4 questions',
+    'Error: This call has more than 4 questions. Split them into separate calls.',
   );
 });
 

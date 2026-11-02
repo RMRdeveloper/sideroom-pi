@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
+import { TOOL_TEXT_VOICE_NOTE } from '../persona/catalog.ts';
 import { Text } from '@earendil-works/pi-tui';
 import { executeAsk } from './execute.ts';
 import {
@@ -19,6 +20,7 @@ export const ASK_PROMPT_GUIDELINES = [
   'Read the repository first: reuse a consistent project fact. An architectural decision (boundaries, dependencies, cost, security, operations, persistence, public contracts, future change difficulty) is never settled silently: never assume it. Follow the sideroom-architecture skill; ask through sideroom_ask with practical consequences and a one-line justification for one recommendation. Name inconsistent patterns in the prompt. Take minor decisions yourself.',
   'Recommend evidence-backed long-term quality: maintainability and growth for known needs over initial speed. State the upfront cost; avoid speculative capacity. If decisive facts or figures are missing, ask for them first through sideroom_ask; recommend gathering evidence, not an unsupported solution.',
   'Write sideroom_ask prompts, tab labels, option labels, and option descriptions in the language the user is speaking; keep ids and option values in English.',
+  `${TOOL_TEXT_VOICE_NOTE} This covers every sideroom_ask prompt, tab label, option label and option description.`,
   'sideroom_ask always adds Out of scope and a write-your-own answer; never send them yourself. A single-selection question needs recommendationIndex; a multiple-selection question needs recommendedIndices and never recommendationIndex.',
   'sideroom_ask only works in the interactive TUI; it errors in print, JSON, and RPC modes.',
 ];

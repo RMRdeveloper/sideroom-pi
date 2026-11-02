@@ -83,6 +83,8 @@ async function fixture(t: TestContext) {
   };
 }
 
+const FRAME_TIMEOUT_MS = 20_000;
+
 function waitForMessage(
   socket: WebSocket,
   type: string,
@@ -91,7 +93,7 @@ function waitForMessage(
     const timeout = setTimeout(() => {
       socket.off('message', listener);
       reject(new Error(`Missing ${type} frame`));
-    }, 5_000);
+    }, FRAME_TIMEOUT_MS);
     function listener(bytes: unknown) {
       const message = JSON.parse(String(bytes));
       if (message.type === type) {

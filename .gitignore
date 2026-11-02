@@ -20,6 +20,10 @@ logs/
 coverage/
 .nyc_output/
 
+# Mutation testing
+.stryker-tmp/
+reports/
+
 # OS
 .DS_Store
 Thumbs.db

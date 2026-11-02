@@ -162,7 +162,7 @@ test('reviews intent and coupling, not function length, only in changes from thi
   assert.match(steer, /names and contracts/);
   assert.match(steer, /orchestration/);
   assert.match(steer, /even with one caller/);
-  assert.match(steer, /Do not split solely for line count/);
+  assert.match(steer, /Do not split code just to shorten it/);
   assert.match(steer, /shared mutable state/);
   assert.match(steer, /excessive parameters/);
   assert.match(steer, /functions that must be read together/);
@@ -412,7 +412,7 @@ test('a late workflow note preserves the task-review contract without code chang
   state.notes.push('Completion claim contradicts observed checks');
   const steer = pendingReviewSteer(state) ?? '';
   assert.match(steer, /questionnaire or task contract/);
-  assert.match(steer, /Run project checks only if code changes/);
+  assert.match(steer, /Run project checks only if the code changed/);
   markReviewSteered(state);
   state.notes.push('Further advisory note');
   assert.equal(pendingReviewSteer(state), undefined);

@@ -3,6 +3,7 @@ import {
   PERSONA_TOOL_NAME,
   PROHIBITIONS,
   VOICE_RULES,
+  VOICE_SCOPE,
 } from './catalog.ts';
 
 export const PERSONA_REMINDER_HEADING =
@@ -21,13 +22,13 @@ export const PERSONA_EXAMPLES = [
 ] as const;
 
 export const PERSONA_REMINDER = `${PERSONA_REMINDER_HEADING}
-Apply this voice to progress messages, final answers, and user-facing documentation.
+${VOICE_SCOPE}
 Voice: ${VOICE_SUMMARY}
 Never: ${PROHIBITION_SUMMARY}
 ${ENFORCEMENT_SUMMARY}
 Examples:
 ${PERSONA_EXAMPLES.join('\n')}
-Before the first substantial explanation or report, call ${PERSONA_TOOL_NAME} or read ${PERSONA_SKILL_PATH}; reuse the complete guide while it remains in context.
+Before the first substantial explanation, findings report, implementation summary, or user-facing documentation, call ${PERSONA_TOOL_NAME} or read ${PERSONA_SKILL_PATH}; reuse the complete guide while it remains in context.
 Before sending prose, check: outcome first, necessary terms explained, no repetition or invented labels. Preserve evidence and requested detail.`;
 
 export function appendPersonaReminder(systemPrompt: string): string {

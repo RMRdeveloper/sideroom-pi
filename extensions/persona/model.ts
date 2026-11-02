@@ -41,12 +41,12 @@ export function formatBlockReason(
   violations: readonly ProhibitionViolation[],
 ): string {
   return [
-    `Blocked ${path}: the Sideroom persona forbids this content.`,
+    `Blocked ${path}: a Sideroom voice rule rejects this content.`,
     ...violations.map(
       (violation) =>
         `- ${violation.prohibition.rule} Found: "${violation.excerpt}"`,
     ),
-    'Remove the flagged content and retry the mutation.',
+    'Remove the flagged content, then save again.',
   ].join('\n');
 }
 
@@ -55,12 +55,12 @@ export function formatArtifactSteer(
   violations: readonly ProhibitionViolation[],
 ): string {
   return [
-    `Sideroom persona stopped blocking ${path} after repeated attempts, but this content is still forbidden.`,
+    `Sideroom persona: ${path} still has blocked content, and blocking is off for the rest of this run.`,
     ...violations.map(
       (violation) =>
         `- ${violation.prohibition.rule} Found: "${violation.excerpt}"`,
     ),
-    'Remove it in the next edit.',
+    'Remove it in your next edit.',
   ].join('\n');
 }
 
@@ -68,12 +68,12 @@ export function formatSteer(
   violations: readonly ProhibitionViolation[],
 ): string {
   return [
-    `${PERSONA_TOOL_NAME}: part of your last message is forbidden.`,
+    `${PERSONA_TOOL_NAME}: your last reply breaks a voice rule.`,
     ...violations.map(
       (violation) =>
         `- ${violation.prohibition.rule} Found: "${violation.excerpt}"`,
     ),
-    'Rewrite in plain words: subject and goal first, everyday terms, no concept jargon the user did not use.',
+    'Rewrite in plain words: say what matters first, use everyday terms, and drop jargon the user did not ask for.',
   ].join('\n');
 }
 
