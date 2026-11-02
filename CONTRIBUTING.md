@@ -76,6 +76,7 @@ headless runs fail fast by design.
 | `npm run format` | ESLint Stylistic fixes. `npm run format:check` verifies without writing. |
 | `npm test` | `node --test` over `extensions/**/*.test.ts` and `scripts/**/*.test.mjs`. |
 | `npm run check` | The gate: types, braces check, ESLint, tests. Run it before every PR. |
+| `npm run mutation` | Mutation testing with Stryker over `extensions/`. Slow; see [Mutation testing](#mutation-testing). |
 | `npm run preview` | Rebuilds `media/preview.png` and `media/preview.mp4`. Needs ffmpeg; maintainer tool. |
 | `npm run cache:report` | Reads this project's Pi session files and prints prompt-cache totals. Maintainer tool. |
 | `npm run changeset` | Creates a changeset (see [Changesets](#changesets)). |
@@ -85,6 +86,48 @@ Use ESLint with TypeScript ESLint and ESLint Stylistic. Do not add Prettier or
 a competing formatter. `no-comments/disallowComments` rejects code comments;
 keep explanations in documentation. The same shared rules run in `site/`,
 which installs its own development dependencies.
+
+## Mutation testing
+
+`npm run mutation` runs Stryker over `extensions/**/*.ts`, tests excluded. It
+answers a different question than `npm test`: not whether the suite passes, but
+whether the suite would notice a changed line.
+
+A full pass covers about 10,800 mutants and takes roughly two hours on four
+workers. While working, run one area at a time:
+
+```bash
+npx stryker run --mutate 'extensions/<area>/**/*.ts,!extensions/<area>/**/*.test.ts'
+```
+
+Read `reports/mutation.json` and filter it to that area. Stryker accumulates
+results across runs in one file, so an unfiltered report mixes areas. A mutant
+that stops the suite from finishing counts as detected, like a failed assertion.
+
+Three rules keep a run trustworthy:
+
+- One Stryker run at a time. Two runs share `.stryker-tmp` and the report files
+  and corrupt each other.
+- The runner is `tap` with `coverageAnalysis: "perTest"`, not the default
+  `command` runner. The command runner repeats the whole suite for every mutant:
+  9.45 s per mutant measured here against 0.63 s with `tap`. Stryker has no
+  `node:test` runner yet.
+- `thresholds.break` is `null` on purpose. Some mutants cannot change anything
+  observable, and a global 100% gate would fail every run because of them.
+
+### Equivalent mutants
+
+A mutant is equivalent when no test can tell the mutated code from the original.
+They are never silenced with comments or line exclusions, because hiding a line
+also hides the real mutants on it. They are listed here instead. When you close
+an area, add its equivalents to this table with the reason.
+
+| Area | Equivalent mutants | Where | Why nothing observable changes |
+| --- | --- | --- | --- |
+| `shared` | 4 | `file-path.ts` lines 65, 77, 96 | The slash guard is required again by the regex that follows; `match?.[2]` never sees `match` undefined; the `'code' in error` check cannot change the branch, and `realpathSync` throws only real errors. |
+| `monorepo-skills` | 8 | `scan.ts` lines 200, 218, 221 | Directory order is sorted again on output and the default `sort()` matches `compareText`; the final list is always ascending, so `<=`, `>=` and an always-negative comparator give the same result. |
+| `done` | 9 | `detect.ts` lines 95, 96, 143, 235; `guard.ts` lines 45, 73, 81; `model.ts` line 39 | The empty-string fallback is unreachable inside the loop; a missing or-operator branch falls back to the pipe verdict, which is unsafe in both cases; an empty encoding still yields the same text; the event bus swallows the listener error; a stale map entry is never read again; the last check gates the branch anyway; the extension regex still matches after slashes are inserted. |
+| `modified-files` | 7 | `session.ts` lines 38, 41, 77, 155, 164, 176, 185 | Starting one past the end adds one empty iteration; entries in range are always defined, so the optional chain never fires; the empty-lines fallback is unreachable; a non-file call leaks an entry that the result path rejects anyway; the trailing check returns the same value. |
 
 ## Layout
 

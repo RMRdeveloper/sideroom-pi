@@ -3,7 +3,7 @@ import { Check } from 'typebox/value';
 
 export const TOOL_NAME = 'sideroom_todo';
 export const UI_UNAVAILABLE =
-  'Error: UI not available (running in non-interactive mode)';
+  'Error: A board proposal needs the interactive window, and this run has none. Use update to change individual items, or run Pi in the TUI.';
 export const TODO_ACTION = {
   propose: 'propose',
   update: 'update',
@@ -33,27 +33,31 @@ const TodoActionSchema = Type.Union([
 ]);
 
 const TodoItemSchema = Type.Object({
-  id: Type.String({ description: 'Stable identifier for this item' }),
-  content: Type.String({ description: 'Short description of the work' }),
+  id: Type.String({
+    description: 'Short stable id for this item, for example auth',
+  }),
+  content: Type.String({
+    description: 'What this task will do, in everyday words',
+  }),
   status: TodoStatusSchema,
 });
 
 const TodoPatchSchema = Type.Object({
-  id: Type.String({ description: 'Identifier of the item to patch' }),
+  id: Type.String({ description: 'Id of the item to change' }),
   status: Type.Optional(TodoStatusSchema),
   content: Type.Optional(
-    Type.String({ description: 'Replacement work description' }),
+    Type.String({ description: 'New wording for the task, replacing the old one' }),
   ),
 });
 
 const TodoItemsField = Type.Array(TodoItemSchema, {
   maxItems: MAX_TODO_ITEMS,
-  description: 'Replacement board for propose, with at most 20 items',
+  description: `Full board for propose, at most ${String(MAX_TODO_ITEMS)} items`,
 });
 
 const TodoPatchesField = Type.Array(TodoPatchSchema, {
   minItems: 1,
-  description: 'Patches to apply for update',
+  description: 'Changes to apply for update, one per item id',
 });
 
 const ProposeParamsSchema = Type.Object({
@@ -120,7 +124,9 @@ const STATUS_MARKS: Readonly<Record<TodoStatus, string>> = {
 };
 
 const BOARD_INSTRUCTIONS =
-  'Call sideroom_todo update before the next item. While any item is pending, exactly one must be in_progress. Complete the current item and start the next in the same update. propose replaces the list; update patches by id.';
+  'Keep the board current: call sideroom_todo update when an item changes status, and mark the finished item while starting the next one in the same call. While any item is pending, exactly one item is in_progress. propose replaces the whole board; update changes items by id.';
+
+const SCHEMA_FALLBACK = `Error: The sideroom_todo call does not match the schema. Send action "propose" with items (at most ${String(MAX_TODO_ITEMS)}), or action "update" with patches.`;
 
 interface JsonWireObject {
   readonly [key: string]: JsonWireValue | undefined;
@@ -195,7 +201,7 @@ function toJsonWireValue(value: unknown): JsonWireValue {
 export function parseTodoParams(value: unknown): ParseTodoResult {
   const decoded = decodeTodoWireArgs(value);
   if (!Check(TodoParamsSchema, decoded)) {
-    return { ok: false, message: 'Error: Invalid sideroom_todo parameters' };
+    return { ok: false, message: SCHEMA_FALLBACK };
   }
 
   if (decoded.action === TODO_ACTION.propose) {
@@ -234,7 +240,7 @@ export function applyTodoParams(
   const patchesById = new Map(params.patches.map((patch) => [patch.id, patch]));
   for (const id of patchesById.keys()) {
     if (!items.some((item) => item.id === id)) {
-      return { ok: false, message: `Error: Unknown todo id: ${id}` };
+      return { ok: false, message: `Error: No item on the board has the id '${id}'. Use an id from the board, or propose the item first.` };
     }
   }
 
@@ -283,7 +289,10 @@ function normalizeItems(
       return id;
     }
     if (seen.has(id.value)) {
-      return { ok: false, message: `Error: Duplicate todo id: ${id.value}` };
+      return {
+        ok: false,
+        message: `Error: Two items use the id '${id.value}'. Give each item its own id.`,
+      };
     }
     seen.add(id.value);
 
@@ -315,14 +324,14 @@ function normalizePatches(
     if (seen.has(id.value)) {
       return {
         ok: false,
-        message: `Error: Duplicate todo patch id: ${id.value}`,
+        message: `Error: Two patches change the item '${id.value}'. Send one patch per item.`,
       };
     }
     seen.add(id.value);
     if (patch.status === undefined && patch.content === undefined) {
       return {
         ok: false,
-        message: `Error: Todo patch '${id.value}' must change status or content`,
+        message: `Error: The patch for '${id.value}' changes nothing. Send a new status, new wording, or both.`,
       };
     }
 
@@ -348,7 +357,7 @@ function normalizeId(
   if (normalized.length === 0 || normalized.length > MAX_TODO_ID_LENGTH) {
     return {
       ok: false,
-      message: `Error: Todo id must contain 1 to ${String(MAX_TODO_ID_LENGTH)} characters`,
+      message: `Error: A todo id must have 1 to ${String(MAX_TODO_ID_LENGTH)} characters. Use a short id, for example auth.`,
     };
   }
   return { ok: true, value: normalized };
@@ -363,7 +372,7 @@ function normalizeContent(
   if (normalized.length === 0 || normalized.length > MAX_TODO_CONTENT_LENGTH) {
     return {
       ok: false,
-      message: `Error: Todo content must contain 1 to ${String(MAX_TODO_CONTENT_LENGTH)} characters`,
+      message: `Error: A task description must have 1 to ${String(MAX_TODO_CONTENT_LENGTH)} characters. Shorten that item.`,
     };
   }
   return { ok: true, value: normalized };
@@ -377,10 +386,12 @@ function validateBoard(items: readonly TodoItem[]): string | undefined {
     (item) => item.status === TODO_STATUS.inProgress,
   ).length;
   if (inProgressCount > 1) {
-    return 'Error: At most one todo item may be in_progress';
+    return `Error: The board has ${String(inProgressCount)} items in progress and only one is allowed. Complete one in this update.`;
   }
   if (pendingCount > 0 && inProgressCount !== 1) {
-    return 'Error: A board with pending items must have exactly one in_progress item';
+    const pendingLabel =
+      pendingCount === 1 ? '1 pending item' : `${String(pendingCount)} pending items`;
+    return `Error: The board has ${pendingLabel} and none in progress. Mark one of them in_progress in this call.`;
   }
   return undefined;
 }

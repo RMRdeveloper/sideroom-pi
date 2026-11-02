@@ -20,7 +20,7 @@ does not need to name a skill for automatic selection.
 | Derive or complete domain vocabulary across existing business code | `sideroom-domain-scaffold` | Code-first glossary work. Generic README or API documentation does not automatically need it. |
 | Write, revise, review, or split user stories and acceptance criteria | `sideroom-user-stories` | Produces text using project conventions. Open feature plans go through grill; drafting does not authorize publication, metadata changes, or implementation. |
 | Any `write` or `edit` | `sideroom-guidelines` | Load the complete skill and matching language guide with `sideroom_guidelines` (`path` is the target file) or full packaged `read` calls. Reuse in the same run; reload after compaction or a new run. Unsupported languages need only the general skill. Read-only investigation needs neither. |
-| Substantial explanations, reports, implementation summaries, or user-facing documentation | `sideroom-persona` | Load the complete guide through the tool or `read`, then reuse it while in context. Brief acknowledgments use the reminder. |
+| Substantial explanations, reports, implementation summaries, user-facing documentation, or text written inside a Sideroom tool | `sideroom-persona` | Load the complete guide through the tool or `read`, then reuse it while in context. Brief acknowledgments and short tool wording use the always-on reminder and the shared note in `sideroom_ask` and `sideroom_todo`. |
 | Enable, review, or troubleshoot precise browser source locations | `sideroom-visual-setup` | Reuses the setup tool; checks project choice and runtime paths, including Docker. Ordinary UI edits do not require setup. |
 
 Skills can compose: grill may load architecture for a decision and domain
@@ -63,8 +63,9 @@ If the skill is visible but goes unread, examine its description, overlapping
 skills, and contradictions in the activation contract. The persona reminder
 is already always active, so a missing `sideroom_persona` call does not mean
 the persona is disabled. Its prose detectors catch selected prohibitions;
-they do not judge clarity, necessary jargon, or repetition. The guide and
-pre-send wording check address those through model instructions.
+they do not judge clarity, necessary jargon, or repetition, and they never read
+text inside tool arguments. The guide and pre-send wording check address those
+through model instructions.
 
 ## Manual behavior checks
 

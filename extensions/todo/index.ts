@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { Text } from '@earendil-works/pi-tui';
+import { TOOL_TEXT_VOICE_NOTE } from '../persona/catalog.ts';
 import { executeTodo, type TodoToolDetails } from './execute.ts';
 import { registerGuardEvents } from './guards.ts';
 import {
@@ -28,6 +29,7 @@ export const TODO_PROMPT_SNIPPET =
 
 export const TODO_PROMPT_GUIDELINES = [
   'Use sideroom_todo to maintain a live work board when implementation has more than one step.',
+  `${TOOL_TEXT_VOICE_NOTE} Each sideroom_todo item says what will be done and which result it serves, in the user's language.`,
   'While any item is pending, exactly one must be in_progress.',
   'Update at task milestones, not after each tool call. Complete the current item and start the next item in the same update call.',
   'propose is interactive-TUI-only; update also works in print, JSON, and RPC modes.',

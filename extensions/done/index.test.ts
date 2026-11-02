@@ -10,25 +10,43 @@ import {
 } from '@earendil-works/pi-coding-agent';
 import { readCheckStatus } from '../shared/check-status.ts';
 import registerDone from './index.ts';
+import { formatMissingTestNotice, MISSING_TEST_NOTICE_TYPE } from './model.ts';
 
 type EventHandler = (event: never, ctx: ExtensionContext) => unknown;
 
+const SETTLE_SUPPLEMENT_EVENT = 'sideroom:settle-supplement';
+
+const SOURCE_PATH = 'src/app.ts';
+
+const TEST_PATH = 'src/app.test.ts';
+
+const TESTED_SCRIPTS: Record<string, string> = { check: 'x', test: 'node --test' };
+
+interface SettleSupplement {
+  readonly customType: string;
+  readonly content: string;
+}
+
 function register(scripts: Record<string, string> = { check: 'x' }) {
   const handlers = new Map<string, EventHandler>();
+  const events = createEventBus();
   const pi = {
     on(name: string, handler: EventHandler) {
       handlers.set(name, handler);
     },
-    events: createEventBus(),
+    events,
     sendMessage() {
       assert.fail('check observation must never send a message');
     },
   } as unknown as ExtensionAPI;
   const cwd = mkdtempSync(join(tmpdir(), 'sideroom-done-'));
-  writeFileSync(join(cwd, 'package.json'), JSON.stringify({ scripts }));
   const ctx = { cwd } as ExtensionContext;
+  writePackageScripts(scripts);
   registerDone(pi);
 
+  function writePackageScripts(next: Record<string, string>): void {
+    writeFileSync(join(cwd, 'package.json'), JSON.stringify({ scripts: next }));
+  }
   function emit(name: string, event: unknown): void {
     const handler = handlers.get(name);
     assert.ok(handler, name);
@@ -38,15 +56,34 @@ function register(scripts: Record<string, string> = { check: 'x' }) {
     emit('tool_call', { toolName: 'bash', toolCallId: 'check', input: { command } });
     emit('tool_result', { toolName: 'bash', toolCallId: 'check', isError });
   }
-  function mutate(isError = false): void {
-    emit('tool_call', { toolName: 'write', toolCallId: 'write', input: { path: 'src/app.ts' } });
+  function writePath(path: string, isError = false): void {
+    emit('tool_call', { toolName: 'write', toolCallId: 'write', input: { path } });
     emit('tool_result', { toolName: 'write', toolCallId: 'write', isError });
+  }
+  function editPath(path: string, isError = false): void {
+    emit('tool_call', { toolName: 'edit', toolCallId: 'edit', input: { path } });
+    emit('tool_result', { toolName: 'edit', toolCallId: 'edit', isError });
+  }
+  function mutate(isError = false): void {
+    writePath(SOURCE_PATH, isError);
+  }
+  function supplement(): SettleSupplement[] {
+    const request: {
+      readonly ctx: ExtensionContext;
+      readonly messages: SettleSupplement[];
+    } = { ctx, messages: [] };
+    events.emit(SETTLE_SUPPLEMENT_EVENT, request);
+    return request.messages;
   }
   return {
     handlers,
     emit,
     check,
     mutate,
+    writePath,
+    editPath,
+    writePackageScripts,
+    supplement,
     status: () => readCheckStatus(pi, ctx),
     close: () => rmSync(cwd, { recursive: true, force: true }),
   };
@@ -125,4 +162,71 @@ test('no detected command means no status and no continuation', (t) => {
   run.check('npm run check');
   assert.equal(run.status(), undefined);
   assert.equal(run.handlers.has('agent_before_settle'), false);
+});
+
+test('ignores tool calls that are not write, edit or bash', (t) => {
+  const run = register();
+  t.after(run.close);
+  run.emit('tool_call', {
+    toolName: 'read',
+    toolCallId: 'read',
+    input: { path: SOURCE_PATH },
+  });
+  assert.equal(run.status()?.green, false);
+});
+
+test('adds the missing-test notice once after a successful code change', (t) => {
+  const run = register(TESTED_SCRIPTS);
+  t.after(run.close);
+  run.mutate();
+  assert.deepEqual(run.supplement(), [
+    { customType: MISSING_TEST_NOTICE_TYPE, content: formatMissingTestNotice() },
+  ]);
+  assert.deepEqual(run.supplement(), []);
+});
+
+test('counts an edit of a source file as a code change', (t) => {
+  const run = register(TESTED_SCRIPTS);
+  t.after(run.close);
+  run.editPath(SOURCE_PATH);
+  assert.equal(run.supplement().length, 1);
+});
+
+test('stays silent when the run changed a test file', (t) => {
+  const run = register(TESTED_SCRIPTS);
+  t.after(run.close);
+  run.writePath(TEST_PATH);
+  assert.deepEqual(run.supplement(), []);
+});
+
+test('stays silent when the run changed only documentation', (t) => {
+  const run = register(TESTED_SCRIPTS);
+  t.after(run.close);
+  run.writePath('README.md');
+  assert.deepEqual(run.supplement(), []);
+});
+
+test('keeps a run that changed a test file out of the missing-test notice', (t) => {
+  const run = register(TESTED_SCRIPTS);
+  t.after(run.close);
+  run.writePath(TEST_PATH);
+  run.writePath(SOURCE_PATH);
+  assert.deepEqual(run.supplement(), []);
+});
+
+test('keeps the first detected test setup for the working directory', (t) => {
+  const run = register(TESTED_SCRIPTS);
+  t.after(run.close);
+  assert.deepEqual(run.supplement(), []);
+  run.writePackageScripts({ check: 'x' });
+  run.mutate();
+  assert.equal(run.supplement().length, 1);
+});
+
+test('keeps the first detected check command for the working directory', (t) => {
+  const run = register({});
+  t.after(run.close);
+  assert.equal(run.status(), undefined);
+  run.writePackageScripts({ check: 'eslint .' });
+  assert.equal(run.status(), undefined);
 });

@@ -15,10 +15,10 @@ import { personaStatusLabel } from './model.ts';
 import { appendPersonaReminder } from './prompt.ts';
 
 export const PERSONA_DESCRIPTION =
-  'Load the complete Sideroom writing guide before a substantial explanation, findings report, implementation summary, or user-facing documentation; also use when asked for clearer, shorter, or less technical wording. Reuse while in context.';
+  'Load the complete Sideroom writing guide before a substantial explanation, findings report, implementation summary, or user-facing documentation, and before writing questions, options, recommendations or task wording inside Sideroom tools; also use when asked for clearer, shorter, or less technical wording. Reuse while in context.';
 
 export const PERSONA_PROMPT_SNIPPET =
-  'Load the complete writing guide before substantial user-facing prose.';
+  'Load the complete writing guide before substantial prose or text written inside Sideroom tools.';
 
 export default function registerPersona(pi: ExtensionAPI): void {
   const state = createPersonaGuardState();

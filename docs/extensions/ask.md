@@ -33,8 +33,9 @@ for that question.
 
 ## Non-interactive behavior
 
-`ask` is TUI-only. In print, JSON, or RPC mode it returns
-`Error: UI not available (running in non-interactive mode)` instead of hanging.
+`ask` is TUI-only. In print, JSON, or RPC mode it returns an error that says the
+questions need the interactive window and asks for ordinary conversation
+instead, rather than hanging.
 
 ## TUI behavior
 

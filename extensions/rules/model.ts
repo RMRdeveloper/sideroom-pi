@@ -203,9 +203,9 @@ export function formatBlockReason(
   violations: readonly RuleViolation[],
 ): string {
   return [
-    `Blocked ${path}: sideroom rules violated.`,
+    `Blocked ${path}: Sideroom rules reject these added lines.`,
     ...violations.map((item) => `- ${item.message}`),
-    'Fix the flagged lines and retry the mutation.',
+    'Fix them and save again.',
   ].join('\n');
 }
 
@@ -214,7 +214,7 @@ export function formatWarnings(
   violations: readonly RuleViolation[],
 ): string {
   return [
-    `Sideroom rules flagged ${path}:`,
+    `Sideroom rules found these in ${path}:`,
     ...violations.map((item) => `- ${item.message}`),
   ].join('\n');
 }

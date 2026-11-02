@@ -153,7 +153,9 @@ export function resolveCompilerLocation({
   }
   const projectRoot = project === undefined ? cwd : allowedPath(cwd, project);
   if (!projectRoot || !statSync(projectRoot).isDirectory()) {
-    return unresolved('The associated project is missing or excluded.');
+    return unresolved(
+      'The project for this page is missing or excluded. Associate the page with a project in F7 again.',
+    );
   }
   const absolute = allowedPath(projectRoot, location.path);
   if (
@@ -163,7 +165,7 @@ export function resolveCompilerLocation({
     statSync(absolute).size > MAX_FILE_BYTES
   ) {
     return unresolved(
-      'The compiler path is missing, excluded, outside the project, or too large.',
+      'Pi cannot read the compiler path: missing, excluded, outside the project, or too large.',
     );
   }
   const path = relative(realpathSync(cwd), absolute).split(sep).join('/');
@@ -172,7 +174,9 @@ export function resolveCompilerLocation({
       extname(path).toLowerCase(),
     )
   ) {
-    return unresolved('The compiler path has an unsupported source format.');
+    return unresolved(
+      'Pi cannot read this source format at the compiler path. Choose another source location.',
+    );
   }
   try {
     const candidates = matchSource({
@@ -190,7 +194,7 @@ export function resolveCompilerLocation({
   } catch (cause) {
     if (cause instanceof InvalidMarkup) {
       return unresolved(
-        'The compiler source could not be parsed; its location was not accepted.',
+        'Pi could not parse the compiler source, so its location was skipped. Link the element again.',
       );
     }
     throw new Error(`Cannot verify compiler source ${path}`, { cause });
@@ -216,7 +220,8 @@ export function resolveProjectSelection({
       candidates: [],
       truncated: false,
       capped: false,
-      issue: 'The associated project is missing or excluded.',
+      issue:
+        'The project for this page is missing or excluded. Associate the page with a project in F7 again.',
     };
   }
   const resolution = scanSource({ cwd: root, selection, paths });

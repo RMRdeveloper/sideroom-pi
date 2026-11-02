@@ -62,6 +62,12 @@ export const VOICE_RULES: readonly VoiceRule[] = [
   },
 ];
 
+export const VOICE_SCOPE =
+  'Apply this voice to everything the user reads: progress messages, final answers, user-facing documentation, and the questions, options, recommendations and task wording you write inside Sideroom tools.';
+
+export const TOOL_TEXT_VOICE_NOTE =
+  "Write the text you add here in Sideroom's voice: everyday words, the decision or result first, and enough detail for the user to decide.";
+
 export type ProhibitionId =
   | 'decorative-symbols'
   | 'flattery-and-filler'

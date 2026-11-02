@@ -53,5 +53,5 @@ export function shouldNoticeMissingTest(
 }
 
 export function formatMissingTestNotice(): string {
-  return 'This run changed code files and no test file. Check whether existing tests cover the changed behavior; add or update a test if coverage is missing, reuse relevant checks that already passed after the latest mutation, and run missing, failed, or stale checks before finishing. Any code or test edit makes earlier checks stale.';
+  return 'This run changed code and no test file. Check whether the existing tests cover the new behavior, and add or update a test where they do not. Reuse the checks that already passed after your last edit, and run only the ones that are missing, failed or out of date. Any further code or test edit makes earlier checks stale.';
 }

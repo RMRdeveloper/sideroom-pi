@@ -382,7 +382,7 @@ export function formatFindings(
     `Sideroom Jev review flagged ${path}:`,
     ...findings.map(
       (finding) =>
-        `- [${finding.ruleId}] Jev scored ${finding.probability.toFixed(2)} probability of a review concern. Verify the supplied evidence and applicable contract against the loaded guide before changing anything. Missing context is not proof of a violation.`,
+        `- [${finding.ruleId}] Jev sees a likely problem here (confidence ${finding.probability.toFixed(2)}). Check it against the evidence and the contract in the loaded guide, and change the code only if it really breaks the rule. Missing context is not proof of a problem.`,
     ),
   ].join('\n');
 }

@@ -7,7 +7,7 @@ export const OUT_OF_SCOPE_LABEL = 'Out of scope';
 export const CUSTOM_VALUE = '__other__';
 export const CUSTOM_LABEL = 'Write a custom answer';
 export const UI_UNAVAILABLE =
-  'Error: UI not available (running in non-interactive mode)';
+  'Error: These questions need the interactive window, and this run has none. Ask the user in ordinary conversation instead, or run Pi in the TUI and try again.';
 
 export const SINGLE_SELECTION_MODE = 'single';
 export const MULTIPLE_SELECTION_MODE = 'multiple';
@@ -21,14 +21,19 @@ const MAX_OPTIONS = 4;
 const MAX_TAB_LABEL_LENGTH = 16;
 const MAX_OPTION_LABEL_LENGTH = 60;
 
+const SCHEMA_FALLBACK =
+  'Error: The sideroom_ask call does not match the schema. Send 1 to 4 questions, each with an id, a prompt, 2 to 4 options and a recommendation.';
+
 const QuestionOptionSchema = Type.Object({
   value: Type.String({ description: 'The value returned when selected' }),
   label: Type.String({
     maxLength: MAX_OPTION_LABEL_LENGTH,
-    description: `Display label for the option, with at most ${String(MAX_OPTION_LABEL_LENGTH)} characters`,
+    description: `Label shown for this option, at most ${String(MAX_OPTION_LABEL_LENGTH)} characters`,
   }),
   description: Type.Optional(
-    Type.String({ description: 'Optional description shown below the label' }),
+    Type.String({
+      description: 'Optional line under the label that helps the user decide',
+    }),
   ),
 });
 
@@ -37,10 +42,10 @@ const QuestionSchema = Type.Object({
   label: Type.Optional(
     Type.String({
       maxLength: MAX_TAB_LABEL_LENGTH,
-      description: `Short contextual label of at most ${String(MAX_TAB_LABEL_LENGTH)} characters for the tab bar, e.g. 'Scope' (defaults to Q1, Q2)`,
+      description: `Short tab label, at most ${String(MAX_TAB_LABEL_LENGTH)} characters, for example 'Scope' (defaults to Q1, Q2)`,
     }),
   ),
-  prompt: Type.String({ description: 'The full question text to display' }),
+  prompt: Type.String({ description: 'The full question the user reads' }),
   options: Type.Array(QuestionOptionSchema, {
     minItems: 2,
     maxItems: MAX_OPTIONS,
@@ -62,14 +67,14 @@ const QuestionSchema = Type.Object({
     Type.Integer({
       minimum: 0,
       description:
-        "Required for a 'single' question: index into options pointing at the recommended option",
+        "Required for a 'single' question: the index of the option you recommend",
     }),
   ),
   recommendedIndices: Type.Optional(
     Type.Array(Type.Integer({ minimum: 0 }), {
       minItems: 1,
       description:
-        "Required for a 'multiple' question: indexes of every recommended option, at least one",
+        "Required for a 'multiple' question: the indexes of the options you recommend, at least one",
     }),
   ),
 });
@@ -241,7 +246,7 @@ export function parseAskParams(value: unknown): ParseAskResult {
     if (seen.has(question.id)) {
       return {
         ok: false,
-        message: `Error: Duplicate question id: ${question.id}`,
+        message: `Error: Two questions use the id '${question.id}'. Give each question its own id.`,
       };
     }
     seen.add(question.id);
@@ -298,29 +303,31 @@ function recommendedIndicesFor(
 function recommendationError(
   question: AskParams['questions'][number],
 ): string | undefined {
+  const optionCount = question.options.length;
+  const lastIndex = optionCount - 1;
   if (selectionModeOf(question) === SINGLE_SELECTION_MODE) {
     if (question.recommendationIndex === undefined) {
-      return `Error: Question '${question.id}' requires recommendationIndex`;
+      return `Error: Question '${question.id}' has no recommendationIndex. A single-selection question needs the index of the option you recommend.`;
     }
     if (question.recommendedIndices !== undefined) {
-      return `Error: Question '${question.id}' is a single-selection question; remove recommendedIndices`;
+      return `Error: Question '${question.id}' is single-selection and includes recommendedIndices. Send recommendationIndex instead.`;
     }
-    if (question.recommendationIndex >= question.options.length) {
-      return `Error: recommendationIndex ${String(question.recommendationIndex)} is out of range for question '${question.id}'`;
+    if (question.recommendationIndex >= optionCount) {
+      return `Error: recommendationIndex ${String(question.recommendationIndex)} points past the last option of question '${question.id}', which has ${String(optionCount)} options. Use an index from 0 to ${String(lastIndex)}.`;
     }
     return undefined;
   }
   if (question.recommendedIndices === undefined) {
-    return `Error: Question '${question.id}' is a multiple-selection question and requires recommendedIndices`;
+    return `Error: Question '${question.id}' is multiple-selection and includes no recommendedIndices. List the indexes to recommend, at least one.`;
   }
   if (question.recommendationIndex !== undefined) {
-    return `Error: Question '${question.id}' is a multiple-selection question; remove recommendationIndex`;
+    return `Error: Question '${question.id}' is multiple-selection and includes recommendationIndex. Send recommendedIndices instead.`;
   }
   const outOfRange = question.recommendedIndices.find(
-    (optionIndex) => optionIndex >= question.options.length,
+    (optionIndex) => optionIndex >= optionCount,
   );
   if (outOfRange !== undefined) {
-    return `Error: recommendedIndices ${String(outOfRange)} is out of range for question '${question.id}'`;
+    return `Error: recommendedIndices ${String(outOfRange)} points past the last option of question '${question.id}', which has ${String(optionCount)} options. Use indexes from 0 to ${String(lastIndex)}.`;
   }
   return undefined;
 }
@@ -373,14 +380,14 @@ export function formatAnswerLines(
 function schemaErrorMessage(value: unknown): string {
   const [error] = Errors(AskParamsSchema, value);
   if (error === undefined) {
-    return 'Error: Invalid sideroom_ask parameters';
+    return SCHEMA_FALLBACK;
   }
   if (error.instancePath === '/questions') {
     if (error.keyword === 'minItems') {
-      return 'Error: No questions provided';
+      return 'Error: No questions were sent. Send 1 to 4 questions in this call.';
     }
     if (error.keyword === 'maxItems') {
-      return `Error: A questionnaire batch may include at most ${String(MAX_QUESTIONS)} questions`;
+      return `Error: This call has more than ${String(MAX_QUESTIONS)} questions. Split them into separate calls.`;
     }
   }
 
@@ -390,10 +397,10 @@ function schemaErrorMessage(value: unknown): string {
     const questionIndex = Number(optionsMatch[1]);
     const id = questionId(questions, questionIndex);
     if (error.keyword === 'minItems') {
-      return `Error: Question '${id}' must include at least two options`;
+      return `Error: Question '${id}' has fewer than two options. Add a second option so the user can choose.`;
     }
     if (error.keyword === 'maxItems') {
-      return `Error: Question '${id}' may include at most ${String(MAX_OPTIONS)} options`;
+      return `Error: Question '${id}' has more than ${String(MAX_OPTIONS)} options. Keep ${String(MAX_OPTIONS)} or fewer.`;
     }
   }
 
@@ -403,14 +410,14 @@ function schemaErrorMessage(value: unknown): string {
   if (recommendedMatch !== null && error.keyword === 'minItems') {
     const questionIndex = Number(recommendedMatch[1]);
     const id = questionId(questions, questionIndex);
-    return `Error: Question '${id}' must mark at least one recommended option`;
+    return `Error: Question '${id}' marks no recommended option. Include at least one index in recommendedIndices.`;
   }
 
   const tabLabelMatch = /\/questions\/(\d+)\/label$/.exec(error.instancePath);
   if (error.keyword === 'maxLength' && tabLabelMatch !== null) {
     const questionIndex = Number(tabLabelMatch[1]);
     const id = questionId(questions, questionIndex);
-    return `Error: Question '${id}' label may contain at most ${String(MAX_TAB_LABEL_LENGTH)} characters`;
+    return `Error: The tab label of question '${id}' is longer than ${String(MAX_TAB_LABEL_LENGTH)} characters. Shorten it.`;
   }
 
   const optionLabelMatch = /\/questions\/(\d+)\/options\/(\d+)\/label$/.exec(
@@ -420,10 +427,10 @@ function schemaErrorMessage(value: unknown): string {
     const questionIndex = Number(optionLabelMatch[1]);
     const optionIndex = Number(optionLabelMatch[2]);
     const id = questionId(questions, questionIndex);
-    return `Error: Option ${String(optionIndex + 1)} for question '${id}' may contain at most ${String(MAX_OPTION_LABEL_LENGTH)} characters`;
+    return `Error: Option ${String(optionIndex + 1)} of question '${id}' has a label longer than ${String(MAX_OPTION_LABEL_LENGTH)} characters. Shorten it.`;
   }
 
-  return 'Error: Invalid sideroom_ask parameters';
+  return SCHEMA_FALLBACK;
 }
 
 function questionId(
