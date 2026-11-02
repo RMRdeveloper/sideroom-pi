@@ -58,6 +58,7 @@ Sideroom answers each one with a small, opinionated surface:
 | Invisible monorepo skills | `monorepo-skills` — trusted child folders join Pi's available skill list |
 | Vague plans | `sideroom-grill` — an interview that settles the words before the work |
 | Costly growth and refactors | `sideroom-codebase-design` — evidenced improvements to module design, tests, and long-term scaling |
+| Unresolved code questions | `sideroom_research` — proactive read-only investigation with references and bounded work |
 | Unapplied guidelines | `sideroom_rules` — mechanical checks that block or flag the lines you add |
 | Unchecked judgment rules | `jev` — asks a decision model about guide rules with visible evidence |
 | Unclear answers | `sideroom_persona` — one voice: direct, plain, and free of unnecessary technical words |
@@ -116,8 +117,22 @@ at least two `{ value, label }` options, and a recommendation:
 several. The UI adds the rest: the recommended mark, the always-on *Out of
 scope* row, and a custom answer.
 
-TUI-only by design. In print, JSON, or RPC modes it fails fast with
-`UI not available` instead of hanging.
+TUI-only by design. In print, JSON, or RPC modes it fails fast with an error
+that says the questions need the interactive window, instead of hanging.
+
+### `sideroom_research` — evidence for a focused question
+
+For non-trivial work that requires exploring code, the parent agent is instructed
+to delegate a concrete question without waiting for you to ask. A separate agent
+reads and searches the project, then returns a report with references and file
+hashes. The parent keeps the choices, edits and checks. It skips trivial work,
+respects a request not to use research and continues directly if research fails.
+The instruction does not force a call or start a follow-up turn.
+
+Research currently requires a trusted Linux or WSL project. It has no web
+access. Hidden and sensitive-named project files are not automatically blocked;
+content read by the researcher can reach the configured model provider. See
+[research](docs/extensions/research.md) for limits, privacy and evaluation.
 
 ### `sideroom_todo` — a board, not a bureaucracy
 

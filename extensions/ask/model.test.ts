@@ -52,7 +52,10 @@ test('rejects an empty batch, duplicate ids, short option lists, and a bad recom
   const empty = parseAskParams({ questions: [] });
   assert.equal(empty.ok, false);
   if (!empty.ok) {
-    assert.equal(empty.message, 'Error: No questions provided');
+    assert.equal(
+      empty.message,
+      'Error: No questions were sent. Send 1 to 4 questions in this call.',
+    );
   }
 
   const [first] = sampleParams().questions;
@@ -62,7 +65,7 @@ test('rejects an empty batch, duplicate ids, short option lists, and a bad recom
   });
   assert.equal(duplicate.ok, false);
   if (!duplicate.ok) {
-    assert.match(duplicate.message, /Duplicate question id: scope/);
+    assert.match(duplicate.message, /Two questions use the id 'scope'/);
   }
 
   const short = parseAskParams({
@@ -75,7 +78,7 @@ test('rejects an empty batch, duplicate ids, short option lists, and a bad recom
   });
   assert.equal(short.ok, false);
   if (!short.ok) {
-    assert.match(short.message, /at least two options/);
+    assert.match(short.message, /fewer than two options/);
   }
 
   const outOfRange = parseAskParams({
@@ -83,7 +86,10 @@ test('rejects an empty batch, duplicate ids, short option lists, and a bad recom
   });
   assert.equal(outOfRange.ok, false);
   if (!outOfRange.ok) {
-    assert.match(outOfRange.message, /recommendationIndex 2 is out of range/);
+    assert.match(
+      outOfRange.message,
+      /recommendationIndex 2 points past the last option/,
+    );
   }
 
   const parsed = parseAskParams(sampleParams());
@@ -121,7 +127,7 @@ test('rejects each exceeded questionnaire batch limit explicitly', () => {
         })),
       },
       expectedMessage:
-        'Error: A questionnaire batch may include at most 4 questions',
+        'Error: This call has more than 4 questions. Split them into separate calls.',
     },
     {
       input: {
@@ -141,7 +147,7 @@ test('rejects each exceeded questionnaire batch limit explicitly', () => {
           },
         ],
       },
-      expectedMessage: "Error: Question 'scope' may include at most 4 options",
+      expectedMessage: "Error: Question 'scope' has more than 4 options. Keep 4 or fewer.",
     },
     {
       input: {
@@ -153,7 +159,7 @@ test('rejects each exceeded questionnaire batch limit explicitly', () => {
         ],
       },
       expectedMessage:
-        "Error: Question 'scope' label may contain at most 16 characters",
+        "Error: The tab label of question 'scope' is longer than 16 characters. Shorten it.",
     },
     {
       input: {
@@ -171,7 +177,7 @@ test('rejects each exceeded questionnaire batch limit explicitly', () => {
         ],
       },
       expectedMessage:
-        "Error: Option 1 for question 'scope' may contain at most 60 characters",
+        "Error: Option 1 of question 'scope' has a label longer than 60 characters. Shorten it.",
     },
   ];
 
@@ -374,7 +380,8 @@ test('rejects a recommendation field that does not match the selection mode', ()
         prompt: 'Who should receive the first rollout?',
         options: singleOptions,
       },
-      expectedMessage: "Error: Question 'scope' requires recommendationIndex",
+      expectedMessage:
+        "Error: Question 'scope' has no recommendationIndex. A single-selection question needs the index of the option you recommend.",
     },
     {
       question: {
@@ -385,7 +392,7 @@ test('rejects a recommendation field that does not match the selection mode', ()
         recommendedIndices: [0],
       },
       expectedMessage:
-        "Error: Question 'scope' is a single-selection question; remove recommendedIndices",
+        "Error: Question 'scope' is single-selection and includes recommendedIndices. Send recommendationIndex instead.",
     },
     {
       question: {
@@ -395,7 +402,7 @@ test('rejects a recommendation field that does not match the selection mode', ()
         options: singleOptions,
       },
       expectedMessage:
-        "Error: Question 'concerns' is a multiple-selection question and requires recommendedIndices",
+        "Error: Question 'concerns' is multiple-selection and includes no recommendedIndices. List the indexes to recommend, at least one.",
     },
     {
       question: {
@@ -407,7 +414,7 @@ test('rejects a recommendation field that does not match the selection mode', ()
         recommendedIndices: [0],
       },
       expectedMessage:
-        "Error: Question 'concerns' is a multiple-selection question; remove recommendationIndex",
+        "Error: Question 'concerns' is multiple-selection and includes recommendationIndex. Send recommendedIndices instead.",
     },
     {
       question: {
@@ -418,7 +425,7 @@ test('rejects a recommendation field that does not match the selection mode', ()
         recommendedIndices: [3],
       },
       expectedMessage:
-        "Error: recommendedIndices 3 is out of range for question 'concerns'",
+        "Error: recommendedIndices 3 points past the last option of question 'concerns', which has 2 options. Use indexes from 0 to 1.",
     },
   ];
 
@@ -450,7 +457,7 @@ test('rejects an empty recommendedIndices list with a specific message', () => {
   if (!parsed.ok) {
     assert.equal(
       parsed.message,
-      "Error: Question 'concerns' must mark at least one recommended option",
+      "Error: Question 'concerns' marks no recommended option. Include at least one index in recommendedIndices.",
     );
   }
 });

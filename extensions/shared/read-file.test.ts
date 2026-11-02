@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { isMissingFile, readFileIfExists } from './read-file.ts';
 
+const MISSING_FILE_CODE = 'ENOENT';
+
 test('reads a file that exists', () => {
   const directory = mkdtempSync(join(tmpdir(), 'sideroom-read-file-'));
   try {
@@ -35,4 +37,15 @@ test('rethrows a failure that is not a missing file', () => {
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('treats only a real error carrying the missing file code as missing', () => {
+  assert.equal(isMissingFile({ code: MISSING_FILE_CODE }), false);
+  assert.equal(isMissingFile(MISSING_FILE_CODE), false);
+  assert.equal(isMissingFile(undefined), false);
+  assert.equal(isMissingFile(new Error('missing')), false);
+  assert.equal(
+    isMissingFile(Object.assign(new Error('missing'), { code: MISSING_FILE_CODE })),
+    true,
+  );
 });

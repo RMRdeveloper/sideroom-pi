@@ -1,9 +1,20 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { commandMatches, detectCheckCommand, hasTestSetup } from './detect.ts';
+import {
+  type CheckCommand,
+  commandMatches,
+  detectCheckCommand,
+  hasTestSetup,
+} from './detect.ts';
+
+const NPM_CHECK: CheckCommand = {
+  executable: 'npm',
+  args: ['run', 'check'],
+  display: 'npm run check',
+};
 
 function withDir(run: (dir: string) => void): void {
   const dir = mkdtempSync(join(tmpdir(), 'sideroom-done-'));
@@ -100,20 +111,125 @@ test('detects a test setup separately from the check command', () => {
 });
 
 test('matches safe command chains without matching unsafe shell joins', () => {
-  const check = {
-    executable: 'npm',
-    args: ['run', 'check'],
-    display: 'npm run check',
-  };
-  assert.equal(commandMatches('npm run check', check), true);
-  assert.equal(commandMatches('  npm   run check  ', check), true);
-  assert.equal(commandMatches('npm run check --silent', check), true);
-  assert.equal(commandMatches('npm run check && npm test', check), true);
-  assert.equal(commandMatches('cd packages/api && npm run check', check), true);
-  assert.equal(commandMatches('npm run check:ci', check), false);
-  assert.equal(commandMatches('npm run checklint', check), false);
-  assert.equal(commandMatches('npm run check; echo done', check), false);
-  assert.equal(commandMatches('npm run check | tee check.log', check), false);
-  assert.equal(commandMatches('npm run check || true', check), false);
-  assert.equal(commandMatches('echo "npm run check"', check), false);
+  assert.equal(commandMatches('npm run check', NPM_CHECK), true);
+  assert.equal(commandMatches('  npm   run check  ', NPM_CHECK), true);
+  assert.equal(commandMatches('npm run check --silent', NPM_CHECK), true);
+  assert.equal(commandMatches('npm run check && npm test', NPM_CHECK), true);
+  assert.equal(
+    commandMatches('cd packages/api && npm run check', NPM_CHECK),
+    true,
+  );
+  assert.equal(commandMatches('npm run check:ci', NPM_CHECK), false);
+  assert.equal(commandMatches('npm run checklint', NPM_CHECK), false);
+  assert.equal(commandMatches('npm run check; echo done', NPM_CHECK), false);
+  assert.equal(commandMatches('npm run check | tee check.log', NPM_CHECK), false);
+  assert.equal(commandMatches('npm run check || true', NPM_CHECK), false);
+  assert.equal(commandMatches('echo "npm run check"', NPM_CHECK), false);
+});
+
+test('keeps shell operators inside quotes out of the command split', () => {
+  assert.equal(
+    commandMatches('echo "a || b" && npm run check', NPM_CHECK),
+    true,
+  );
+  assert.equal(
+    commandMatches("echo 'a || b' && npm run check", NPM_CHECK),
+    true,
+  );
+  assert.equal(
+    commandMatches('echo `a || b` && npm run check', NPM_CHECK),
+    true,
+  );
+  assert.equal(
+    commandMatches('echo "a b" && npm run check', NPM_CHECK),
+    true,
+  );
+});
+
+test('treats a backslash as quoted text inside quotes', () => {
+  assert.equal(
+    commandMatches('echo "a \\" b" && npm run check', NPM_CHECK),
+    true,
+  );
+  assert.equal(commandMatches("echo 'a\\' && npm run check", NPM_CHECK), true);
+});
+
+test('matches a check that runs before the last command in the chain', () => {
+  assert.equal(
+    commandMatches('cd packages/api && npm run check && echo done', NPM_CHECK),
+    true,
+  );
+});
+
+test('does not confirm a check joined by a sequence or background operator', () => {
+  assert.equal(commandMatches('npm run check ; echo done', NPM_CHECK), false);
+  assert.equal(commandMatches('npm run check & echo done', NPM_CHECK), false);
+});
+
+test('detects go from go.mod as a test setup', () => {
+  withDir((dir) => {
+    writeFileSync(join(dir, 'go.mod'), 'module x');
+    assert.equal(hasTestSetup(dir), true);
+  });
+});
+
+test('detects yarn and bun lockfiles as the package manager', () => {
+  const lockfiles: ReadonlyArray<{
+    readonly lockfile: string;
+    readonly display: string;
+  }> = [
+    { lockfile: 'yarn.lock', display: 'yarn test' },
+    { lockfile: 'bun.lockb', display: 'bun run test' },
+    { lockfile: 'bun.lock', display: 'bun run test' },
+  ];
+
+  for (const { lockfile, display } of lockfiles) {
+    withDir((dir) => {
+      writeFileSync(
+        join(dir, 'package.json'),
+        JSON.stringify({ scripts: { test: 'node --test' } }),
+      );
+      writeFileSync(join(dir, lockfile), '');
+      assert.equal(detectCheckCommand(dir)?.display, display, lockfile);
+    });
+  }
+});
+
+test('ignores a Makefile target that only ends with check', () => {
+  withDir((dir) => {
+    writeFileSync(join(dir, 'Makefile'), 'precheck:\n\ttrue\n');
+    assert.equal(detectCheckCommand(dir), undefined);
+  });
+});
+
+test('names the file when package.json cannot be parsed', () => {
+  withDir((dir) => {
+    const packagePath = join(dir, 'package.json');
+    writeFileSync(packagePath, '{');
+    assert.throws(
+      () => detectCheckCommand(dir),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.equal(error.message, `Failed to read scripts from ${packagePath}`);
+        assert.equal((error.cause as Error).name, 'SyntaxError');
+        return true;
+      },
+    );
+  });
+});
+
+test('names the file when the Makefile cannot be read', () => {
+  withDir((dir) => {
+    const makefilePath = join(dir, 'Makefile');
+    mkdirSync(makefilePath);
+    assert.throws(
+      () => detectCheckCommand(dir),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.equal(error.message, `Failed to read ${makefilePath}`);
+        assert.equal((error.cause as { code?: string }).code, 'EISDIR');
+        return true;
+      },
+    );
+  });
 });

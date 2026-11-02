@@ -81,12 +81,13 @@ sideroom_todo (live board; do not recap in prose)
 ✓ schema completed    Item types
 ~ extra  cancelled    Optional telemetry
 
-Call sideroom_todo update before the next item. While any item is pending,
-exactly one must be in_progress. Complete the current item and start the next in
-the same update. propose replaces the list; update patches by id.
+Keep the board current: call sideroom_todo update when an item changes status,
+and mark the finished item while starting the next one in the same call. While
+any item is pending, exactly one item is in_progress. propose replaces the whole
+board; update changes items by id.
 ```
 
-Marks: `>` in progress, `-` pending, `✓` completed, `~` cancelled.
+Marks: `>` in progress, `-` pending, a check mark for completed, `~` cancelled.
 `formatBoardBlock()` is shared by the board block and the widget.
 
 Sending the block as a message keeps the system prompt byte-identical while the

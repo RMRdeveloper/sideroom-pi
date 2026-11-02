@@ -43,10 +43,13 @@ test('registers sideroom_ask as a sequential parent-agent tool', () => {
   assert.match(guidelines, /practical consequences/);
   assert.match(guidelines, /one-line justification/);
   assert.match(guidelines, /evidence-backed long-term quality/);
+  assert.match(guidelines, /Sideroom's voice/);
+  assert.match(guidelines, /everyday words/);
+  assert.match(guidelines, /enough detail for the user to decide/);
   assert.match(guidelines, /growth for known needs over initial speed/);
   assert.match(guidelines, /ask for them first through sideroom_ask/);
   assert.match(guidelines, /not an unsupported solution/);
-  assert.equal(guidelines.length <= 1400, true);
+  assert.equal(guidelines.length <= 1750, true);
 });
 
 test('keeps the architecture decision contract self-contained', () => {

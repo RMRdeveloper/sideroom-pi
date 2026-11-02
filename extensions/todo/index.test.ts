@@ -165,7 +165,7 @@ test('ignores reads, bash and failed edits, and only suggests supported proposal
   assert.equal(run.steers.length, 0);
   run.emit('tool_result', { toolName: 'write', isError: false });
   assert.equal(run.steers.length, 1);
-  assert.match(run.steers[0]?.content ?? '', /propose if.*multiple steps/);
+  assert.match(run.steers[0]?.content ?? '', /Use sideroom_todo propose to show the plan/);
   const print = guardHarness([], 'print');
   print.emit('tool_result', { toolName: 'write', isError: false });
   assert.equal(print.steers.length, 0);

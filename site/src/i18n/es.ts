@@ -325,9 +325,9 @@ export const es: typeof en = {
         label: 'Bloqueado',
         body: 'La escritura no ocurre, al agente se le dice qué línea es y el paso siguiente espera.',
         output: [
-          'Blocked src/app.ts: sideroom rules violated.',
+          'Blocked src/app.ts: Sideroom rules reject these added lines.',
           '- [braced-conditionals] Wrap the conditional body in braces.',
-          'Fix the flagged lines and retry the mutation.',
+          'Fix them and save again.',
         ],
       },
       {
@@ -335,7 +335,7 @@ export const es: typeof en = {
         label: 'Señalado',
         body: 'La escritura pasa y el aviso se queda en el resultado, junto al archivo que nombra.',
         output: [
-          'Sideroom rules flagged src/app.ts:',
+          'Sideroom rules found these in src/app.ts:',
           '- [debug-artifacts] Remove debug output before finishing.',
         ],
       },

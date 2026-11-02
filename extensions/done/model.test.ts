@@ -2,8 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   createDoneState,
+  type DoneState,
+  formatMissingTestNotice,
   isSourcePath,
   isTestPath,
+  MISSING_TEST_NOTICE_TYPE,
+  resetDoneRun,
   shouldNoticeMissingTest,
 } from './model.ts';
 
@@ -58,6 +62,55 @@ test('distinguishes source files from documentation and configuration', () => {
   for (const path of otherPaths) {
     assert.equal(isSourcePath(path), false, path);
   }
+});
+
+test('keeps the missing-test notice type stable for the settle supplement', () => {
+  assert.equal(MISSING_TEST_NOTICE_TYPE, 'sideroom-missing-test-notice');
+});
+
+test('starts and resets every observation as unset', () => {
+  assert.deepEqual(createDoneState(), {
+    checksGreen: false,
+    mutatedSource: false,
+    mutatedTest: false,
+    noticedMissingTest: false,
+  });
+
+  const state: DoneState = {
+    checksGreen: true,
+    mutatedSource: true,
+    mutatedTest: true,
+    noticedMissingTest: true,
+  };
+  resetDoneRun(state);
+  assert.deepEqual(state, createDoneState());
+});
+
+test('recognises test directories and Windows separators', () => {
+  const testPaths = [
+    'test/user.ts',
+    'src/tests',
+    'user.test.ts',
+    'src\\tests\\user.ts',
+  ];
+
+  for (const path of testPaths) {
+    assert.equal(isTestPath(path), true, path);
+  }
+  assert.equal(isTestPath('scripts/test_users.py.bak'), false);
+});
+
+test('counts the module variants of JavaScript as source', () => {
+  for (const path of ['src/user.cjs', 'src/user.mjs']) {
+    assert.equal(isSourcePath(path), true, path);
+  }
+});
+
+test('keeps the missing-test notice naming the gap, the fix and stale checks', () => {
+  const notice = formatMissingTestNotice();
+  assert.match(notice, /changed code and no test file/);
+  assert.match(notice, /add or update a test where they do not/);
+  assert.match(notice, /makes earlier checks stale/);
 });
 
 test('notices a code-only run once and never without a test setup', () => {

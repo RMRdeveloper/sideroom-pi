@@ -64,26 +64,26 @@ test('rejects malformed boards and broken in_progress invariants', () => {
         { id: 'auth', content: 'Login', status: 'in_progress' },
         { id: 'auth', content: 'Tests', status: 'pending' },
       ]),
-      /Duplicate todo id: auth/,
+      /Two items use the id 'auth'/,
     ],
     [
       propose([{ id: ' ', content: 'Login', status: 'in_progress' }]),
-      /Todo id must contain 1 to 32 characters/,
+      /A todo id must have 1 to 32 characters/,
     ],
     [
       propose([{ id: 'auth', content: ' ', status: 'in_progress' }]),
-      /Todo content must contain 1 to 200 characters/,
+      /A task description must have 1 to 200 characters/,
     ],
     [
       propose([
         { id: 'one', content: 'One', status: 'in_progress' },
         { id: 'two', content: 'Two', status: 'in_progress' },
       ]),
-      /At most one todo item may be in_progress/,
+      /items in progress and only one is allowed/,
     ],
     [
       propose([{ id: 'one', content: 'One', status: 'pending' }]),
-      /exactly one/,
+      /none in progress/,
     ],
     [
       propose(
@@ -93,7 +93,7 @@ test('rejects malformed boards and broken in_progress invariants', () => {
           status: index === 0 ? ('in_progress' as const) : ('pending' as const),
         })),
       ),
-      /Invalid sideroom_todo parameters/,
+      /does not match the schema/,
     ],
   ];
 
@@ -140,7 +140,7 @@ test('rejects invalid patches without partially changing the board', () => {
   });
   assert.equal(noChange.ok, false);
   if (!noChange.ok) {
-    assert.match(noChange.message, /must change status or content/);
+    assert.match(noChange.message, /changes nothing/);
   }
 
   const duplicate = parseTodoParams({
@@ -152,7 +152,7 @@ test('rejects invalid patches without partially changing the board', () => {
   });
   assert.equal(duplicate.ok, false);
   if (!duplicate.ok) {
-    assert.match(duplicate.message, /Duplicate todo patch id: auth/);
+    assert.match(duplicate.message, /Two patches change the item 'auth'/);
   }
 
   const unknown = parseTodoParams({
@@ -163,7 +163,8 @@ test('rejects invalid patches without partially changing the board', () => {
   if (unknown.ok) {
     assert.deepEqual(applyTodoParams(board, unknown.params), {
       ok: false,
-      message: 'Error: Unknown todo id: missing',
+      message:
+        "Error: No item on the board has the id 'missing'. Use an id from the board, or propose the item first.",
     });
   }
 
@@ -176,7 +177,7 @@ test('rejects invalid patches without partially changing the board', () => {
     assert.deepEqual(applyTodoParams(board, brokenInvariant.params), {
       ok: false,
       message:
-        'Error: A board with pending items must have exactly one in_progress item',
+        'Error: The board has 1 pending item and none in progress. Mark one of them in_progress in this call.',
     });
   }
 });
@@ -196,7 +197,7 @@ test('formats the complete board and its workflow instructions', () => {
       '✓ schema completed    Item types',
       '~ extra  cancelled    Optional telemetry',
       '',
-      'Call sideroom_todo update before the next item. While any item is pending, exactly one must be in_progress. Complete the current item and start the next in the same update. propose replaces the list; update patches by id.',
+      'Keep the board current: call sideroom_todo update when an item changes status, and mark the finished item while starting the next one in the same call. While any item is pending, exactly one item is in_progress. propose replaces the whole board; update changes items by id.',
     ].join('\n'),
   );
 });
@@ -269,7 +270,7 @@ test('still rejects invalid JSON strings and decoded values that fail the schema
     if (!parsed.ok) {
       assert.match(
         parsed.message,
-        /Invalid sideroom_todo parameters|exactly one/,
+        /does not match the schema|none in progress/,
       );
     }
   }

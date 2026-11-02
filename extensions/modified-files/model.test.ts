@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   displayModifiedPath,
   FILE_TOOL_NAME,
+  isRecord,
   MAX_TRACKED_FILES,
   readModifiedFilesSnapshot,
   recordModifiedFile,
@@ -64,4 +65,47 @@ test('accepts only valid modified-files snapshots', () => {
     }),
     undefined,
   );
+});
+
+test('strips only a leading at-sign from tool paths', () => {
+  assert.equal(resolveModifiedPath('/work', '@src/app.ts'), '/work/src/app.ts');
+  assert.equal(resolveModifiedPath('/work', 'src/a@b.ts'), '/work/src/a@b.ts');
+});
+
+test('treats the working directory and its parents as external paths', () => {
+  assert.equal(displayModifiedPath('/work', '/work'), 'external: /work');
+  assert.equal(displayModifiedPath('/work', '/work/..'), 'external: /work/..');
+  assert.equal(displayModifiedPath('/work', '/work/src'), 'src');
+});
+
+test('rejects snapshots whose shape is not a file list', () => {
+  assert.equal(readModifiedFilesSnapshot(null), undefined);
+  assert.equal(readModifiedFilesSnapshot(undefined), undefined);
+  assert.equal(readModifiedFilesSnapshot(42), undefined);
+  assert.equal(readModifiedFilesSnapshot({ files: 'src' }), undefined);
+  assert.equal(readModifiedFilesSnapshot({ files: [null] }), undefined);
+  assert.equal(
+    readModifiedFilesSnapshot({
+      files: [{ path: 42, toolName: FILE_TOOL_NAME.edit }],
+    }),
+    undefined,
+  );
+});
+
+test('accepts write snapshots', () => {
+  assert.deepEqual(
+    readModifiedFilesSnapshot({
+      files: [{ path: '/work/app.ts', toolName: FILE_TOOL_NAME.write }],
+    }),
+    [{ path: '/work/app.ts', toolName: FILE_TOOL_NAME.write }],
+  );
+});
+
+test('recognises only non-null objects as records', () => {
+  assert.equal(isRecord({}), true);
+  assert.equal(isRecord([]), true);
+  assert.equal(isRecord('text'), false);
+  assert.equal(isRecord(42), false);
+  assert.equal(isRecord(null), false);
+  assert.equal(isRecord(undefined), false);
 });

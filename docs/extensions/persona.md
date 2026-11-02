@@ -1,8 +1,9 @@
 # `sideroom_persona`
 
-One built-in voice, always active. Its voice rules govern user-facing prose;
-the decorative-symbol prohibition also checks artifacts. No files are written
-and no project config is read; the persona ships with the package.
+One built-in voice, always active. Its voice rules govern user-facing prose, the
+text the agent writes inside Sideroom tools, and the package's own fixed
+messages; the decorative-symbol prohibition also checks artifacts. No files are
+written and no project config is read; the persona ships with the package.
 
 ## Scope
 
@@ -11,16 +12,33 @@ There are no profiles and nothing to switch. No profile state is persisted and
 footer shows the current run's counts, or `persona: direct` while the run is
 clean.
 
+The voice covers four kinds of text:
+
+| Text | Where |
+| --- | --- |
+| Progress messages and final answers | Agent prose |
+| User-facing documentation | Agent prose |
+| Questions, tab labels, options, recommendations and task wording | Text the agent writes inside `sideroom_ask` and `sideroom_todo` |
+| Tool results, block reasons, board blocks, review notes and notices | Messages written in this package |
+
+`VOICE_SCOPE` in `catalog.ts` states that scope once and the reminder renders
+it. The text inside a tool is guided by the instruction, not by a detector:
+nothing blocks a question or a task description. `TOOL_TEXT_VOICE_NOTE` is the
+shared note that `sideroom_ask` and `sideroom_todo` add to their own
+`promptGuidelines`, so the wording cannot drift between them. Fixed package
+messages are written in the code with the same voice and stay in English, like
+the rest of the fixed text; the agent must not rewrite or translate them.
+
 ## Voice rules
 
 Array order sets how the rules read in the reminder; `plain-language` comes first.
 
 | Rule id | Instruction |
 | --- | --- |
-| `plain-language` | Say what the user needs to know or do before details. Use everyday words even when the user used a technical term; keep a term only if needed to understand or act, and explain it at first use. Stay accurate without repeating yourself. |
-| `direct` | Direct and dry. Short sentences. No preamble, no closing summary. |
+| `plain-language` | Say what the user needs to know or do before details. Use everyday words even when the user used a technical term; keep a term only if needed to understand or act, and explain it at first use. Do not repeat yourself or chain technical labels. |
+| `direct` | Be direct and dry. Short sentences. No preamble or closing summary. |
 | `no-filler` | No filler. |
-| `no-invented-terms` | Do not coin intermediate terms, abbreviations, or codenames. Use the user's terms only when needed to answer. |
+| `no-invented-terms` | Do not coin intermediate terms, abbreviations, or codenames. Use the user's terms only when needed to answer; otherwise explain in everyday words. |
 | `short-prose` | Default to short prose. Lists or tables only to compare options or list more than three items. |
 | `user-language` | Answer in the user's language and variant. |
 
@@ -34,12 +52,14 @@ Array order sets how the rules read in the reminder; `plain-language` comes firs
 | `ai-meta-commentary` | prose |
 
 A prohibition only fires where its scope applies: `findViolations(text, scope)`
-skips every prohibition that does not list the scope. The catalog rule text
-stays authoritative; the detectors in `checks.ts` are heuristics, so a
-prohibition may be stated without being detected. The decorative-symbol
-detector targets default emoji presentation, emoji variation selectors, and
-explicit check or cross marks. Semantic text symbols used for copyright,
-trademark, or registration stay valid.
+skips every prohibition that does not list the scope. The two scopes are the
+agent's prose and the added lines of a `write` or `edit`; text inside tool
+arguments is out of detection, so its voice rests on the instruction. The
+catalog rule text stays authoritative; the detectors in `checks.ts` are
+heuristics, so a prohibition may be stated without being detected. The
+decorative-symbol detector targets default emoji presentation, emoji variation
+selectors, and explicit check or cross marks. Semantic text symbols used for
+copyright, trademark, or registration stay valid.
 
 ## Injection
 
@@ -59,10 +79,11 @@ section without changing the result.
 `sideroom_persona` takes no arguments and returns the complete packaged
 `SKILL.md`, including the Do/Don't examples and activation contract. It formerly
 returned only a catalog summary, leaving the examples unloaded. The reminder
-asks for this guide before the first substantial explanation or report, reuses
-it while in context, and asks for an internal wording check before sending
-prose. This is model guidance, not a tool-call gate. With one voice there is
-nothing to select, so the tool has no action parameter.
+asks for this guide before the first substantial explanation, findings report,
+implementation summary, or user-facing documentation, reuses it while in
+context, and asks for an internal wording check before sending prose. This is
+model guidance, not a tool-call gate. With one voice there is nothing to
+select, so the tool has no action parameter.
 
 ## Enforcement
 
@@ -112,10 +133,11 @@ nothing to select, so the tool has no action parameter.
 
 `checks.test.ts` covers hits, semantic text symbols, misses, and scope
 filtering. `prompt.test.ts` covers the idempotent append, both example pairs,
-representative plain and jargon-heavy answers, and the reminder length budget.
-These text checks protect the shipped instructions; they do not score the
-clarity of a generated answer. The prose detector still checks only hard
-prohibitions, not whether a technical term was necessary. `model.test.ts`
+the scope sentence with the tool text, the packaged guide's matching sentence,
+and the reminder length budget. These text checks protect the shipped
+instructions; they do not score the clarity of a generated answer. The prose
+detector still checks only hard prohibitions, not whether a technical term was
+necessary, and no detector reads text inside tool arguments. `model.test.ts`
 covers the formatters and message extraction; `execute.test.ts` checks that
 the tool returns the entire packaged guide with its catalog ids. `index.test.ts`
 covers blocking, path aliases, degradation, the steer cap and its `triggerTurn` options, the

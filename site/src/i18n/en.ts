@@ -322,9 +322,9 @@ export const en = {
         label: 'Blocked',
         body: 'The write does not happen, the agent is told which line, and the next step waits.',
         output: [
-          'Blocked src/app.ts: sideroom rules violated.',
+          'Blocked src/app.ts: Sideroom rules reject these added lines.',
           '- [braced-conditionals] Wrap the conditional body in braces.',
-          'Fix the flagged lines and retry the mutation.',
+          'Fix them and save again.',
         ],
       },
       {
@@ -332,7 +332,7 @@ export const en = {
         label: 'Flagged',
         body: 'The write goes through and the warning stays in the result, next to the file it names.',
         output: [
-          'Sideroom rules flagged src/app.ts:',
+          'Sideroom rules found these in src/app.ts:',
           '- [debug-artifacts] Remove debug output before finishing.',
         ],
       },

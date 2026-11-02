@@ -153,10 +153,14 @@ export function mutationBlockReason(
     return undefined;
   }
   if (!readToolAvailable) {
-    return `Blocked ${targetPath}: the read tool is inactive and sideroom_guidelines is inactive. Enable either tool, then load ${requiredPaths.join(' and ')} before retrying the mutation.`;
+    return `Blocked ${targetPath}: the read tool is inactive and sideroom_guidelines is inactive, so the required guide cannot be loaded. Enable either tool, then load ${requiredPaths.join(' and ')} and save again.`;
   }
 
-  return `Blocked ${targetPath}: call sideroom_guidelines with path ${JSON.stringify(targetPath)}, or read ${requiredPaths.join(' and ')} in full with the read tool in this agent run, then retry the mutation.`;
+  return [
+    `Blocked ${targetPath}: the required guide is not loaded yet.`,
+    `Load it with sideroom_guidelines (path ${JSON.stringify(targetPath)}), or read ${requiredPaths.join(' and ')} in full with the read tool in this agent run.`,
+    'Then save again.',
+  ].join('\n');
 }
 
 const canonicalCatalogPaths = new Map<string, string>();
