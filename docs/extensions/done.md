@@ -7,7 +7,8 @@ instructions and the guidelines review.
 
 ## Check-command detection
 
-Detected from `ctx.cwd`, in order, cached per working directory:
+Detected from `ctx.cwd`, in order, cached per working directory until an
+observed `write` or `edit` changes a file that determines it:
 
 1. `package.json` script, first of `check` → `test` → `lint` → `typecheck` →
    `types`, run with the lockfile's package manager (`pnpm`, `yarn`, `bun`,
@@ -18,16 +19,26 @@ Detected from `ctx.cwd`, in order, cached per working directory:
 5. `make check` when the `Makefile` has a `check:` target.
 
 Detection observes one command, not an aggregate of equivalent checks.
-Unrecognised shell forms remain unconfirmed and never trigger a retry.
+A result confirms that command only when the shell text is the exact detected
+command, run in that working directory, and started after the latest observed
+mutation there. Extra arguments, help flags, another directory, newlines, and
+shell joins stay unconfirmed. They never block the command and never trigger a
+retry. A detection error publishes `outcome: unknown` instead of a pass, and
+does not block bash. An unobserved disk edit is not a detection change.
 
 ## Observed state
 
-- A successful `write`/`edit` clears `checksGreen`.
-- A bash command matching the detected check marks the call. Its result sets
-  `checksGreen` to whether it succeeded; a failed rerun clears a previous pass.
-- The synchronous `sideroom:check-status` event exposes the detected command and
-  green flag. Guidelines review can reuse a successful result when no later
-  mutation made it stale. Jev can also read this bounded status.
+- A successful `write`/`edit` clears green for that working directory. A pass
+  becomes `stale`; a check that overlaps the edit cannot turn green again.
+- A bash command matching the exact detected check marks the call. Its result
+  sets green only when it succeeded and still covers that directory's current
+  changes. A failed rerun clears a previous pass. Another directory's check does
+  not turn the parent green.
+- The synchronous `sideroom:check-status` event exposes the detected command,
+  green flag, and outcome (`not-run`, `passed`, `failed`, `stale`, or
+  `unknown`). Guidelines review can reuse a successful result when no later
+  mutation made it stale. Jev reads this status when it is present and otherwise
+  uses the same confirmation rules.
 - State resets on idle interactive/RPC input and `session_start`. Input queued
   while the agent runs does not reset a green check.
 - No extension executes a check. Missing, failed, or unrecognised checks do not
@@ -54,8 +65,8 @@ test exists.
 
 | File | Role |
 | --- | --- |
-| `extensions/done/index.ts` | Creates state, caches detections per `cwd`, wires reset events. |
-| `extensions/done/detect.ts` | Check-command detection, test-setup detection, and command matching. |
+| `extensions/done/index.ts` | Creates state and wires reset events. |
+| `extensions/done/detect.ts` | Check-command detection, cached resolution, test-setup detection, and exact command confirmation. |
 | `extensions/done/guard.ts` | Observes mutations and bash results; contributes coverage supplements. |
 | `extensions/done/model.ts` | State, reset, coverage decision, path detection, and notice text. |
 | `extensions/shared/settle.ts` | Coordinates necessary review/style continuations and their supplements. |

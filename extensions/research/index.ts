@@ -84,18 +84,22 @@ export default function registerResearch(pi: ExtensionAPI): void {
           return;
         }
         const outcome = boundResearchOutcome(execution.outcome);
-        delivery.enqueue({ ctx, message: {
-          customType: RESEARCH_RESULT_MESSAGE,
-          content: `Research ${toolCallId} finished. Review this report and verify its evidence before using it.\n\n${formatResearchOutcome(outcome)}`,
-          display: true,
-          details: { id: toolCallId, outcome, usage: execution.usage },
-        } });
+        delivery.enqueue({
+          ctx,
+          wake: outcome.runStatus === 'completed' || outcome.report.findings.length > 0 || outcome.files.length > 0,
+          message: {
+            customType: RESEARCH_RESULT_MESSAGE,
+            content: `Research ${toolCallId} finished. Review this report and verify its evidence before using it.\n\n${formatResearchOutcome(outcome)}`,
+            display: true,
+            details: { id: toolCallId, outcome, usage: execution.usage },
+          },
+        });
       }).catch((error: unknown) => {
         if (generation !== sessionGeneration || activeSignal.aborted) {
           return;
         }
         const reason = error instanceof Error ? error.message : String(error);
-        delivery.enqueue({ ctx, message: { customType: RESEARCH_RESULT_MESSAGE, content: `Research ${toolCallId} failed: ${reason}. Continue with direct investigation.`, display: true, details: { id: toolCallId, error: reason } } });
+        delivery.enqueue({ ctx, wake: false, message: { customType: RESEARCH_RESULT_MESSAGE, content: `Research ${toolCallId} failed: ${reason}. Continue with direct investigation.`, display: true, details: { id: toolCallId, error: reason } } });
       }).finally(() => {
         if (active.get(key) === controller) {
           active.delete(key);

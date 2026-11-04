@@ -43,9 +43,11 @@ contracts, or for a word conflict — that is `sideroom-domain-modeling`.
   is a project fact: reuse it, never ask it. When the repository shows two
   inconclusive patterns for the same kind of decision, name that inconsistency
   in the prompt instead of picking one.
-- Quantify or decline. An architectural dimension does not close without a
-  number, a range, or an explicit `Out of scope` from the user. A decision
-  without a figure is a preference in disguise.
+- Quantify a dimension only when a number would change the decision. Latency,
+  volume, cost, and capacity need a figure, a range, or an explicit
+  `Out of scope`. Dependency direction and maintenance responsibility can close
+  on a concrete qualitative agreement. Do not invent a figure to satisfy this
+  rule.
 - Every option of an architectural question carries a `description`: its
   practical consequence, its cost, and the obligation it imposes. The label
   names the choice; the description carries the trade-off. Never a one-word
@@ -65,8 +67,9 @@ contracts, or for a word conflict — that is `sideroom-domain-modeling`.
 
 ## Dimension catalog
 
-Reference, not a checklist. Pick only what the change touches; force a number or
-an explicit `Out of scope` on each one you pick.
+Reference, not a checklist. Pick only what the change touches. Force a number
+or an explicit `Out of scope` only on dimensions where a figure would change
+the decision.
 
 | Dimension | The question it forces |
 | --- | --- |

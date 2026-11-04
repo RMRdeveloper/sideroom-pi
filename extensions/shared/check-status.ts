@@ -5,9 +5,20 @@ import type {
 
 const CHECK_STATUS_EVENT = 'sideroom:check-status';
 
+export const CHECK_OUTCOME = {
+  notRun: 'not-run',
+  passed: 'passed',
+  failed: 'failed',
+  stale: 'stale',
+  unknown: 'unknown',
+} as const;
+
+export type CheckOutcome = (typeof CHECK_OUTCOME)[keyof typeof CHECK_OUTCOME];
+
 export interface CheckStatus {
-  readonly command: string;
+  readonly command: string | undefined;
   readonly green: boolean;
+  readonly outcome: CheckOutcome;
 }
 
 interface CheckStatusRequest {

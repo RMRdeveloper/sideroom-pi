@@ -2,7 +2,12 @@ import { realpath } from 'node:fs/promises';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { ExtensionContext } from '@earendil-works/pi-coding-agent';
 import { createResearchAgent } from './agent.ts';
-import { createResearchEvidence, verifyResearchEvidence, type EvidenceCheck } from './evidence.ts';
+import {
+  createResearchEvidence,
+  UNFINISHED_VERIFICATION,
+  verifyResearchEvidence,
+  type EvidenceCheck,
+} from './evidence.ts';
 import { researchLimits } from './limits.ts';
 import { parseResearchRequest, parseResearchResult, type ResearchResult } from './model.ts';
 import { buildPartialReport } from './partial.ts';
@@ -91,8 +96,10 @@ export async function executeResearch({ ctx, input, signal, environment = proces
       run = { ...run, status: 'timed_out', report: run.report === undefined ? undefined : { ...run.report, status: 'partial' } };
     }
     const snapshot = evidence.snapshot();
-    let checks = unavailableChecks(snapshot.files.map((file) => file.path), 'Verification did not finish.');
-    if (!activeSignal.aborted && run.status !== 'cancelled' && run.status !== 'timed_out') {
+    let checks = unavailableChecks(snapshot.files.map((file) => file.path), UNFINISHED_VERIFICATION);
+    const userCancelled = signal?.aborted === true;
+    const deadlineExpired = deadline.signal.aborted;
+    if (!userCancelled && !deadlineExpired && run.status !== 'cancelled') {
       try {
         checks = [...await verifyResearchEvidence({ cwd, files: snapshot.files, signal: activeSignal })];
       } catch (error) {

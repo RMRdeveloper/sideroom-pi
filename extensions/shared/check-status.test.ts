@@ -37,7 +37,11 @@ const WORKING_CONTEXT = { cwd: '/work', mode: 'tui' } as ExtensionContext;
 
 test('returns the observed check status for the asking context', () => {
   const { pi } = createEventApi();
-  const status: CheckStatus = { command: CHECK_COMMAND, green: true };
+  const status: CheckStatus = {
+    command: CHECK_COMMAND,
+    green: true,
+    outcome: 'passed',
+  };
   const askedContexts: ExtensionContext[] = [];
   registerCheckStatus(pi, (ctx) => {
     askedContexts.push(ctx);
@@ -54,7 +58,11 @@ test('returns nothing when no check result was observed', () => {
 
 test('reads its answer from a listener on the shared check status channel', () => {
   const { pi, bus } = createEventApi();
-  const status: CheckStatus = { command: CHECK_COMMAND, green: false };
+  const status: CheckStatus = {
+    command: CHECK_COMMAND,
+    green: false,
+    outcome: 'failed',
+  };
   bus.on(CHECK_STATUS_CHANNEL, (payload) => {
     (payload as CheckStatusRequest).status = status;
   });

@@ -33,9 +33,9 @@ A review request does not authorize a rewrite. An implementation request does
 not require pausing after every recommendation. Ask only about consequential
 choices or missing facts that the user and repository have not settled.
 
-## Vocabulary (use these terms exactly)
+## Vocabulary (internal reference)
 
-Use these terms consistently in all recommendations and designs. Do not substitute "component", "service", "API", "boundary", "unit" or similar loose words. Consistent language is the point.
+Use these terms when they make a design clearer. They are not required in text the user reads. Prefer everyday words there, and explain a design term once if it is needed. Do not rename the project's own domain words to match this list.
 
 | Term | Meaning | Avoid |
 |------|---------|-------|
@@ -54,7 +54,7 @@ Use these terms consistently in all recommendations and designs. Do not substitu
 - The interface is the test surface. Callers and tests cross the same seam. If you want to test past the interface, the module is probably the wrong shape.
 - One adapter means a hypothetical seam. Two adapters (e.g. production + test stand-in) means a real one. Don't introduce a seam unless something actually varies across it.
 
-When writing recommendations, use these terms. Explain any necessary design term once if the user is unfamiliar, then stick to them. Respect the project's existing domain vocabulary (`CONTEXT.md` or equivalent) for business concepts — do not replace established domain names just to impose this design glossary.
+In text the user reads, use an everyday word unless one of these terms is needed to decide. Explain that term once. Respect the project's existing domain vocabulary (`CONTEXT.md` or equivalent) for business concepts. Do not replace established domain names just to impose this design glossary.
 
 ## Inspect before recommending
 

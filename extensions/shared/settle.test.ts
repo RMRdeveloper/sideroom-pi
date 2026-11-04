@@ -86,7 +86,7 @@ function harness(order: readonly Stage[], hasTests = false) {
       registerDoneGuard({
         pi,
         state: done,
-        resolveCommand: () => CHECK,
+        resolveCommand: () => ({ kind: 'detected', command: CHECK }),
         resolveTestSetup: () => hasTests,
       });
     }

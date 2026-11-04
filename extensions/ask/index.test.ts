@@ -61,7 +61,8 @@ test('keeps the architecture decision contract self-contained', () => {
 
   assert.match(skill, /Assume nothing architectural/);
   assert.match(skill, /do not march the whole\s+catalog/);
-  assert.match(skill, /Quantify or decline/);
+  assert.match(skill, /Quantify a dimension only when a number would change the decision/);
+  assert.match(skill, /Do not invent a figure/);
   assert.match(skill, /Out of scope/);
   assert.match(skill, /maintainable option that can meet known growth needs/);
   assert.match(skill, /ask for it before\s+recommending an architecture/);

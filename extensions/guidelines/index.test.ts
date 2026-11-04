@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -115,14 +115,7 @@ test('requires completed reads before a later tool round can mutate', () => {
     /SKILL\.md/,
   );
 
-  toolResult(
-    {
-      toolName: 'read',
-      input: { path: `@${GUIDELINE_SKILL_PATH}` },
-      isError: false,
-    } as never,
-    { cwd } as never,
-  );
+  finishRead(handlers, { path: `@${GUIDELINE_SKILL_PATH}` }, { cwd });
   const beforeLanguageGuide = toolCall({
     toolName: 'edit',
     input: { path: 'src/example.tsx' },
@@ -144,14 +137,7 @@ test('requires completed reads before a later tool round can mutate', () => {
     /typescript\.md/,
   );
 
-  toolResult(
-    {
-      toolName: 'read',
-      input: { path: typescriptGuidePath },
-      isError: false,
-    } as never,
-    { cwd } as never,
-  );
+  finishRead(handlers, { path: typescriptGuidePath }, { cwd });
   assert.equal(toolCall(typescriptWrite), undefined);
 
   beforeAgentStart({ systemPrompt: 'base prompt' } as never);
@@ -190,25 +176,17 @@ test('resolves relative and dotted guide paths against the session cwd', () => {
 
   beforeAgentStart({ systemPrompt: 'base prompt' } as never);
 
-  toolResult(
-    {
-      toolName: 'read',
-      input: {
-        path: './skills/sideroom-guidelines/../sideroom-guidelines/SKILL.md',
-      },
-      isError: false,
-    } as never,
-    { cwd: packageRoot } as never,
+  finishRead(
+    handlers,
+    { path: './skills/sideroom-guidelines/../sideroom-guidelines/SKILL.md' },
+    { cwd: packageRoot },
   );
-  toolResult(
+  finishRead(
+    handlers,
     {
-      toolName: 'read',
-      input: {
-        path: 'skills/sideroom-guidelines/references/languages/../languages/typescript.md',
-      },
-      isError: false,
-    } as never,
-    { cwd: packageRoot } as never,
+      path: 'skills/sideroom-guidelines/references/languages/../languages/typescript.md',
+    },
+    { cwd: packageRoot },
   );
   assert.equal(toolCall(typescriptWrite), undefined);
 });
@@ -240,14 +218,7 @@ test('resolves symlinked guide paths to the catalog location', {
   } as never;
 
   beforeAgentStart({ systemPrompt: 'base prompt' } as never);
-  toolResult(
-    {
-      toolName: 'read',
-      input: { path: GUIDELINE_SKILL_PATH },
-      isError: false,
-    } as never,
-    { cwd: packageRoot } as never,
-  );
+  finishRead(handlers, { path: GUIDELINE_SKILL_PATH }, { cwd: packageRoot });
 
   const linkRoot = mkdtempSync(join(tmpdir(), 'sideroom-guidelines-'));
   try {
@@ -257,13 +228,10 @@ test('resolves symlinked guide paths to the catalog location', {
       linkedLanguages,
       'dir',
     );
-    toolResult(
-      {
-        toolName: 'read',
-        input: { path: join(linkedLanguages, 'typescript.md') },
-        isError: false,
-      } as never,
-      { cwd: packageRoot } as never,
+    finishRead(
+      handlers,
+      { path: join(linkedLanguages, 'typescript.md') },
+      { cwd: packageRoot },
     );
   } finally {
     rmSync(linkRoot, { recursive: true, force: true });
@@ -303,22 +271,8 @@ test('resets the gate after compaction so stale reads cannot authorize mutations
   } as never;
 
   beforeAgentStart({ systemPrompt: 'base prompt' } as never);
-  toolResult(
-    {
-      toolName: 'read',
-      input: { path: GUIDELINE_SKILL_PATH },
-      isError: false,
-    } as never,
-    { cwd } as never,
-  );
-  toolResult(
-    {
-      toolName: 'read',
-      input: { path: typescriptGuidePath },
-      isError: false,
-    } as never,
-    { cwd } as never,
-  );
+  finishRead(handlers, { path: GUIDELINE_SKILL_PATH }, { cwd });
+  finishRead(handlers, { path: typescriptGuidePath }, { cwd });
   assert.equal(toolCall(typescriptWrite), undefined);
 
   sessionCompact({ reason: 'threshold' } as never);
@@ -339,6 +293,37 @@ test('maps every catalog extension to its language guide', () => {
     }
   }
 });
+
+function finishRead(
+  handlers: Map<string, EventHandler>,
+  input: { readonly path: string },
+  ctx: { readonly cwd: string },
+): void {
+  const toolResult = handlers.get('tool_result');
+  const toolExecutionEnd = handlers.get('tool_execution_end');
+  assert.ok(toolResult);
+  assert.ok(toolExecutionEnd);
+  const localPath = input.path.startsWith('@') ? input.path.slice(1) : input.path;
+  const text = readFileSync(resolve(ctx.cwd, localPath), 'utf8');
+  toolResult(
+    {
+      toolName: 'read',
+      toolCallId: 'read',
+      input,
+      isError: false,
+    } as never,
+    ctx as never,
+  );
+  toolExecutionEnd(
+    {
+      toolName: 'read',
+      toolCallId: 'read',
+      isError: false,
+      result: { content: [{ type: 'text', text }] },
+    } as never,
+    ctx as never,
+  );
+}
 
 function registerGuidelines(pi: ExtensionAPI): void {
   registerGuidelinesExtension({ ...pi, registerTool() {} });

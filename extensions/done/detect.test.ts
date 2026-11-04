@@ -110,14 +110,16 @@ test('detects a test setup separately from the check command', () => {
   });
 });
 
-test('matches safe command chains without matching unsafe shell joins', () => {
+test('confirms only the exact detected command', () => {
   assert.equal(commandMatches('npm run check', NPM_CHECK), true);
   assert.equal(commandMatches('  npm   run check  ', NPM_CHECK), true);
-  assert.equal(commandMatches('npm run check --silent', NPM_CHECK), true);
-  assert.equal(commandMatches('npm run check && npm test', NPM_CHECK), true);
+  assert.equal(commandMatches('npm\trun\tcheck', NPM_CHECK), true);
+  assert.equal(commandMatches('npm run check\n', NPM_CHECK), true);
+  assert.equal(commandMatches('npm run check --silent', NPM_CHECK), false);
+  assert.equal(commandMatches('npm run check && npm test', NPM_CHECK), false);
   assert.equal(
     commandMatches('cd packages/api && npm run check', NPM_CHECK),
-    true,
+    false,
   );
   assert.equal(commandMatches('npm run check:ci', NPM_CHECK), false);
   assert.equal(commandMatches('npm run checklint', NPM_CHECK), false);
@@ -125,40 +127,38 @@ test('matches safe command chains without matching unsafe shell joins', () => {
   assert.equal(commandMatches('npm run check | tee check.log', NPM_CHECK), false);
   assert.equal(commandMatches('npm run check || true', NPM_CHECK), false);
   assert.equal(commandMatches('echo "npm run check"', NPM_CHECK), false);
+  assert.equal(commandMatches('CI=1 npm run check', NPM_CHECK), false);
 });
 
-test('keeps shell operators inside quotes out of the command split', () => {
+test('does not confirm a quoted copy or a chain that only contains the command', () => {
   assert.equal(
     commandMatches('echo "a || b" && npm run check', NPM_CHECK),
-    true,
+    false,
   );
   assert.equal(
     commandMatches("echo 'a || b' && npm run check", NPM_CHECK),
-    true,
+    false,
   );
   assert.equal(
     commandMatches('echo `a || b` && npm run check', NPM_CHECK),
-    true,
-  );
-  assert.equal(
-    commandMatches('echo "a b" && npm run check', NPM_CHECK),
-    true,
+    false,
   );
 });
 
-test('treats a backslash as quoted text inside quotes', () => {
-  assert.equal(
-    commandMatches('echo "a \\" b" && npm run check', NPM_CHECK),
-    true,
-  );
-  assert.equal(commandMatches("echo 'a\\' && npm run check", NPM_CHECK), true);
-});
-
-test('matches a check that runs before the last command in the chain', () => {
+test('does not confirm a check hidden by a later command or another directory', () => {
+  assert.equal(commandMatches('cd site && npm run check', NPM_CHECK), false);
   assert.equal(
     commandMatches('cd packages/api && npm run check && echo done', NPM_CHECK),
-    true,
+    false,
   );
+  assert.equal(commandMatches('npm run check\ntrue', NPM_CHECK), false);
+  assert.equal(commandMatches('npm run check -- --help', NPM_CHECK), false);
+  assert.equal(commandMatches('npm run check -- src/app.test.ts', NPM_CHECK), false);
+  assert.equal(commandMatches('go test ./pkg', {
+    executable: 'go',
+    args: ['test', './...'],
+    display: 'go test ./...',
+  }), false);
 });
 
 test('does not confirm a check joined by a sequence or background operator', () => {

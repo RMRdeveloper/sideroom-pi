@@ -1,5 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import {
+  projectRelativePath,
+  resolveFileToolPath,
+} from '../shared/file-path.ts';
 
 export interface CheckCommand {
   readonly executable: string;
@@ -7,20 +11,36 @@ export interface CheckCommand {
   readonly display: string;
 }
 
-const SHELL_OPERATOR = {
-  and: '&&',
-  or: '||',
-  pipe: '|',
-  sequence: ';',
-  background: '&',
+export const CHECK_RESOLUTION = {
+  detected: 'detected',
+  absent: 'absent',
+  unknown: 'unknown',
 } as const;
 
-type ShellOperator = (typeof SHELL_OPERATOR)[keyof typeof SHELL_OPERATOR];
+export type CheckResolution =
+  | {
+    readonly kind: typeof CHECK_RESOLUTION.detected;
+    readonly command: CheckCommand;
+  }
+  | { readonly kind: typeof CHECK_RESOLUTION.absent }
+  | { readonly kind: typeof CHECK_RESOLUTION.unknown };
 
-interface ShellSegment {
-  readonly text: string;
-  readonly operatorBefore: ShellOperator | undefined;
-}
+const DETECTION_FILE = {
+  packageJson: 'package.json',
+  pnpmLock: 'pnpm-lock.yaml',
+  yarnLock: 'yarn.lock',
+  bunLock: 'bun.lock',
+  bunLockb: 'bun.lockb',
+  pyproject: 'pyproject.toml',
+  setupPy: 'setup.py',
+  goMod: 'go.mod',
+  cargoToml: 'Cargo.toml',
+  makefile: 'Makefile',
+} as const;
+
+const DETECTION_FILES = new Set<string>(Object.values(DETECTION_FILE));
+const detectedCommands = new Map<string, CheckCommand | undefined>();
+const detectedTestSetups = new Map<string, boolean>();
 
 export const PACKAGE_MANAGER = {
   npm: 'npm',
@@ -45,15 +65,15 @@ export function detectCheckCommand(cwd: string): CheckCommand | undefined {
     return packageCommand;
   }
   if (
-    existsSync(join(cwd, 'pyproject.toml')) ||
-    existsSync(join(cwd, 'setup.py'))
+    existsSync(join(cwd, DETECTION_FILE.pyproject)) ||
+    existsSync(join(cwd, DETECTION_FILE.setupPy))
   ) {
     return command('pytest', ['-q']);
   }
-  if (existsSync(join(cwd, 'go.mod'))) {
+  if (existsSync(join(cwd, DETECTION_FILE.goMod))) {
     return command('go', ['test', './...']);
   }
-  if (existsSync(join(cwd, 'Cargo.toml'))) {
+  if (existsSync(join(cwd, DETECTION_FILE.cargoToml))) {
     return command('cargo', ['test']);
   }
   if (hasMakeCheck(cwd)) {
@@ -63,98 +83,66 @@ export function detectCheckCommand(cwd: string): CheckCommand | undefined {
 }
 
 export function commandMatches(text: string, check: CheckCommand): boolean {
-  const target = collapseWhitespace(check.display);
-  const segments = splitShellCommand(text);
-  const hasUnsafeOperator = segments.some(
-    ({ operatorBefore }) =>
-      operatorBefore !== undefined && operatorBefore !== SHELL_OPERATOR.and,
-  );
-  if (hasUnsafeOperator) {
+  return collapseHorizontalSpace(text.trim()) === collapseHorizontalSpace(check.display);
+}
+
+export function resolveCheckCommand(cwd: string): CheckResolution {
+  if (detectedCommands.has(cwd)) {
+    const command = detectedCommands.get(cwd);
+    return command === undefined
+      ? { kind: CHECK_RESOLUTION.absent }
+      : { kind: CHECK_RESOLUTION.detected, command };
+  }
+  try {
+    const command = detectCheckCommand(cwd);
+    detectedCommands.set(cwd, command);
+    return command === undefined
+      ? { kind: CHECK_RESOLUTION.absent }
+      : { kind: CHECK_RESOLUTION.detected, command };
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error;
+    }
+    return { kind: CHECK_RESOLUTION.unknown };
+  }
+}
+
+export function resolveCachedTestSetup(cwd: string): boolean {
+  const cached = detectedTestSetups.get(cwd);
+  if (cached !== undefined) {
+    return cached;
+  }
+  try {
+    const hasTests = hasTestSetup(cwd);
+    detectedTestSetups.set(cwd, hasTests);
+    return hasTests;
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error;
+    }
     return false;
   }
-
-  return segments.some(({ text: segmentText }) =>
-    simpleCommandMatches(segmentText, target),
-  );
 }
 
-function simpleCommandMatches(text: string, target: string): boolean {
-  const normalized = collapseWhitespace(text.trim());
-  if (normalized === target) {
-    return true;
-  }
-  return normalized.startsWith(`${target} `);
+export function invalidateProjectDetection(cwd: string): void {
+  detectedCommands.delete(cwd);
+  detectedTestSetups.delete(cwd);
 }
 
-function splitShellCommand(commandText: string): ShellSegment[] {
-  const segments: ShellSegment[] = [];
-  let segmentStart = 0;
-  let operatorBefore: ShellOperator | undefined;
-  let quote = '';
-
-  for (let index = 0; index < commandText.length; index += 1) {
-    const character = commandText[index] ?? '';
-    if (quote.length > 0) {
-      if (character === '\\' && quote === '"') {
-        index += 1;
-        continue;
-      }
-      if (character === quote) {
-        quote = '';
-      }
-      continue;
+export function isDirectDetectionFile(cwd: string, path: string): boolean {
+  let relativePath: string | undefined;
+  try {
+    const absolute = resolveFileToolPath(cwd, path);
+    relativePath = absolute === undefined
+      ? undefined
+      : projectRelativePath(cwd, absolute);
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error;
     }
-
-    const startsQuote =
-      character === "'" || character === '"' || character === '`';
-    if (startsQuote) {
-      quote = character;
-      continue;
-    }
-
-    const operator = shellOperatorAt(commandText, index);
-    if (operator === undefined) {
-      continue;
-    }
-    segments.push({
-      text: commandText.slice(segmentStart, index),
-      operatorBefore,
-    });
-    operatorBefore = operator;
-    index += operator.length - 1;
-    segmentStart = index + 1;
+    return false;
   }
-
-  segments.push({
-    text: commandText.slice(segmentStart),
-    operatorBefore,
-  });
-  return segments;
-}
-
-function shellOperatorAt(
-  commandText: string,
-  index: number,
-): ShellOperator | undefined {
-  const twoCharacterOperator = commandText.slice(index, index + 2);
-  if (twoCharacterOperator === SHELL_OPERATOR.and) {
-    return SHELL_OPERATOR.and;
-  }
-  if (twoCharacterOperator === SHELL_OPERATOR.or) {
-    return SHELL_OPERATOR.or;
-  }
-
-  const character = commandText[index];
-  if (character === SHELL_OPERATOR.pipe) {
-    return SHELL_OPERATOR.pipe;
-  }
-  if (character === SHELL_OPERATOR.sequence) {
-    return SHELL_OPERATOR.sequence;
-  }
-  if (character === SHELL_OPERATOR.background) {
-    return SHELL_OPERATOR.background;
-  }
-  return undefined;
+  return relativePath !== undefined && DETECTION_FILES.has(relativePath);
 }
 
 export function hasTestSetup(cwd: string): boolean {
@@ -162,19 +150,19 @@ export function hasTestSetup(cwd: string): boolean {
     return true;
   }
   if (
-    existsSync(join(cwd, 'pyproject.toml')) ||
-    existsSync(join(cwd, 'setup.py'))
+    existsSync(join(cwd, DETECTION_FILE.pyproject)) ||
+    existsSync(join(cwd, DETECTION_FILE.setupPy))
   ) {
     return true;
   }
-  if (existsSync(join(cwd, 'go.mod'))) {
+  if (existsSync(join(cwd, DETECTION_FILE.goMod))) {
     return true;
   }
-  return existsSync(join(cwd, 'Cargo.toml'));
+  return existsSync(join(cwd, DETECTION_FILE.cargoToml));
 }
 
 function hasPackageTestScript(cwd: string): boolean {
-  const packagePath = join(cwd, 'package.json');
+  const packagePath = join(cwd, DETECTION_FILE.packageJson);
   if (!existsSync(packagePath)) {
     return false;
   }
@@ -182,7 +170,7 @@ function hasPackageTestScript(cwd: string): boolean {
 }
 
 function detectPackageCommand(cwd: string): CheckCommand | undefined {
-  const packagePath = join(cwd, 'package.json');
+  const packagePath = join(cwd, DETECTION_FILE.packageJson);
   if (!existsSync(packagePath)) {
     return undefined;
   }
@@ -214,20 +202,23 @@ function readScripts(path: string): Record<string, unknown> {
 }
 
 function packageManager(cwd: string): PackageManager {
-  if (existsSync(join(cwd, 'pnpm-lock.yaml'))) {
+  if (existsSync(join(cwd, DETECTION_FILE.pnpmLock))) {
     return PACKAGE_MANAGER.pnpm;
   }
-  if (existsSync(join(cwd, 'yarn.lock'))) {
+  if (existsSync(join(cwd, DETECTION_FILE.yarnLock))) {
     return PACKAGE_MANAGER.yarn;
   }
-  if (existsSync(join(cwd, 'bun.lockb')) || existsSync(join(cwd, 'bun.lock'))) {
+  if (
+    existsSync(join(cwd, DETECTION_FILE.bunLockb)) ||
+    existsSync(join(cwd, DETECTION_FILE.bunLock))
+  ) {
     return PACKAGE_MANAGER.bun;
   }
   return PACKAGE_MANAGER.npm;
 }
 
 function hasMakeCheck(cwd: string): boolean {
-  const path = join(cwd, 'Makefile');
+  const path = join(cwd, DETECTION_FILE.makefile);
   if (!existsSync(path)) {
     return false;
   }
@@ -246,6 +237,6 @@ function command(executable: string, args: readonly string[]): CheckCommand {
   };
 }
 
-function collapseWhitespace(value: string): string {
-  return value.replaceAll(/\s+/g, ' ');
+function collapseHorizontalSpace(value: string): string {
+  return value.replaceAll(/[ \t]+/g, ' ');
 }

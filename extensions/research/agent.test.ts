@@ -25,7 +25,8 @@ test('creates a separate agent with only restricted research tools', async () =>
     'Give file references',
     'End with one JSON object',
     'Web access is unavailable',
-    'include an up-to-date partial report',
+    'single JSON object',
+    'no markdown fence',
     'A search without results does not prove absence',
   ]) {
     assert.match(agent.state.systemPrompt, new RegExp(instruction, 'u'));

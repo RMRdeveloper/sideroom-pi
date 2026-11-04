@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -41,6 +41,78 @@ function writeResultEvent(toolCallId: string): never {
     isError: false,
   } as never;
 }
+
+test('does not block text inside a string or miss a swallowed error beside a kept catch', () => {
+  const { handlers, cwd } = register();
+  try {
+    writeFileSync(join(cwd, 'message.ts'), 'const text = `\nhello\n`;\n');
+    writeFileSync(
+      join(cwd, 'save.ts'),
+      'try {\n  save();\n} catch (error) {\n  throw error;\n}\n',
+    );
+    const toolCall = handlers.get('tool_call');
+    const toolResult = handlers.get('tool_result');
+    assert.ok(toolCall);
+    assert.ok(toolResult);
+    const insideString = toolCall({
+      toolName: 'edit',
+      toolCallId: 'string',
+      input: {
+        path: 'message.ts',
+        edits: [{ oldText: 'hello', newText: 'if (active) return;' }],
+      },
+    } as never, { cwd } as never);
+    assert.equal(insideString, undefined);
+
+    const swallowed = toolCall({
+      toolName: 'edit',
+      toolCallId: 'catch',
+      input: {
+        path: 'save.ts',
+        edits: [{ oldText: 'throw error;', newText: 'return null;' }],
+      },
+    } as never, { cwd } as never) as { block?: boolean; reason?: string };
+    assert.equal(swallowed?.block, true);
+    assert.match(swallowed?.reason ?? '', /explicit-error-handling/);
+
+    writeFileSync(join(cwd, 'twice.ts'), 'const value = 1;\nconst value = 1;\n');
+    const ambiguous = toolCall({
+      toolName: 'edit',
+      toolCallId: 'ambiguous',
+      input: {
+        path: 'twice.ts',
+        edits: [{ oldText: 'const value = 1;', newText: 'if (active) return;' }],
+      },
+    } as never, { cwd } as never);
+    assert.equal(ambiguous, undefined);
+    const enriched = toolResult({
+      toolName: 'edit',
+      toolCallId: 'ambiguous',
+      input: {},
+      content: [{ type: 'text', text: 'ok' }],
+      isError: false,
+    } as never) as { content: { text: string }[] };
+    assert.match(enriched.content[1]?.text ?? '', /not blocked/);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('blocks an unbraced else in a proposed file', () => {
+  const { handlers, cwd } = register();
+  try {
+    const toolCall = handlers.get('tool_call');
+    assert.ok(toolCall);
+    const decision = toolCall(
+      writeEvent('else', 'src/user.ts', 'if (active) {\n  run();\n} else return;\n'),
+      { cwd } as never,
+    ) as { block?: boolean; reason?: string };
+    assert.equal(decision?.block, true);
+    assert.match(decision?.reason ?? '', /braced-conditionals/);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
 
 test('blocks a write that introduces a braceless conditional', () => {
   const { handlers, cwd } = register();

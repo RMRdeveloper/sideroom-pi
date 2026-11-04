@@ -47,7 +47,7 @@ test('suggests a plan before a multi-step change and keeps the reminder quiet', 
   assert.equal(run.steers.length, 1);
   assert.match(
     run.steers[0]?.content ?? '',
-    /Use sideroom_todo propose to show the plan/,
+    /sideroom_todo propose to show the plan/,
   );
   assert.deepEqual(run.steers[0]?.options, {
     triggerTurn: false,

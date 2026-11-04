@@ -141,8 +141,12 @@ export async function askJevRequest({
   }
 
   const envelope = parseEnvelope(response.text);
-  if (envelope === undefined) {
-    return { findings: [], model: undefined, failure: undefined };
+  if (envelope === undefined || envelope.answers === undefined) {
+    return {
+      findings: undefined,
+      model: envelope?.model,
+      failure: JEV_FAILURE.transient,
+    };
   }
   return {
     findings: readFindings(

@@ -38,6 +38,12 @@ test('recovers the latest valid partial report before a tool call', () => {
   ]), newer);
   assert.equal(readLatestPartialReport([assistant(JSON.stringify({ ...report, status: 'complete', questions: [] }), 'toolUse')]), undefined);
   assert.equal(readLatestPartialReport([assistant('ordinary text', 'toolUse')]), undefined);
+  assert.equal(
+    readLatestPartialReport([
+      assistant(`\`\`\`json\n${JSON.stringify(report)}\n\`\`\``, 'toolUse'),
+    ]),
+    undefined,
+  );
 });
 
 test('rejects missing, interrupted, malformed and oversized reports', () => {
