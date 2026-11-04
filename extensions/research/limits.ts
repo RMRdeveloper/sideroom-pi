@@ -1,3 +1,4 @@
+export const MAX_RESEARCH_TIMEOUT_MS = 1_800_000;
 export const MAX_RESEARCH_OUTPUT_BYTES = 256_000;
 
 export interface ResearchLimits {
@@ -29,7 +30,7 @@ function configuredLimit({ value, fallback, minimum, maximum, name }: LimitInput
 
 export function researchLimits(environment: Readonly<Record<string, string | undefined>>): ResearchLimits {
   return {
-    timeoutMs: configuredLimit({ value: environment.SIDEROOM_RESEARCH_TIMEOUT_MS, fallback: 120_000, minimum: 1_000, maximum: 120_000, name: 'SIDEROOM_RESEARCH_TIMEOUT_MS' }),
+    timeoutMs: configuredLimit({ value: environment.SIDEROOM_RESEARCH_TIMEOUT_MS, fallback: MAX_RESEARCH_TIMEOUT_MS, minimum: 1_000, maximum: MAX_RESEARCH_TIMEOUT_MS, name: 'SIDEROOM_RESEARCH_TIMEOUT_MS' }),
     outputBytes: configuredLimit({ value: environment.SIDEROOM_RESEARCH_OUTPUT_BYTES, fallback: MAX_RESEARCH_OUTPUT_BYTES, minimum: 1_024, maximum: MAX_RESEARCH_OUTPUT_BYTES, name: 'SIDEROOM_RESEARCH_OUTPUT_BYTES' }),
   };
 }
