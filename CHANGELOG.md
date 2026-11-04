@@ -1,5 +1,12 @@
 # Changelog
 
+## 9.3.1
+
+### Patch Changes
+
+- b74a3a6: Stop treating an ambiguous check, an incomplete guide read, or a rule match without file context as proof. Tool failures are marked as errors, an unreadable review is a failure, and an empty research failure no longer wakes an idle session.
+- 1c73b07: Raise the `sideroom_research` time limit from 2 to 30 minutes, including finalization. The default and the ceiling of `SIDEROOM_RESEARCH_TIMEOUT_MS` both become 1,800,000 ms, so the operator can still lower it but not raise it further.
+
 ## 9.3.0
 
 ### Minor Changes
