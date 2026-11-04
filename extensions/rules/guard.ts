@@ -1,4 +1,3 @@
-import { resolve } from 'node:path';
 import {
   type ExtensionAPI,
   isEditToolResult,
@@ -6,9 +5,10 @@ import {
   isWriteToolResult,
   type ToolCallEvent,
 } from '@earendil-works/pi-coding-agent';
+import { resolveFileToolPath } from '../shared/file-path.ts';
 import { readFileIfExists } from '../shared/read-file.ts';
 import { languageForPath, type RuleId, SEVERITY } from './catalog.ts';
-import { evaluateAddedLines } from './checks.ts';
+import { evaluateContextualChange } from './checks.ts';
 import {
   type AddedLine,
   addedLines,
@@ -23,18 +23,13 @@ const CLEAN_RESET_AFTER = 5;
 interface PendingWarnings {
   readonly path: string;
   readonly violations: readonly RuleViolation[];
+  readonly note: string | undefined;
 }
 
 export interface RulesState {
   readonly fires: Map<RuleId, number>;
   cleanChecks: number;
   readonly pendingWarnings: Map<string, PendingWarnings>;
-}
-
-interface ExtractedMutation {
-  readonly path: string;
-  readonly language: ReturnType<typeof languageForPath>;
-  readonly lines: readonly AddedLine[];
 }
 
 export function createRulesState(): RulesState {
@@ -53,13 +48,20 @@ export function registerRulesGuard(pi: ExtensionAPI, state: RulesState): void {
     if (mutation === undefined) {
       return undefined;
     }
-    const violations = evaluateAddedLines(mutation.language, mutation.lines);
-    return applyRulesOutcome(
-      state,
-      event.toolCallId,
-      mutation.path,
-      decideRules(state, violations),
-    );
+    const violations = mutation.source === undefined
+      ? []
+      : evaluateContextualChange(
+        mutation.language,
+        mutation.source,
+        mutation.lines,
+      );
+    const decision = decideRules(state, violations);
+    return applyRulesOutcome(state, event.toolCallId, mutation.path, {
+      ...decision,
+      note: mutation.uncertain
+        ? 'This edit could not be checked against the surrounding file, so it was not blocked. Check the change yourself before relying on it.'
+        : undefined,
+    });
   });
 
   pi.on('tool_result', (event) => {
@@ -71,12 +73,17 @@ export function registerRulesGuard(pi: ExtensionAPI, state: RulesState): void {
     if (pending === undefined || event.isError) {
       return;
     }
+    const findings = pending.violations.length === 0
+      ? pending.note ?? ''
+      : `${formatWarnings(pending.path, pending.violations)}${
+        pending.note === undefined ? '' : `\n${pending.note}`
+      }`;
     return {
       content: [
         ...event.content,
         {
           type: 'text' as const,
-          text: formatWarnings(pending.path, pending.violations),
+          text: findings,
         },
       ],
     };
@@ -86,6 +93,7 @@ export function registerRulesGuard(pi: ExtensionAPI, state: RulesState): void {
 export interface RulesDecision {
   readonly blocking: readonly RuleViolation[];
   readonly warnings: readonly RuleViolation[];
+  readonly note: string | undefined;
 }
 
 export function decideRules(
@@ -101,6 +109,7 @@ export function decideRules(
       (item) =>
         item.severity === SEVERITY.warn || isDegraded(state, item.ruleId),
     ),
+    note: undefined,
   };
 }
 
@@ -118,10 +127,11 @@ function applyRulesOutcome(
   }
 
   registerCleanCheck(state);
-  if (decision.warnings.length > 0) {
+  if (decision.warnings.length > 0 || decision.note !== undefined) {
     state.pendingWarnings.set(toolCallId, {
       path,
       violations: decision.warnings,
+      note: decision.note,
     });
   }
   return undefined;
@@ -130,38 +140,80 @@ function applyRulesOutcome(
 function extractMutation(
   event: ToolCallEvent,
   cwd: string,
-): ExtractedMutation | undefined {
+): ProposedChange | undefined {
   if (isToolCallEventType('write', event)) {
     return extractWrite(event.input.path, event.input.content, cwd);
   }
   if (isToolCallEventType('edit', event)) {
-    return extractEdit(event.input.path, event.input.edits);
+    return extractEdit(event.input.path, event.input.edits, cwd);
   }
   return undefined;
+}
+
+interface ProposedChange {
+  readonly path: string;
+  readonly language: ReturnType<typeof languageForPath>;
+  readonly lines: readonly AddedLine[];
+  readonly source: string | undefined;
+  readonly uncertain: boolean;
 }
 
 function extractWrite(
   path: string,
   content: string,
   cwd: string,
-): ExtractedMutation {
-  const previous = readFileIfExists(resolve(cwd, path));
+): ProposedChange {
+  const previous = readExisting(cwd, path);
   return {
     path,
     language: languageForPath(path),
     lines: addedLines(previous, content),
+    source: content,
+    uncertain: false,
   };
 }
 
 function extractEdit(
   path: string,
   edits: readonly { readonly oldText: string; readonly newText: string }[],
-): ExtractedMutation {
-  const lines: AddedLine[] = [];
-  for (const edit of edits) {
-    lines.push(...addedLines(edit.oldText, edit.newText));
+  cwd: string,
+): ProposedChange {
+  const previous = readExisting(cwd, path);
+  const proposed = previous === undefined
+    ? undefined
+    : applyEdits(previous, edits);
+  return {
+    path,
+    language: languageForPath(path),
+    lines: proposed === undefined
+      ? []
+      : addedLines(previous, proposed),
+    source: proposed,
+    uncertain: proposed === undefined,
+  };
+}
+
+function readExisting(cwd: string, path: string): string | undefined {
+  const absolute = resolveFileToolPath(cwd, path);
+  if (absolute === undefined) {
+    return undefined;
   }
-  return { path, language: languageForPath(path), lines };
+  return readFileIfExists(absolute);
+}
+
+function applyEdits(
+  source: string,
+  edits: readonly { readonly oldText: string; readonly newText: string }[],
+): string | undefined {
+  let next = source;
+  for (const edit of edits) {
+    const start = next.indexOf(edit.oldText);
+    if (start < 0 || next.indexOf(edit.oldText, start + edit.oldText.length) >= 0) {
+      return undefined;
+    }
+    next = `${next.slice(0, start)}${edit.newText}${next.slice(start + edit.oldText.length)}`;
+  }
+  return next;
 }
 
 function isDegraded(state: RulesState, ruleId: RuleId): boolean {

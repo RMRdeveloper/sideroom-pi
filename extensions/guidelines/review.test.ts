@@ -8,6 +8,7 @@ import { REVIEW_NOTE_EVENT } from '../shared/review-note.ts';
 import registerGuidelines from './index.ts';
 import {
   createReviewState,
+  formatCheckNote,
   markReviewSteered,
   pendingReviewSteer,
   REVIEW_NOTES_STEER,
@@ -130,6 +131,28 @@ function input(
 ): void {
   handlerOf(harness, 'input')({ source, streamingBehavior } as never);
 }
+
+test('names a passed check and an undetectable check, and stays quiet otherwise', () => {
+  assert.match(
+    formatCheckNote({
+      command: 'npm run check',
+      green: true,
+      outcome: 'passed',
+    }),
+    /npm run check.*passed after the latest successful file mutation/,
+  );
+  assert.match(formatCheckNote({
+    command: undefined,
+    green: false,
+    outcome: 'unknown',
+  }), /could not be detected/);
+  assert.equal(formatCheckNote(undefined), '');
+  assert.equal(formatCheckNote({
+    command: 'npm run check',
+    green: false,
+    outcome: 'failed',
+  }), '');
+});
 
 test('appends one hidden review and continues after a mutation settles', async () => {
   const harness = register();

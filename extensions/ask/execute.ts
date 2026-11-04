@@ -12,6 +12,7 @@ import { runAskUi } from './ui.ts';
 interface AskToolResult {
   readonly content: [{ readonly type: 'text'; readonly text: string }];
   readonly details: AskResult;
+  readonly isError?: boolean;
 }
 
 export async function executeAsk(
@@ -51,6 +52,7 @@ function cancelledResult(
 ): AskToolResult {
   return {
     content: [{ type: 'text', text: message }],
-    details: { questions, answers: [], cancelled: true },
+    details: { questions, answers: [], cancelled: true, reason: 'rejected' },
+    isError: true,
   };
 }

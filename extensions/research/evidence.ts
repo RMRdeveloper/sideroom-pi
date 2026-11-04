@@ -2,6 +2,8 @@ import { createResearchReader, type ResearchFileEvidence } from './reader.ts';
 
 const MAX_EVIDENCE_FILES = 200;
 
+export const UNFINISHED_VERIFICATION = 'Verification did not finish.';
+
 export interface ResearchEvidenceSnapshot {
   readonly files: readonly ResearchFileEvidence[];
   readonly changedDuringResearch: readonly string[];
@@ -51,11 +53,19 @@ export function createResearchEvidence(): ResearchEvidence {
 }
 
 export async function verifyResearchEvidence({ cwd, files, signal }: VerifyEvidenceOptions): Promise<readonly EvidenceCheck[]> {
+  signal?.throwIfAborted();
   const checks: EvidenceCheck[] = [];
   let observed: ResearchFileEvidence | undefined;
   const reader = await createResearchReader(cwd, { onRead: (file) => { observed = file; } });
   for (const file of files) {
-    signal?.throwIfAborted();
+    if (signal?.aborted === true) {
+      checks.push({
+        path: file.path,
+        status: 'unavailable',
+        error: UNFINISHED_VERIFICATION,
+      });
+      continue;
+    }
     observed = undefined;
     try {
       await reader.read(file.path, signal);

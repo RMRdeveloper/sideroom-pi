@@ -98,15 +98,24 @@ test('reports the failure class for a bad status', async () => {
   assert.equal(limited.failure, JEV_FAILURE.rateLimited);
 });
 
-test('treats an unusable body as no answer, not as a failure', async () => {
-  const attempt = await askJev(
+test('treats an unusable body as a failure, not as a review with no findings', async () => {
+  const nonsense = await askJev(
     transportReturning(200, 'nonsense'),
     'key',
     FILE,
     undefined,
   );
-  assert.equal(attempt.failure, undefined);
-  assert.deepEqual(attempt.findings, []);
+  assert.equal(nonsense.failure, JEV_FAILURE.transient);
+  assert.equal(nonsense.findings, undefined);
+
+  const missingAnswers = await askJev(
+    transportReturning(200, '{"model":"jev-test"}'),
+    'key',
+    FILE,
+    undefined,
+  );
+  assert.equal(missingAnswers.failure, JEV_FAILURE.transient);
+  assert.equal(missingAnswers.findings, undefined);
 });
 
 test('posts to the packaged endpoint with a bearer token', async () => {

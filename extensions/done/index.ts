@@ -4,9 +4,8 @@ import type {
 } from '@earendil-works/pi-coding-agent';
 import { startsUserTurn } from '../shared/settle.ts';
 import {
-  type CheckCommand,
-  detectCheckCommand,
-  hasTestSetup,
+  resolveCachedTestSetup,
+  resolveCheckCommand,
 } from './detect.ts';
 import {
   type ResolveCommand,
@@ -17,29 +16,12 @@ import { createDoneState, resetDoneRun } from './model.ts';
 
 export default function registerDone(pi: ExtensionAPI): void {
   const state = createDoneState();
-  const cache = new Map<string, CheckCommand | undefined>();
-  const testCache = new Map<string, boolean>();
   const resolveCommand: ResolveCommand = (
     ctx: Pick<ExtensionContext, 'cwd'>,
-  ) => {
-    if (cache.has(ctx.cwd)) {
-      return cache.get(ctx.cwd);
-    }
-    const command = detectCheckCommand(ctx.cwd);
-    cache.set(ctx.cwd, command);
-    return command;
-  };
+  ) => resolveCheckCommand(ctx.cwd);
   const resolveTestSetup: ResolveTestSetup = (
     ctx: Pick<ExtensionContext, 'cwd'>,
-  ) => {
-    const cached = testCache.get(ctx.cwd);
-    if (cached !== undefined) {
-      return cached;
-    }
-    const hasTests = hasTestSetup(ctx.cwd);
-    testCache.set(ctx.cwd, hasTests);
-    return hasTests;
-  };
+  ) => resolveCachedTestSetup(ctx.cwd);
 
   registerDoneGuard({ pi, state, resolveCommand, resolveTestSetup });
 

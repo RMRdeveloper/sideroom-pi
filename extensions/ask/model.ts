@@ -119,6 +119,7 @@ export interface AskResult {
   readonly questions: readonly AskQuestion[];
   readonly answers: readonly AskAnswer[];
   readonly cancelled: boolean;
+  readonly reason?: 'rejected';
 }
 
 export type RenderOption = QuestionOption & {

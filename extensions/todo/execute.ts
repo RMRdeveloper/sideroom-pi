@@ -18,6 +18,7 @@ export interface TodoToolDetails {
 export interface TodoToolResult {
   readonly content: [{ readonly type: 'text'; readonly text: string }];
   readonly details: TodoToolDetails;
+  readonly isError?: boolean;
 }
 
 export function executeTodo(
@@ -69,5 +70,6 @@ function errorResult(
   return {
     content: [{ type: 'text', text: error }],
     details: { action, items, error },
+    isError: true,
   };
 }

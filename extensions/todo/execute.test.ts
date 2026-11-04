@@ -15,9 +15,11 @@ function propose(items: readonly TodoItem[]): TodoParams {
 test('prepares propose only in the TUI, and update works headlessly', () => {
   const rejected = executeTodo(propose(initialItems), { mode: 'print' }, []);
   assert.equal(rejected.details.error, UI_UNAVAILABLE);
+  assert.equal(rejected.isError, true);
 
   const proposed = executeTodo(propose(initialItems), { mode: 'tui' }, []);
   assert.equal(proposed.details.error, undefined);
+  assert.equal(proposed.isError, undefined);
   assert.deepEqual(proposed.details.items, initialItems);
 
   const updated = executeTodo(

@@ -59,9 +59,11 @@ Single-session scope: if the effort is too big to hold in one session, say so an
 2. Run one `sideroom_ask` round on what remains genuinely open: terms first,
    then missing facts that could change a recommendation, then the architectural
    decisions. Minor decisions are yours; do not spend a round on them.
-3. After each round, write resolved terms to `CONTEXT.md` and qualifying
-   decisions to `docs/adr/`. Offer the ADR for an accepted architectural
-   decision only when all three gates pass.
+3. After each round, state what was settled in the conversation. Write
+   `CONTEXT.md` or an ADR only when the user asked to save it, or when
+   domain-modeling's own gates say to offer that file. Explaining a round does
+   not authorize writing. If there is no TUI, ask the open points in the
+   conversation instead of calling `sideroom_ask`.
 4. Repeat until no open term or hard decision remains, or the user cancels.
 5. Close by stating the settled glossary, the ADRs written (if any), and the
    suggested next step: a spec for anything non-trivial, implementation for
@@ -69,9 +71,9 @@ Single-session scope: if the effort is too big to hold in one session, say so an
 
 ## Output Contract
 
-The repo holds the shared vocabulary and the hard decisions; the
-conversation holds everything else. The user can re-read `CONTEXT.md` and
-the ADRs and find exactly what was agreed, nothing softened.
+The conversation holds what was settled. Write `CONTEXT.md` or an ADR only
+when saving was requested or offered and accepted. Do not soften an agreement
+when you do write it.
 
 ## References
 

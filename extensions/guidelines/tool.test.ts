@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   createExtensionRuntime,
@@ -74,7 +75,22 @@ function harness() {
   function blocked(path = 'new.ts', toolName = 'write') {
     return emit('tool_call', { toolName, input: { path } });
   }
-  return { tool: registered, handlers, emit, load, deliver, blocked };
+  function finishRead(path: string): void {
+    const text = readFileSync(path, 'utf8');
+    emit('tool_result', {
+      toolName: 'read',
+      toolCallId: 'read',
+      input: { path },
+      isError: false,
+    });
+    emit('tool_execution_end', {
+      toolName: 'read',
+      toolCallId: 'read',
+      isError: false,
+      result: { content: [{ type: 'text', text }] },
+    });
+  }
+  return { tool: registered, handlers, emit, load, deliver, blocked, finishRead };
 }
 
 test('registered tool authorizes only after complete delivery and reuses loaded guides', async () => {
@@ -100,21 +116,17 @@ test('unsupported target loads only the skill and can combine with read for a la
   gate.deliver(await gate.load('README.md'));
   assert.equal(gate.blocked('README.md'), undefined);
   assert.ok(gate.blocked());
-  gate.emit('tool_result', {
-    toolName: 'read',
-    input: { path: languageGuideFor('new.ts') },
-    isError: false,
-  });
+  const guide = languageGuideFor('new.ts');
+  assert.ok(guide);
+  gate.finishRead(guide);
   assert.equal(gate.blocked(), undefined);
 });
 
 test('read language loads can combine with a tool skill load', async () => {
   const gate = harness();
-  gate.emit('tool_result', {
-    toolName: 'read',
-    input: { path: languageGuideFor('new.ts') },
-    isError: false,
-  });
+  const guide = languageGuideFor('new.ts');
+  assert.ok(guide);
+  gate.finishRead(guide);
   assert.ok(gate.blocked());
   gate.deliver(await gate.load('README.md'));
   assert.equal(gate.blocked(), undefined);
@@ -260,11 +272,69 @@ for (const reset of [
 
 test('full reads still load the skill when the new tool is unused', () => {
   const gate = harness();
+  gate.finishRead(GUIDELINE_SKILL_PATH);
+  assert.equal(gate.blocked('README.md'), undefined);
+});
+
+test('a read result does not authorize until its final delivery matches the file', async () => {
+  const gate = harness();
+  const path = GUIDELINE_SKILL_PATH;
   gate.emit('tool_result', {
     toolName: 'read',
-    input: { path: GUIDELINE_SKILL_PATH },
+    toolCallId: 'read',
+    input: { path },
+    isError: false,
+    content: [{ type: 'text', text: readFileSync(path, 'utf8') }],
+  });
+  assert.ok(gate.blocked('README.md'), 'tool_result alone cannot authorize');
+
+  const laterHandler = (): ToolResultEventResult => ({ isError: true });
+  gate.handlers.set('tool_result', [
+    ...(gate.handlers.get('tool_result') ?? []),
+    laterHandler,
+  ]);
+  const runner = new ExtensionRunner(
+    [{ path: 'guidelines-read', handlers: gate.handlers } as unknown as Extension],
+    createExtensionRuntime(),
+    '/target-project',
+    SessionManager.inMemory(),
+    {} as ModelRegistry,
+  );
+  const finalResult = await runner.emitToolResult({
+    type: 'tool_result',
+    toolName: 'read',
+    toolCallId: 'transformed',
+    input: { path },
+    isError: false,
+    content: [{ type: 'text', text: readFileSync(path, 'utf8') }],
+    details: undefined,
+  });
+  await runner.emit({
+    type: 'tool_execution_end',
+    toolName: 'read',
+    toolCallId: 'transformed',
+    isError: finalResult?.isError ?? false,
+    result: finalResult,
+  });
+  assert.ok(gate.blocked('README.md'), 'a later error cannot authorize');
+
+  gate.emit('tool_result', {
+    toolName: 'read',
+    toolCallId: 'nested',
+    parentToolCallId: 'outer',
+    input: { path },
     isError: false,
   });
+  gate.emit('tool_execution_end', {
+    toolName: 'read',
+    toolCallId: 'nested',
+    parentToolCallId: 'outer',
+    isError: false,
+    result: { content: [{ type: 'text', text: readFileSync(path, 'utf8') }] },
+  });
+  assert.ok(gate.blocked('README.md'), 'a nested read cannot authorize');
+
+  gate.finishRead(path);
   assert.equal(gate.blocked('README.md'), undefined);
 });
 

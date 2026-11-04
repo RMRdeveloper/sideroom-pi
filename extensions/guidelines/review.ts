@@ -1,9 +1,17 @@
+import { readFileSync } from 'node:fs';
 import {
   type ExtensionAPI,
   isEditToolResult,
+  isToolCallEventType,
   isWriteToolResult,
 } from '@earendil-works/pi-coding-agent';
-import { readCheckStatus } from '../shared/check-status.ts';
+import { resolveFileToolPath } from '../shared/file-path.ts';
+import { isMissingFile } from '../shared/read-file.ts';
+import {
+  CHECK_OUTCOME,
+  type CheckStatus,
+  readCheckStatus,
+} from '../shared/check-status.ts';
 import { isReviewNote, REVIEW_NOTE_EVENT } from '../shared/review-note.ts';
 import {
   registerSettleGuard,
@@ -82,6 +90,21 @@ function withNotes(lead: string, notes: readonly string[]): string {
   return [lead, ...notes].join('\n\n');
 }
 
+function sameAsExistingFile(cwd: string, path: string, content: string): boolean {
+  const absolute = resolveFileToolPath(cwd, path);
+  if (absolute === undefined) {
+    return false;
+  }
+  try {
+    return readFileSync(absolute, 'utf8') === content;
+  } catch (error) {
+    if (isMissingFile(error)) {
+      return false;
+    }
+    throw error;
+  }
+}
+
 export function registerReviewGuard(
   pi: ExtensionAPI,
   state: ReviewState,
@@ -93,11 +116,27 @@ export function registerReviewGuard(
     resetReviewTurn(state);
   });
 
+  const identicalWrites = new Set<string>();
+
+  pi.on('tool_call', (event, ctx) => {
+    if (
+      ctx === undefined ||
+      !isToolCallEventType('write', event) ||
+      !sameAsExistingFile(ctx.cwd, event.input.path, event.input.content)
+    ) {
+      return;
+    }
+    identicalWrites.add(event.toolCallId);
+  });
+
   pi.on('tool_result', (event) => {
     if (event.isError) {
       return;
     }
     if (!isEditToolResult(event) && !isWriteToolResult(event)) {
+      return;
+    }
+    if (identicalWrites.delete(event.toolCallId)) {
       return;
     }
     state.mutated = true;
@@ -119,14 +158,21 @@ export function registerReviewGuard(
       }
       markReviewSteered(state);
       const check = readCheckStatus(pi, ctx);
-      const checkNote = check?.green
-        ? `\n\nThe detected project check \`${check.command}\` passed after the latest successful file mutation in this user turn. Reuse that result if this review changes no files; rerun it after any further mutation.`
-        : '';
       return withHiddenSteer({
         event,
         customType: REVIEW_STEER_TYPE,
-        content: steer + checkNote,
+        content: steer + formatCheckNote(check),
       });
     },
   });
+}
+
+export function formatCheckNote(check: CheckStatus | undefined): string {
+  if (check?.green === true && check.command !== undefined) {
+    return `\n\nThe detected project check \`${check.command}\` passed after the latest successful file mutation in this user turn. Reuse that result if this review changes no files; rerun it after any further mutation.`;
+  }
+  if (check?.outcome === CHECK_OUTCOME.unknown) {
+    return '\n\nThe project check could not be detected, so this review has no pass to reuse. Run the project check yourself if you can tell which command it is.';
+  }
+  return '';
 }

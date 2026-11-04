@@ -1,5 +1,8 @@
+import { CHECK_OUTCOME, type CheckOutcome } from '../shared/check-status.ts';
+
 export interface DoneState {
   checksGreen: boolean;
+  checkOutcome: CheckOutcome;
   mutatedSource: boolean;
   mutatedTest: boolean;
   noticedMissingTest: boolean;
@@ -17,6 +20,7 @@ const SOURCE_FILE = /\.(?:[cm]?js|jsx|ts|tsx|go|java|php|py|rs)$/i;
 export function createDoneState(): DoneState {
   return {
     checksGreen: false,
+    checkOutcome: CHECK_OUTCOME.notRun,
     mutatedSource: false,
     mutatedTest: false,
     noticedMissingTest: false,
@@ -25,6 +29,7 @@ export function createDoneState(): DoneState {
 
 export function resetDoneRun(state: DoneState): void {
   state.checksGreen = false;
+  state.checkOutcome = CHECK_OUTCOME.notRun;
   state.mutatedSource = false;
   state.mutatedTest = false;
   state.noticedMissingTest = false;

@@ -4,7 +4,11 @@ export const RESEARCH_RESULT_MESSAGE = 'sideroom-research-result';
 const RETRY_MS = 5_000;
 
 type ResearchMessage = { customType: typeof RESEARCH_RESULT_MESSAGE; content: string; display: boolean; details: { id: string; outcome?: unknown; usage?: unknown; error?: string } };
-type PendingDelivery = { message: ResearchMessage; ctx: Pick<ExtensionToolContext, 'isIdle'> };
+type PendingDelivery = {
+  message: ResearchMessage;
+  ctx: Pick<ExtensionToolContext, 'isIdle'>;
+  wake?: boolean;
+};
 
 export function createResearchDelivery(pi: Pick<ExtensionAPI, 'sendMessage'>) {
   const pending: PendingDelivery[] = [];
@@ -37,7 +41,10 @@ export function createResearchDelivery(pi: Pick<ExtensionAPI, 'sendMessage'>) {
     }
     sent = true;
     try {
-      pi.sendMessage(current.message, { triggerTurn: true, deliverAs: 'steer' });
+      pi.sendMessage(current.message, {
+        triggerTurn: current.wake !== false || !current.ctx.isIdle(),
+        deliverAs: 'steer',
+      });
     } catch (error) {
       sent = false;
       console.error('Research delivery failed; it will be retried in this session.', error);
