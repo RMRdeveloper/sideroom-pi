@@ -1,11 +1,9 @@
 import type { Agent, AgentEvent, AgentMessage } from '@earendil-works/pi-agent-core';
 import type { ResearchReport, ResearchRequest } from './model.ts';
 import { CONTEXT_FINALIZATION, shouldFinishResearch } from './context.ts';
-import { MAX_RESEARCH_OUTPUT_BYTES } from './limits.ts';
+import { MAX_RESEARCH_OUTPUT_BYTES, MAX_RESEARCH_TIMEOUT_MS } from './limits.ts';
 import { buildPartialReport } from './partial.ts';
 import { readLatestPartialReport, readResearchReport } from './report.ts';
-
-const DEFAULT_TIMEOUT_MS = 120_000;
 
 type ResearchAgent = Pick<Agent, 'prompt' | 'abort' | 'subscribe' | 'state'>;
 
@@ -40,13 +38,13 @@ export async function runResearch({
   agent,
   request,
   signal,
-  timeoutMs = DEFAULT_TIMEOUT_MS,
+  timeoutMs = MAX_RESEARCH_TIMEOUT_MS,
   maxOutputBytes = MAX_RESEARCH_OUTPUT_BYTES,
   unreadPaths,
   contextWindow = 0,
 }: RunOptions): Promise<ResearchRun> {
-  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > DEFAULT_TIMEOUT_MS) {
-    throw new Error('Research time must be between 1 and 120000 milliseconds.');
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > MAX_RESEARCH_TIMEOUT_MS) {
+    throw new Error(`Research time must be between 1 and ${String(MAX_RESEARCH_TIMEOUT_MS)} milliseconds.`);
   }
   if (!Number.isSafeInteger(maxOutputBytes) || maxOutputBytes < 1_024 || maxOutputBytes > MAX_RESEARCH_OUTPUT_BYTES) {
     throw new Error(`Research output must be between 1024 and ${String(MAX_RESEARCH_OUTPUT_BYTES)} bytes.`);

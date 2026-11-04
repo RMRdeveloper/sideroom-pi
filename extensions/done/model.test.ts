@@ -71,6 +71,7 @@ test('keeps the missing-test notice type stable for the settle supplement', () =
 test('starts and resets every observation as unset', () => {
   assert.deepEqual(createDoneState(), {
     checksGreen: false,
+    checkOutcome: 'not-run',
     mutatedSource: false,
     mutatedTest: false,
     noticedMissingTest: false,
@@ -78,6 +79,7 @@ test('starts and resets every observation as unset', () => {
 
   const state: DoneState = {
     checksGreen: true,
+    checkOutcome: 'passed',
     mutatedSource: true,
     mutatedTest: true,
     noticedMissingTest: true,

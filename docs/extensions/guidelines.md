@@ -19,7 +19,9 @@ The tool requires Pi 1.2.0 or later and uses `model-only` exposure: nested
 callers cannot load documents and discard them before the agent sees them.
 The guard records a load only on a successful `tool_execution_end` whose text
 exactly matches every document returned by that execution, after all
-`tool_result` handlers finish. Failed, cancelled, changed,
+`tool_execution_end`. A direct `read` counts only after that same final
+delivery: canonical path, complete file text, no nested caller, and no error or
+truncation. A `tool_result` alone does not authorize. Failed, cancelled, changed,
 or partial results do not authorize any document from that call. An in-memory
 receipt is consumed on delivery and discarded on reset; no state is written to
 the target repository. Full packaged `read` calls remain supported and can be
@@ -82,8 +84,9 @@ against the loaded language guide. It fixes demonstrated violations caused by
 the change, preserves required behavior, and avoids unrelated refactors. The
 agent reuses successful relevant checks performed after the latest mutation
 and runs only missing, failed or stale checks. The done observer shares its actual
-green status and detected command through `sideroom:check-status`; after a
-corrective edit, earlier checks are stale again. Done never forces a continuation
+green status, detected command, and outcome through `sideroom:check-status`.
+Only a green result is a pass to reuse. An unknown detection is not a pass.
+After a corrective edit, earlier checks are stale again. Done never forces a continuation
 to run checks. If the
 guide has left context, the steer asks for a fresh full read.
 
@@ -134,7 +137,7 @@ the review collects them for the current turn.
 - Notes that arrive after the review fired, because the review's own fixes drew
   new ones, get one follow-up steer per turn. A second batch in the same turn is
   held, so a fix that draws new notes cannot keep the run going.
-- A note alone never starts a review; it needs a successful mutation first.
+- A note alone can start one evidence-based review of the questionnaire or task. It does not start a code review or require checks unless the code changed.
 - A follow-up that yields to an abort, an error, or a pending user message keeps
   its notes for the next boundary. An idle user prompt drops them with the rest
   of the turn state. Malformed payloads are ignored.

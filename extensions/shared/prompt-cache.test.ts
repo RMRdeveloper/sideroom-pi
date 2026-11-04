@@ -15,6 +15,7 @@ import registerJev from '../jev/index.ts';
 import registerModifiedFiles from '../modified-files/index.ts';
 import registerMonorepoSkills from '../monorepo-skills/index.ts';
 import registerPersona from '../persona/index.ts';
+import registerResearch from '../research/index.ts';
 import registerRules from '../rules/index.ts';
 import registerTodo from '../todo/index.ts';
 import type { TodoItem, TodoParams } from '../todo/model.ts';
@@ -33,6 +34,7 @@ const EXTENSIONS: readonly ExtensionEntry[] = [
   ['modified-files', registerModifiedFiles],
   ['monorepo-skills', registerMonorepoSkills],
   ['persona', registerPersona],
+  ['research', registerResearch],
   ['rules', registerRules],
   ['todo', registerTodo],
   ['visual-context', registerVisualContext],

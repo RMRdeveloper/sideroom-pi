@@ -132,8 +132,8 @@ test('does not start when already cancelled and validates the time limit', async
   assert.equal((await runResearch({ agent: fake.agent, request, signal: controller.signal })).status, 'cancelled');
   assert.equal(fake.aborts(), 0);
   assert.equal(fake.unsubscribes(), 0);
-  for (const timeoutMs of [0, -1, 120_001, Number.NaN]) {
-    await assert.rejects(runResearch({ agent: fake.agent, request, timeoutMs }), /between 1 and 120000/u);
+  for (const timeoutMs of [0, -1, 1_800_001, Number.NaN]) {
+    await assert.rejects(runResearch({ agent: fake.agent, request, timeoutMs }), /between 1 and 1800000/u);
   }
   await assert.rejects(runResearch({ agent: fake.agent, request, maxOutputBytes: 256_001 }), /between 1024 and 256000/u);
 });

@@ -67,10 +67,12 @@ const FUNCTION_PARAMS: readonly RegExp[] = [
 export function evaluateAddedLines(
   language: LanguageId,
   lines: readonly AddedLine[],
+  options: { readonly structural?: boolean } = {},
 ): RuleViolation[] {
   const violations: RuleViolation[] = [];
   const joined = lines.map((added) => added.text).join('\n');
   const code = maskNonCode(joined, language);
+  const includeStructural = options.structural !== false;
   const codeLines = code.split('\n');
   const usesBracedConditionals = supportsBracedConditionals(language);
   const usesExplicitAny = supportsExplicitAny(language);
@@ -78,7 +80,7 @@ export function evaluateAddedLines(
     ? maskNonCode(joined, language, { keepComments: true }).split('\n')
     : [];
 
-  if (usesBracedConditionals) {
+  if (includeStructural && usesBracedConditionals) {
     collectBracedConditionals(code, lines, violations);
   }
   if (usesExplicitAny) {
@@ -109,8 +111,158 @@ export function evaluateAddedLines(
     collectDebugArtifacts(codeLine, violations);
   }
 
-  collectErrorHandling(language, code, lines, violations);
+  if (includeStructural) {
+    collectErrorHandling(language, code, lines, violations);
+  }
   return dedupe(violations);
+}
+
+export function evaluateContextualChange(
+  language: LanguageId,
+  source: string,
+  added: readonly AddedLine[],
+): RuleViolation[] {
+  const addedLineNumbers = new Set(added.map((line) => line.line));
+  const masked = maskNonCode(source, language);
+  const commented = maskNonCode(source, language, { keepComments: true });
+  const commentLines = commented.split('\n');
+  const contextualAdded = added.map((line) => ({
+    line: line.line,
+    text: commentLines[line.line - 1] ?? '',
+  }));
+  return dedupe([
+    ...evaluateAddedLines(language, contextualAdded, { structural: false }),
+    ...structuralFindings(language, masked, addedLineNumbers),
+  ]);
+}
+
+function structuralFindings(
+  language: LanguageId,
+  code: string,
+  addedLineNumbers: ReadonlySet<number>,
+): RuleViolation[] {
+  const violations: RuleViolation[] = [];
+  if (supportsBracedConditionals(language)) {
+    collectContextualConditionals(code, addedLineNumbers, violations);
+  }
+  collectContextualSwallow(language, code, addedLineNumbers, violations);
+  return violations;
+}
+
+function collectContextualConditionals(
+  code: string,
+  addedLineNumbers: ReadonlySet<number>,
+  violations: RuleViolation[],
+): void {
+  const controlMatcher = new RegExp(CONTROL_HEADER.source, CONTROL_HEADER.flags);
+  for (const match of code.matchAll(controlMatcher)) {
+    const matchOffset = match.index ?? 0;
+    const openingOffset = code.indexOf('(', matchOffset);
+    if (openingOffset < 0) {
+      continue;
+    }
+    const closingOffset = closingParenthesisOffset(code, openingOffset);
+    if (closingOffset === undefined) {
+      continue;
+    }
+    const bodyOffset = nextCodeOffset(code, closingOffset + 1);
+    if (bodyOffset === undefined || code[bodyOffset] === '{') {
+      continue;
+    }
+    const line = addedLineInSpan(code, addedLineNumbers, matchOffset, bodyOffset);
+    if (line === undefined) {
+      continue;
+    }
+    violations.push(violation(
+      'braced-conditionals',
+      '[braced-conditionals] Wrap the conditional body in braces.',
+      line,
+    ));
+  }
+
+  const elseMatcher = new RegExp(ELSE_KEYWORD.source, ELSE_KEYWORD.flags);
+  for (const match of code.matchAll(elseMatcher)) {
+    const matchOffset = match.index ?? 0;
+    const bodyOffset = nextCodeOffset(code, matchOffset + match[0].length);
+    if (bodyOffset === undefined || code[bodyOffset] === '{' || startsWithWord(code, bodyOffset, 'if')) {
+      continue;
+    }
+    const line = addedLineInSpan(code, addedLineNumbers, matchOffset, bodyOffset);
+    if (line === undefined) {
+      continue;
+    }
+    violations.push(violation(
+      'braced-conditionals',
+      '[braced-conditionals] Wrap the conditional body in braces.',
+      line,
+    ));
+  }
+}
+
+function collectContextualSwallow(
+  language: LanguageId,
+  code: string,
+  addedLineNumbers: ReadonlySet<number>,
+  violations: RuleViolation[],
+): void {
+  const patterns = swallowPatterns(language);
+  for (const pattern of patterns) {
+    const matcher = new RegExp(pattern.source, pattern.flags);
+    for (const match of code.matchAll(matcher)) {
+      const start = match.index ?? 0;
+      const line = addedLineInSpan(
+        code,
+        addedLineNumbers,
+        start,
+        start + match[0].length,
+      );
+      if (line === undefined) {
+        continue;
+      }
+      violations.push(violation(
+        'explicit-error-handling',
+        '[explicit-error-handling] Do not swallow errors; rethrow with context or let them propagate.',
+        line,
+      ));
+    }
+  }
+}
+
+function swallowPatterns(language: LanguageId): readonly RegExp[] {
+  if (language === LANGUAGE.python) {
+    return [PYTHON_SWALLOW, PYTHON_SWALLOW_BLOCK];
+  }
+  if (language === LANGUAGE.generic) {
+    return [];
+  }
+  return [EMPTY_CATCH, SWALLOW_RETURN];
+}
+
+function addedLineInSpan(
+  code: string,
+  addedLineNumbers: ReadonlySet<number>,
+  start: number,
+  end: number,
+): number | undefined {
+  const startLine = lineNumberAt(code, start);
+  const endLine = lineNumberAt(code, Math.max(start, end - 1));
+  for (let line = startLine; line <= endLine; line += 1) {
+    if (addedLineNumbers.has(line)) {
+      return line;
+    }
+  }
+  return undefined;
+}
+
+function lineNumberAt(code: string, offset: number): number {
+  let line = 1;
+  const limit = Math.min(offset, code.length);
+  for (let index = 0; index < limit; index += 1) {
+    if (code.charCodeAt(index) === 10) {
+      line += 1;
+    }
+  }
+  return line;
 }
 
 function violation(

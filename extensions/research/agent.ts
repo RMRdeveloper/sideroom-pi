@@ -17,7 +17,7 @@ const RESEARCH_INSTRUCTIONS = [
   'Give file references and identify missing evidence. Do not claim tests were run. Mark a question blocking when a decision or source is needed before the intended change; a blocking question requires a partial or blocked report.',
   'Trace relevant behavior to its consumers, seek contradictory evidence, and expand scope only when needed. Reuse the supplied findings unless incomplete or stale; do not invent alternatives when evidence already resolves the question.',
   'A search without results does not prove absence: state its scope. Web access is unavailable; identify needed external evidence as pending.',
-  'When calling tools, include an up-to-date partial report as a JSON text block when possible, so it can be recovered if the work stops.',
+  'When calling tools, include one up-to-date partial report as a single JSON object in a text block, with no introduction and no markdown fence, so it can be recovered if the work stops.',
   `End with one JSON object matching this schema, with no markdown: ${JSON.stringify(ResearchReportSchema)}`,
 ].join('\n');
 

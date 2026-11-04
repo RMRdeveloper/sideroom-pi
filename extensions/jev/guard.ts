@@ -6,7 +6,12 @@ import {
   isWriteToolResult,
   type ToolCallEvent,
 } from '@earendil-works/pi-coding-agent';
-import { commandMatches, detectCheckCommand } from '../done/detect.ts';
+import {
+  CHECK_RESOLUTION,
+  commandMatches,
+  resolveCheckCommand,
+} from '../done/detect.ts';
+import { CHECK_OUTCOME, readCheckStatus } from '../shared/check-status.ts';
 import {
   projectRelativePath,
   resolveFileToolPath,
@@ -62,6 +67,22 @@ export const JEV_STATUS = {
 } as const;
 
 export type JevStatus = (typeof JEV_STATUS)[keyof typeof JEV_STATUS];
+
+interface StartedCheck {
+  readonly cwd: string;
+  readonly version: number;
+}
+
+interface ObservedCheck {
+  readonly command: string;
+  readonly cwd: string;
+  readonly failed: boolean;
+  readonly toolCallId: string;
+  readonly startedChecks: Map<string, StartedCheck>;
+  readonly coverageVersions: Map<string, number>;
+  readonly evidence: WorkflowEvidence;
+  readonly invalidate: () => void;
+}
 
 interface MutationTarget {
   readonly absolutePath: string;
@@ -164,7 +185,26 @@ export function registerJevGuard(
     state.pending.clear();
   });
 
+  const startedChecks = new Map<string, StartedCheck>();
+  const coverageVersions = new Map<string, number>();
+
   pi.on('tool_call', (event, ctx) => {
+    if (isToolCallEventType('bash', event)) {
+      const resolved = resolveCheckCommand(ctx.cwd);
+      if (
+        resolved.kind === CHECK_RESOLUTION.detected &&
+        commandMatches(event.input.command, resolved.command)
+      ) {
+        startedChecks.set(event.toolCallId, {
+          cwd: ctx.cwd,
+          version: coverageVersions.get(ctx.cwd) ?? 0,
+        });
+      }
+      return undefined;
+    }
+    if (dependencies.apiKey() === undefined) {
+      return undefined;
+    }
     const mutation = extractMutation(event, ctx.cwd);
     if (mutation === undefined || !isReviewablePath(mutation.relativePath)) {
       return undefined;
@@ -179,6 +219,10 @@ export function registerJevGuard(
     if (!event.isError && pending !== undefined) {
       state.queue.invalidate(pending.relativePath);
       state.queue.invalidate('sideroom_todo');
+      coverageVersions.set(
+        ctx.cwd,
+        (coverageVersions.get(ctx.cwd) ?? 0) + 1,
+      );
     }
     const apiKey = dependencies.apiKey();
     if (
@@ -186,7 +230,11 @@ export function registerJevGuard(
       !shouldCallJev(state) ||
       ctx.signal?.aborted === true
     ) {
-      if (!event.isError && pending !== undefined && isWorthAsking(pending)) {
+      if (
+        !event.isError &&
+        (pending !== undefined && isWorthAsking(pending) ||
+          (apiKey === undefined && isReviewableToolPath(event, ctx.cwd)))
+      ) {
         dependencies.report(
           apiKey === undefined ? JEV_STATUS.noKey : guardStatus(state),
           ctx,
@@ -194,25 +242,20 @@ export function registerJevGuard(
       }
       return undefined;
     }
-    if (event.isError) {
-      if (
-        event.toolName === 'bash' &&
-        typeof event.input.command === 'string'
-      ) {
-        const check = detectCheckCommand(ctx.cwd);
-        if (check !== undefined && commandMatches(event.input.command, check)) {
-          state.evidence.checks = 'failed';
-          state.queue.invalidate('sideroom_todo');
-        }
-      }
+    if (event.toolName === 'bash' && typeof event.input.command === 'string') {
+      applyObservedCheck({
+        command: event.input.command,
+        cwd: ctx.cwd,
+        failed: event.isError,
+        toolCallId: event.toolCallId,
+        startedChecks,
+        coverageVersions,
+        evidence: state.evidence,
+        invalidate: () => state.queue.invalidate('sideroom_todo'),
+      });
       return undefined;
     }
-    if (event.toolName === 'bash' && typeof event.input.command === 'string') {
-      const check = detectCheckCommand(ctx.cwd);
-      if (check !== undefined && commandMatches(event.input.command, check)) {
-        state.evidence.checks = 'passed';
-        state.queue.invalidate('sideroom_todo');
-      }
+    if (event.isError) {
       return undefined;
     }
     let requestBody: JevRequestBody | undefined;
@@ -234,6 +277,11 @@ export function registerJevGuard(
       if (items === undefined) {
         return undefined;
       }
+      state.evidence.checks = sharedCheckEvidence(
+        pi,
+        ctx,
+        state.evidence.checks,
+      );
       requestBody = buildBoardReview({
         items,
         evidence: state.evidence,
@@ -358,6 +406,83 @@ function markNoted(
   for (const finding of findings) {
     state.notedThisTurn.add(findingKey(path, finding.ruleId));
   }
+}
+
+function isReviewableToolPath(
+  event: { readonly toolName: string; readonly input: Record<string, unknown> },
+  cwd: string,
+): boolean {
+  if (event.toolName !== MUTATION_KIND.write && event.toolName !== MUTATION_KIND.edit) {
+    return false;
+  }
+  if (typeof event.input.path !== 'string') {
+    return false;
+  }
+  const absolute = resolveFileToolPath(cwd, event.input.path);
+  if (absolute === undefined) {
+    return false;
+  }
+  const relative = projectRelativePath(cwd, absolute);
+  return relative !== undefined && isReviewablePath(relative);
+}
+
+function applyObservedCheck({
+  command,
+  cwd,
+  failed,
+  toolCallId,
+  startedChecks,
+  coverageVersions,
+  evidence,
+  invalidate,
+}: ObservedCheck): void {
+  const resolved = resolveCheckCommand(cwd);
+  if (
+    resolved.kind !== CHECK_RESOLUTION.detected ||
+    !commandMatches(command, resolved.command)
+  ) {
+    return;
+  }
+  const started = startedChecks.get(toolCallId);
+  startedChecks.delete(toolCallId);
+  if (failed) {
+    evidence.checks = 'failed';
+    invalidate();
+    return;
+  }
+  const version = coverageVersions.get(cwd) ?? 0;
+  if (
+    started !== undefined &&
+    started.cwd === cwd &&
+    started.version === version
+  ) {
+    evidence.checks = 'passed';
+    invalidate();
+  }
+}
+
+function sharedCheckEvidence(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  local: WorkflowEvidence['checks'],
+): WorkflowEvidence['checks'] {
+  const status = readCheckStatus(pi, ctx);
+  if (status === undefined) {
+    return local;
+  }
+  if (status.outcome === CHECK_OUTCOME.passed && status.green) {
+    return 'passed';
+  }
+  if (status.outcome === CHECK_OUTCOME.failed) {
+    return 'failed';
+  }
+  if (status.outcome === CHECK_OUTCOME.stale) {
+    return 'stale';
+  }
+  if (status.outcome === CHECK_OUTCOME.unknown) {
+    return 'unknown';
+  }
+  return local;
 }
 
 function registerFailure(state: JevGuardState, failure: JevFailure): void {

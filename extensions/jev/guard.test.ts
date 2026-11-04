@@ -600,6 +600,27 @@ test('workflow reviews share the missing-key, cancellation and quota policies', 
   });
 });
 
+test('does not treat another directory or extra arguments as the project check', async () => {
+  await withHarness(async (harness) => {
+    writeFileSync(
+      join(harness.cwd, 'package.json'),
+      '{"scripts":{"check":"true"}}',
+    );
+    await workflowResult(harness, {
+      toolName: 'bash',
+      input: { command: 'cd site && npm run check' },
+      details: {},
+    });
+    await workflowResult(harness, {
+      toolName: 'bash',
+      input: { command: 'npm run check -- --help' },
+      details: {},
+      isError: true,
+    });
+    assert.equal(harness.guardState.evidence.checks, 'unknown');
+  });
+});
+
 test('reviews completed tasks against bounded source and check status, excluding command output', async () => {
   await withHarness(async (harness) => {
     await writeFile(harness);

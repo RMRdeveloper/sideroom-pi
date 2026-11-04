@@ -370,7 +370,10 @@ JavaScript and TypeScript; put rationale in documentation rather than code comme
   including `model-only` tool exposure for guidelines.
 - `sideroom_done` observes detected check results and shares them with review;
   it never registers a settle guard or forces a continuation to run checks.
-  Later successful mutations clear green. Coverage notices for code-only changes
+  Green means the exact detected command in that working directory, started
+  after the latest observed mutation there. Extra arguments, another directory,
+  shell joins, and a detection error do not count as green and do not block
+  bash. Later successful mutations clear green. Coverage notices for code-only changes
   join an existing necessary settle continuation at most once per user turn;
   they never request a standalone response. State resets only on idle user input
   and `session_start`.

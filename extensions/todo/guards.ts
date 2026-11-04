@@ -55,7 +55,7 @@ export function registerGuardEvents(
         customType: REMINDER_TYPE,
         content:
           store.items.length === 0
-            ? 'This change has more than one step. Use sideroom_todo propose to show the plan, then update it at each task milestone, not after every tool call.'
+            ? 'If this work has more than one step, use sideroom_todo propose to show the plan, then update it at each task milestone, not after every tool call.'
             : 'Update sideroom_todo when a task changes status: mark the finished one and start the next in the same call. A tool that ran is not a status change.',
         display: false,
       },

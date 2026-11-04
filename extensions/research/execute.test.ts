@@ -60,6 +60,49 @@ test('automatically attaches evidence, usage and revision limitations', async ()
   }
 });
 
+test('verifies evidence after an internal timeout while the overall deadline remains', async () => {
+  const cwd = await mkdtemp(join(tmpdir(), 'sideroom-research-timeout-'));
+  try {
+    await writeFile(join(cwd, 'value.ts'), 'export const value = 42;\n');
+    let calls = 0;
+    const modelRegistry = {
+      streamSimple(_model: unknown, _context: unknown, options?: { signal?: AbortSignal }) {
+        calls += 1;
+        if (calls > 1) {
+          const pending = new Promise<void>((resolve) => {
+            options?.signal?.addEventListener('abort', () => resolve(), { once: true });
+          });
+          return {
+            async *[Symbol.asyncIterator]() {
+              yield* [];
+              await pending;
+            },
+            result: () => pending,
+          };
+        }
+        const message = {
+          role: 'assistant',
+          content: [{ type: 'toolCall', id: '1', name: 'research_read', arguments: { path: 'value.ts' } }],
+          api: 'test', provider: 'test', model: 'test',
+          usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+          stopReason: 'toolUse', timestamp: Date.now(),
+        };
+        return { async *[Symbol.asyncIterator]() { yield { type: 'done', message }; }, result: async () => message };
+      },
+    } as unknown as ExtensionContext['modelRegistry'];
+    const execution = await executeResearch({
+      ctx: { cwd, model, modelRegistry },
+      input: request,
+      environment: { SIDEROOM_RESEARCH_TIMEOUT_MS: '1000' },
+    });
+    assert.equal(execution.outcome.runStatus, 'timed_out');
+    assert.equal(execution.outcome.report.status, 'partial');
+    assert.deepEqual(execution.outcome.evidenceChecks, [{ path: 'value.ts', status: 'unchanged' }]);
+  } finally {
+    await rm(cwd, { force: true, recursive: true });
+  }
+});
+
 test('returns the report as partial if a read file changes before verification', async () => {
   const cwd = await mkdtemp(join(tmpdir(), 'sideroom-research-execute-'));
   try {

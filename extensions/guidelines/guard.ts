@@ -1,4 +1,4 @@
-import { realpathSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { isAbsolute, join, normalize, resolve } from 'node:path';
 import {
@@ -22,10 +22,19 @@ interface ReadInput {
   readonly limit?: number;
 }
 
+const MISSING_READ_ID = 'read';
+
+interface PendingRead {
+  readonly path: string;
+  readonly cwd: string;
+  readonly partial: boolean;
+}
+
 export interface GuidelineReadState {
   skillRead: boolean;
   readonly languageGuidesRead: Set<string>;
   readonly pendingLoads: Map<string, GuidelinesToolResult>;
+  readonly pendingReads: Map<string, PendingRead>;
 }
 
 export function createGuidelineReadState(): GuidelineReadState {
@@ -33,6 +42,7 @@ export function createGuidelineReadState(): GuidelineReadState {
     skillRead: false,
     languageGuidesRead: new Set(),
     pendingLoads: new Map(),
+    pendingReads: new Map(),
   };
 }
 
@@ -40,6 +50,7 @@ export function resetGuidelineReadState(state: GuidelineReadState): void {
   state.skillRead = false;
   state.languageGuidesRead.clear();
   state.pendingLoads.clear();
+  state.pendingReads.clear();
 }
 
 export function registerGuidelineGuard(
@@ -74,19 +85,38 @@ export function registerGuidelineGuard(
   });
 
   pi.on('tool_result', (event, ctx) => {
-    if (!isReadToolResult(event) || event.isError) {
+    if (!isReadToolResult(event)) {
       return;
     }
 
     const input = event.input as unknown as ReadInput;
+    state.pendingReads.set(event.toolCallId ?? MISSING_READ_ID, {
+      path: input.path,
+      cwd: ctx.cwd,
+      partial:
+        event.isError ||
+        input.offset !== undefined ||
+        input.limit !== undefined ||
+        event.details?.truncation?.truncated === true,
+    });
+  });
+
+  pi.on('tool_execution_end', (event) => {
+    if (event.toolName !== 'read') {
+      return;
+    }
+    const pending = state.pendingReads.get(event.toolCallId ?? MISSING_READ_ID);
+    state.pendingReads.delete(event.toolCallId ?? MISSING_READ_ID);
     if (
-      input.offset !== undefined ||
-      input.limit !== undefined ||
-      event.details?.truncation?.truncated === true
+      pending === undefined ||
+      pending.partial ||
+      event.isError ||
+      event.parentToolCallId !== undefined ||
+      !finalReadMatchesFile(event.result, pending.path, pending.cwd)
     ) {
       return;
     }
-    recordGuidelineRead(state, input.path, ctx.cwd);
+    recordGuidelineRead(state, pending.path, pending.cwd);
   });
 
   pi.on('tool_call', (event) => {
@@ -109,6 +139,52 @@ export function registerGuidelineGuard(
     }
     return { block: true, reason };
   });
+}
+
+function finalReadMatchesFile(
+  toolResult: unknown,
+  path: string,
+  cwd: string,
+): boolean {
+  const delivered = textFromResult(toolResult);
+  if (delivered === undefined) {
+    return false;
+  }
+  try {
+    return delivered === readFileSync(canonicalizePath(path, cwd), 'utf8');
+  } catch (error) {
+    if (!(error instanceof Error)) {
+      throw error;
+    }
+    return false;
+  }
+}
+
+function textFromResult(toolResult: unknown): string | undefined {
+  if (
+    typeof toolResult !== 'object' ||
+    toolResult === null ||
+    !('content' in toolResult) ||
+    !Array.isArray(toolResult.content) ||
+    toolResult.content.length === 0
+  ) {
+    return undefined;
+  }
+  const texts: string[] = [];
+  for (const part of toolResult.content) {
+    if (
+      typeof part !== 'object' ||
+      part === null ||
+      !('type' in part) ||
+      part.type !== 'text' ||
+      !('text' in part) ||
+      typeof part.text !== 'string'
+    ) {
+      return undefined;
+    }
+    texts.push(part.text);
+  }
+  return texts.join('');
 }
 
 export function recordGuidelineRead(

@@ -39,6 +39,8 @@ function context(
 test('fails closed outside the TUI instead of auto-accepting the recommendation', async () => {
   const result = await executeAsk(sampleParams, context('print'));
   assert.equal(result.details.cancelled, true);
+  assert.equal(result.details.reason, 'rejected');
+  assert.equal(result.isError, true);
   assert.equal(result.content[0]?.text, UI_UNAVAILABLE);
 });
 

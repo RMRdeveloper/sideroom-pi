@@ -99,7 +99,7 @@ const activeSubscriptions = (subscriptions: Subscription[]) => subscriptions.fil
 
 ### 7. Command Query Separation (CQS)
 
-RULE: A function either does something (side effect) or returns something (query) — never both. A "getter" must never mutate.
+RULE: A query must not mutate. A command may return the result of the operation it just performed. Do not split a public contract only to avoid returning that result. A getter must never mutate.
 
 ```ts
 // bad
@@ -107,6 +107,7 @@ function nextId(counter: Counter): number { counter.value++; return counter.valu
 // good
 function peekNextId(counter: Counter): number { return counter.value + 1; }
 function incrementCounter(counter: Counter): void { counter.value++; }
+function create(input: ValidatedUser): Promise<User> { const user = normalize(input); return repository.save(user); }
 ```
 
 ### 8. Null/undefined handling

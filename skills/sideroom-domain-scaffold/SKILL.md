@@ -1,6 +1,6 @@
 ---
 name: sideroom-domain-scaffold
-description: "Derive and merge a domain glossary in CONTEXT.md from existing business code. Use when asked to document domain vocabulary, explain business entities and relationships across a repository, or build or complete a brownfield glossary. Resolve terms from code and collect conflicts for later questions. Skip generic README or API documentation, a single naming conflict, and feature planning."
+description: "Derive and merge a domain glossary in CONTEXT.md from existing business code. Use when asked to document domain vocabulary or build or complete a brownfield glossary. Resolve terms from code and collect conflicts for later questions. Explaining entities does not authorize writing. Skip generic README or API documentation, a single naming conflict, and feature planning."
 license: MIT
 metadata:
   author: RMRdeveloper
